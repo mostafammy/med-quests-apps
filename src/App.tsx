@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Shell } from './ui/app/Shell.tsx';
 import { Dashboard } from './ui/features/dashboard/Dashboard.tsx';
+import { TestHub } from './ui/features/test/TestHub.tsx';
 import { QuickPractice } from './ui/features/test/QuickPractice.tsx';
 import { MockExamSetup } from './ui/features/test/MockExamSetup.tsx';
 import { SessionPlayer } from './ui/features/test/SessionPlayer.tsx';
@@ -27,7 +28,7 @@ export const App: React.FC = () => {
         {/* Standard Web App Shell */}
         <Route path="/" element={<Shell />}>
           <Route index element={<Dashboard />} />
-          <Route path="test" element={<QuickPractice />} />
+          <Route path="test" element={<TestHub />} />
           <Route path="test/quick" element={<QuickPractice />} />
           <Route path="test/mock" element={<MockExamSetup />} />
           <Route path="review" element={<ReviewHub />} />
