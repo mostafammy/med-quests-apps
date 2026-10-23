@@ -10,14 +10,20 @@ import { ReviewHub } from './ui/features/review/ReviewHub.tsx';
 import { CurriculumLibrary } from './ui/features/curriculum/CurriculumLibrary.tsx';
 import { QuestionStudio } from './ui/features/studio/QuestionStudio.tsx';
 import { useQuestionStore } from './application/stores/useQuestionStore.ts';
+import { useThemeStore } from './application/stores/useThemeStore.ts';
 
 export const App: React.FC = () => {
   const { loadQuestions } = useQuestionStore();
+  const { initTheme } = useThemeStore();
 
   useEffect(() => {
+    // Synchronize and initialize dynamic appearance listener
+    const cleanup = initTheme();
     // Initialise and load stored questions for active block (CVS)
     loadQuestions('cvs');
-  }, [loadQuestions]);
+
+    return () => cleanup?.();
+  }, [loadQuestions, initTheme]);
 
   return (
     <BrowserRouter>
