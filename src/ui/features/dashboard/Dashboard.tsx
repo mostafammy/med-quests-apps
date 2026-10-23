@@ -11,7 +11,10 @@ import {
   Award,
   BookOpen,
   Zap,
-  Clock
+  Clock,
+  TrendingUp,
+  Flame,
+  CheckCircle2
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
@@ -42,22 +45,28 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] py-8 px-4 sm:px-6 lg:px-8 space-y-8 animate-in fade-in duration-300">
-      {/* Top Banner: Glassmorphic Hub Card */}
-      <div className="p-6 md:p-8 rounded-3xl bg-white/65 dark:bg-zinc-900/65 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.06)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] space-y-6 transition-all">
+    <div className="relative min-h-[calc(100vh-4rem)] py-8 px-4 sm:px-6 lg:px-8 space-y-8 animate-apple-entrance">
+      {/* Top Banner: Rich Glassmorphic Hub Card with Vivid Chromatic Gradients */}
+      <div className="p-6 md:p-8 rounded-3xl glass-surface space-y-6 relative overflow-hidden">
+        {/* Subtle Ambient Color Splash */}
+        <div className="pointer-events-none absolute -right-16 -top-16 w-80 h-80 bg-gradient-to-br from-blue-500/20 via-indigo-500/15 to-purple-500/10 rounded-full blur-3xl -z-10" />
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
           <div className="space-y-1.5">
             <div className="flex items-center space-x-2">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-500/10 dark:bg-blue-400/10 px-2.5 py-0.5 rounded-full border border-blue-400/20 backdrop-blur-md">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-500/15 dark:bg-blue-400/15 px-2.5 py-0.5 rounded-full border border-blue-400/30 backdrop-blur-md">
                 Exam Preparation
               </span>
               <span className="text-xs text-slate-300 dark:text-zinc-600">•</span>
-              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center space-x-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center space-x-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
                 <span>Local-First IndexedDB Engine</span>
               </span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 dark:from-zinc-100 dark:via-zinc-200 dark:to-blue-200 bg-clip-text text-transparent">
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-400 dark:via-indigo-300 dark:to-purple-300 bg-clip-text text-transparent">
               CVS Block Mastery
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl leading-relaxed">
@@ -68,7 +77,7 @@ export const Dashboard: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={() => setShowResetConfirm(true)}
-              className="py-2.5 px-3.5 bg-white/50 dark:bg-zinc-800/50 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 dark:hover:text-rose-400 text-slate-600 dark:text-zinc-400 rounded-2xl text-xs font-bold flex items-center space-x-1.5 border border-white/80 dark:border-zinc-700/80 backdrop-blur-md shadow-xs transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
+              className="py-2.5 px-3.5 glass-pill-luxury text-slate-600 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-2xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer"
               title="Reset all test attempts and mastery statistics"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -76,14 +85,14 @@ export const Dashboard: React.FC = () => {
             </button>
             <button
               onClick={() => navigate('/test/quick')}
-              className="py-2.5 px-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl text-xs sm:text-sm font-bold flex items-center space-x-2 shadow-md shadow-blue-500/20 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
+              className="shimmer-active py-2.5 px-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl text-xs sm:text-sm font-bold flex items-center space-x-2 shadow-lg shadow-blue-500/25 transition-all duration-300 hover:-translate-y-1 hover:shadow-blue-500/40 cursor-pointer"
             >
-              <Play className="w-4 h-4 fill-current" />
+              <Play className="w-4 h-4 fill-current text-white" />
               <span>{totalAttempts > 0 ? 'Continue Practice' : 'Start Practice'}</span>
             </button>
             <button
               onClick={() => navigate('/test/mock')}
-              className="py-2.5 px-5 bg-slate-900/90 dark:bg-zinc-800/90 hover:bg-slate-800 dark:hover:bg-zinc-700 text-white rounded-2xl text-xs sm:text-sm font-bold border border-slate-700/60 dark:border-zinc-700 backdrop-blur-md shadow-md transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex items-center space-x-2"
+              className="py-2.5 px-5 bg-gradient-to-r from-slate-900 to-indigo-950 dark:from-zinc-800 dark:to-zinc-900 hover:from-slate-800 hover:to-indigo-900 text-white rounded-2xl text-xs sm:text-sm font-bold border border-indigo-500/30 dark:border-indigo-500/20 backdrop-blur-md shadow-md shadow-indigo-950/20 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl cursor-pointer flex items-center space-x-2"
             >
               <Clock className="w-4 h-4 text-amber-400" />
               <span>Start Exam (2h)</span>
@@ -91,11 +100,15 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* 5 Key Metric Cards (Grounded in Real IndexedDB Stats) */}
+        {/* 5 Key Metric Cards with Apple-Caliber Distinct Vivid Tinting */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5 pt-4 border-t border-slate-200/60 dark:border-zinc-800/60">
-          <div className="p-4 rounded-2xl bg-white/50 dark:bg-zinc-800/40 backdrop-blur-md border border-white/80 dark:border-zinc-700/60 shadow-xs transition-all duration-200 hover:-translate-y-0.5">
-            <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-bold uppercase tracking-wider">Overall Mastery</div>
-            <div className="text-2xl font-black text-slate-900 dark:text-zinc-50 mt-1">
+          {/* Overall Mastery - Emerald Tinted Glass */}
+          <div className="p-4 rounded-2xl glass-card-interactive bg-emerald-500/5 dark:bg-emerald-950/20 border-emerald-400/30 dark:border-emerald-700/40 hover:border-emerald-400/60 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-emerald-800 dark:text-emerald-300 font-bold uppercase tracking-wider">Overall Mastery</span>
+              <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="text-2xl font-black text-emerald-900 dark:text-emerald-200 mt-1">
               {masteryPercentage}%
             </div>
             <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
@@ -103,10 +116,14 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white/50 dark:bg-zinc-800/40 backdrop-blur-md border border-white/80 dark:border-zinc-700/60 shadow-xs transition-all duration-200 hover:-translate-y-0.5">
-            <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-bold uppercase tracking-wider">Active Bank</div>
-            <div className="text-2xl font-black text-slate-900 dark:text-zinc-50 mt-1">
-              {questions.length} <span className="text-xs font-normal text-slate-400">Qs</span>
+          {/* Active Bank - Sapphire Blue Tinted Glass */}
+          <div className="p-4 rounded-2xl glass-card-interactive bg-blue-500/5 dark:bg-blue-950/20 border-blue-400/30 dark:border-blue-700/40 hover:border-blue-400/60 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-blue-800 dark:text-blue-300 font-bold uppercase tracking-wider">Active Bank</span>
+              <BookOpen className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="text-2xl font-black text-blue-950 dark:text-blue-100 mt-1">
+              {questions.length} <span className="text-xs font-normal text-slate-400 dark:text-zinc-500">Qs</span>
             </div>
             <div className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold mt-1">
               <span onClick={() => navigate('/studio')} className="cursor-pointer hover:underline">
@@ -115,18 +132,26 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white/50 dark:bg-zinc-800/40 backdrop-blur-md border border-white/80 dark:border-zinc-700/60 shadow-xs transition-all duration-200 hover:-translate-y-0.5">
-            <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-bold uppercase tracking-wider">Attempts Logged</div>
-            <div className="text-2xl font-black text-slate-900 dark:text-zinc-50 mt-1">
+          {/* Attempts Logged - Royal Indigo Tinted Glass */}
+          <div className="p-4 rounded-2xl glass-card-interactive bg-indigo-500/5 dark:bg-indigo-950/20 border-indigo-400/30 dark:border-indigo-700/40 hover:border-indigo-400/60 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-indigo-800 dark:text-indigo-300 font-bold uppercase tracking-wider">Attempts Logged</span>
+              <CheckCircle2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div className="text-2xl font-black text-indigo-950 dark:text-indigo-100 mt-1">
               {totalAttempts}
             </div>
-            <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-semibold mt-1">
+            <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold mt-1">
               {totalAttempts > 0 ? `${overallAccuracy}% accuracy` : 'Awaiting 1st attempt'}
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white/50 dark:bg-zinc-800/40 backdrop-blur-md border border-white/80 dark:border-zinc-700/60 shadow-xs transition-all duration-200 hover:-translate-y-0.5">
-            <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-bold uppercase tracking-wider">Weak Areas</div>
+          {/* Weak Areas - Coral Rose Tinted Glass */}
+          <div className="p-4 rounded-2xl glass-card-interactive bg-rose-500/5 dark:bg-rose-950/20 border-rose-400/30 dark:border-rose-700/40 hover:border-rose-400/60 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-rose-800 dark:text-rose-300 font-bold uppercase tracking-wider">Weak Areas</span>
+              <Flame className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+            </div>
             <div className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
               {weakTopicsCount}
             </div>
@@ -137,8 +162,12 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white/50 dark:bg-zinc-800/40 backdrop-blur-md border border-white/80 dark:border-zinc-700/60 shadow-xs col-span-2 sm:col-span-1 transition-all duration-200 hover:-translate-y-0.5">
-            <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-bold uppercase tracking-wider">Due Reviews</div>
+          {/* Due Reviews - Amber Gold Tinted Glass */}
+          <div className="p-4 rounded-2xl glass-card-interactive bg-amber-500/5 dark:bg-amber-950/20 border-amber-400/30 dark:border-amber-700/40 hover:border-amber-400/60 col-span-2 sm:col-span-1 transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-amber-800 dark:text-amber-300 font-bold uppercase tracking-wider">Due Reviews</span>
+              <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            </div>
             <div className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">
               {dueReviewsCount}
             </div>
@@ -147,6 +176,43 @@ export const Dashboard: React.FC = () => {
                 Spaced repetition →
               </span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Dynamic Recommendation Banner: Electric Indigo to Cobalt Blue Gradient */}
+      <div className="relative rounded-3xl p-6 sm:p-8 text-white shadow-xl overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 border border-white/20">
+        <div className="absolute right-0 top-0 bottom-0 w-2/5 bg-gradient-to-l from-white/10 to-transparent pointer-events-none" />
+        <div className="absolute -left-10 -bottom-10 w-48 h-48 bg-pink-500/20 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="max-w-2xl space-y-4 relative z-10">
+          <div className="inline-flex items-center space-x-1.5 px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-extrabold tracking-wide uppercase border border-white/30 text-white">
+            <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+            <span>Recommended Next Action</span>
+          </div>
+
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
+            {totalAttempts === 0
+              ? 'Start Your 15-Question Baseline Practice Drill'
+              : weakTopicsCount > 0
+              ? 'Target Your Identified Weak Topics'
+              : 'Take a Timed 50-Question CVS Mock Examination'}
+          </h2>
+
+          <p className="text-xs sm:text-sm text-blue-100 leading-relaxed max-w-xl">
+            {totalAttempts === 0
+              ? 'Your stats are clean. Complete a quick practice set with spatial keys (1–4) to calibrate your topic mastery.'
+              : `You have completed ${totalAttempts} total attempts with an overall accuracy of ${overallAccuracy}%. Continue drilling to maintain exam readiness.`}
+          </p>
+
+          <div className="pt-2">
+            <button
+              onClick={() => navigate('/test/quick')}
+              className="py-3 px-6 bg-white text-indigo-700 hover:bg-blue-50 font-extrabold rounded-2xl text-sm flex items-center space-x-2 shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer"
+            >
+              <span>{totalAttempts === 0 ? 'Start Diagnostic Practice' : 'Continue Practice'}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>
@@ -160,47 +226,47 @@ export const Dashboard: React.FC = () => {
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Quick Practice Card */}
+            {/* Quick Practice Card - Vibrant Blue/Indigo Glow */}
             <div 
               onClick={() => navigate('/test/quick')}
-              className="p-6 rounded-3xl bg-white/60 dark:bg-zinc-900/60 hover:bg-white/80 dark:hover:bg-zinc-900/80 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.3)] transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer group space-y-4"
+              className="p-6 rounded-3xl glass-card-interactive cursor-pointer group space-y-4 bg-gradient-to-b from-blue-500/10 via-white/50 to-white/70 dark:from-blue-950/30 dark:via-zinc-900/60 dark:to-zinc-900/80 border-blue-400/30 dark:border-blue-800/40"
             >
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-500/20 to-blue-400/10 border border-blue-400/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-inner group-hover:scale-105 transition-all">
-                <Zap className="w-6 h-6 fill-blue-500/20" />
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/30 group-hover:scale-110 group-hover:rotate-2 transition-all duration-300">
+                <Zap className="w-6 h-6 fill-white text-white group-hover:scale-110 transition-transform" />
               </div>
               <div>
                 <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-lg flex items-center justify-between">
                   <span>Quick Practice</span>
-                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:translate-x-1.5 transition-all duration-300" />
                 </h3>
                 <p className="text-xs text-slate-600 dark:text-zinc-400 mt-1 leading-relaxed">
                   Zero-friction keyboard answering (`1`–`4`) with immediate explanation and lecture slide citation.
                 </p>
               </div>
               <div className="flex items-center space-x-2 text-[11px] font-bold text-blue-600 dark:text-blue-400">
-                <Sparkles className="w-3.5 h-3.5" />
+                <Sparkles className="w-3.5 h-3.5 animate-pulse" />
                 <span>Instant Feedback • No setup screens</span>
               </div>
             </div>
 
-            {/* Mock Exam Card */}
+            {/* Mock Exam Card - Vibrant Purple/Indigo Glow */}
             <div 
               onClick={() => navigate('/test/mock')}
-              className="p-6 rounded-3xl bg-white/60 dark:bg-zinc-900/60 hover:bg-white/80 dark:hover:bg-zinc-900/80 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.3)] transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer group space-y-4"
+              className="p-6 rounded-3xl glass-card-interactive cursor-pointer group space-y-4 bg-gradient-to-b from-purple-500/10 via-white/50 to-white/70 dark:from-purple-950/30 dark:via-zinc-900/60 dark:to-zinc-900/80 border-purple-400/30 dark:border-purple-800/40"
             >
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500/20 to-indigo-400/10 border border-indigo-400/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-inner group-hover:scale-105 transition-all">
-                <Award className="w-6 h-6" />
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-purple-500/30 group-hover:scale-110 group-hover:rotate-2 transition-all duration-300">
+                <Award className="w-6 h-6 text-amber-300 group-hover:scale-110 transition-transform" />
               </div>
               <div>
                 <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-lg flex items-center justify-between">
                   <span>Faculty Mock Exam</span>
-                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 group-hover:translate-x-1.5 transition-all duration-300" />
                 </h3>
                 <p className="text-xs text-slate-600 dark:text-zinc-400 mt-1 leading-relaxed">
                   Standardized 50-question / 120-minute simulation with blind scoring matching university conditions.
                 </p>
               </div>
-              <div className="flex items-center space-x-2 text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
+              <div className="flex items-center space-x-2 text-[11px] font-bold text-purple-600 dark:text-purple-400">
                 <Clock className="w-3.5 h-3.5" />
                 <span>50 Qs • 2 Hours • Score calibration</span>
               </div>
@@ -214,10 +280,10 @@ export const Dashboard: React.FC = () => {
             Curriculum Grounding
           </h2>
 
-          <div className="p-6 rounded-3xl bg-white/65 dark:bg-zinc-900/65 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.06)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] space-y-4">
+          <div className="p-6 rounded-3xl glass-surface space-y-4">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-2xl bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                <BookOpen className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+                <BookOpen className="w-5 h-5 text-white" />
               </div>
               <div>
                 <h3 className="font-bold text-slate-900 dark:text-zinc-100 text-sm">Faculty Handouts</h3>
@@ -231,11 +297,89 @@ export const Dashboard: React.FC = () => {
 
             <button
               onClick={() => navigate('/curriculum')}
-              className="w-full py-2.5 px-4 rounded-2xl bg-white/60 dark:bg-zinc-800/60 hover:bg-white/80 dark:hover:bg-zinc-800 border border-white/80 dark:border-zinc-700/80 text-xs font-bold text-slate-800 dark:text-zinc-200 transition-all duration-200 hover:-translate-y-0.5 flex items-center justify-between cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-2xl glass-card-interactive text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
             >
               <span>Explore Curriculum Library</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+              <ArrowRight className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Section: Exam Readiness Subject Cards with Vibrant Subject Identity */}
+      <div className="space-y-4">
+        <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-zinc-400 px-1">
+          CVS Subject Curriculum
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Anatomy Card - Royal Blue Glow */}
+          <div className="p-6 rounded-3xl glass-card-interactive space-y-3 border-blue-400/25 dark:border-blue-700/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50" />
+                <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-sm">Anatomy & Embryology</h3>
+              </div>
+              <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md">3 Chapters</span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
+              Heart chambers, valves, coronaries, pericardium, cardiac looping, atrial & ventricular septation.
+            </p>
+            <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-100 dark:border-zinc-800">
+              <span className="font-bold text-slate-700 dark:text-zinc-300">58 Questions</span>
+              <button
+                onClick={() => navigate('/test?subject=cvs-anatomy')}
+                className="text-blue-600 dark:text-blue-400 font-bold hover:underline cursor-pointer flex items-center space-x-1"
+              >
+                <span>Practice →</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Histology Card - Violet / Purple Glow */}
+          <div className="p-6 rounded-3xl glass-card-interactive space-y-3 border-purple-400/25 dark:border-purple-700/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shadow-sm shadow-purple-500/50" />
+                <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-sm">CVS Histology</h3>
+              </div>
+              <span className="text-[11px] font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-md">2 Chapters</span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
+              Heart wall layers, intercalated discs, Purkinje fibers, elastic/muscular arteries, and capillary beds.
+            </p>
+            <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-100 dark:border-zinc-800">
+              <span className="font-bold text-slate-700 dark:text-zinc-300">26 Questions</span>
+              <button
+                onClick={() => navigate('/test?subject=cvs-histology')}
+                className="text-purple-600 dark:text-purple-400 font-bold hover:underline cursor-pointer flex items-center space-x-1"
+              >
+                <span>Practice →</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Microbiology Card - Emerald Green Glow */}
+          <div className="p-6 rounded-3xl glass-card-interactive space-y-3 border-emerald-400/25 dark:border-emerald-700/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" />
+                <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-sm">CVS Microbiology</h3>
+              </div>
+              <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">3 Chapters</span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
+              Rheumatic fever (JONES criteria & M protein mimicry), infective endocarditis, and viral myocarditis.
+            </p>
+            <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-100 dark:border-zinc-800">
+              <span className="font-bold text-slate-700 dark:text-zinc-300">24 Questions</span>
+              <button
+                onClick={() => navigate('/test?subject=cvs-microbiology')}
+                className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer flex items-center space-x-1"
+              >
+                <span>Practice →</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
