@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 import { Question, ChoiceId } from '../../../domain/model/types.ts';
+import { db } from '../../../infrastructure/storage/db.ts';
+import { PostTestReport } from './PostTestReport.tsx';
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -118,7 +120,23 @@ export const SessionPlayer: React.FC = () => {
     setBookmarks((prev) => ({ ...prev, [currentQ.id]: !prev[currentQ.id] }));
   }, [currentQ]);
 
-  const handleSubmitExam = () => {
+  const handleSubmitExam = async () => {
+    // Record attempts in IndexedDB
+    const records = Object.entries(answers).map(([qId, ans]) => ({
+      id: `att-${Date.now()}-${qId}`,
+      questionId: qId,
+      blockId: 'cvs',
+      sessionId: `sess-${Date.now()}`,
+      mode,
+      selectedChoiceId: ans.choiceId,
+      isCorrect: ans.isCorrect,
+      confidence: 'unsure' as const,
+      responseTimeMs: 30000,
+      answeredAt: new Date().toISOString(),
+    }));
+    if (records.length > 0) {
+      await db.attempts.bulkPut(records);
+    }
     setIsSubmitted(true);
   };
 
@@ -162,6 +180,27 @@ export const SessionPlayer: React.FC = () => {
         >
           Open Question Studio
         </button>
+      </div>
+    );
+  }
+
+  if (isSubmitted) {
+    return (
+      <div className="min-h-screen bg-slate-50 py-4">
+        <PostTestReport
+          result={{
+            sessionQuestions,
+            answers,
+            timeSpentSeconds: (sessionConfig.timeLimitMinutes || 120) * 60 - timeLeftSeconds,
+            mode,
+          }}
+          onRetestMistakes={(mistakes) => {
+            setSessionQuestions(mistakes);
+            setCurrentIndex(0);
+            setAnswers({});
+            setIsSubmitted(false);
+          }}
+        />
       </div>
     );
   }
@@ -236,10 +275,19 @@ export const SessionPlayer: React.FC = () => {
             <Bookmark className={`w-4 h-4 ${bookmarks[currentQ.id] ? 'fill-current' : ''}`} />
           </button>
 
+          {Object.keys(answers).length > 0 && !isExamMode && (
+            <button
+              onClick={handleSubmitExam}
+              className="py-1.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+            >
+              Finish & View Report
+            </button>
+          )}
+
           {isExamMode && (
             <button
               onClick={handleSubmitExam}
-              className="py-1.5 px-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
+              className="py-1.5 px-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
             >
               Submit Exam
             </button>

@@ -4,8 +4,8 @@ node_modules/
 .pnp.js
 
 # Production build output
-dist/
-build/
+/dist/
+/build/
 
 # Operating System & IDE junk
 .DS_Store

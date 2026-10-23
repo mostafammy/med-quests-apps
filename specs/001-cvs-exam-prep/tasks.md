@@ -54,10 +54,10 @@
 
 ---
 
-## Phase 7: Next Phase — Post-Test Report & Comprehensive Bank Population (In Progress)
-- [ ] T027 [P] [US1/US2] Build Post-Test Exam Report view (`src/ui/features/test/PostTestReport.tsx`) with score %, calibration, and curriculum review plan
-- [ ] T028 [US1/US2] Implement "Retest Mistakes" action looping back to Session Player with missed questions
-- [ ] T029 [P] Author and validate 25 high-yield questions for CVS Anatomy (Chambers, Valves, Coronaries) in `bank.v1.json`
-- [ ] T030 [P] Author and validate 25 high-yield questions for Cardiac Embryology (Looping, Septation, Anomalies) in `bank.v1.json`
-- [ ] T031 [P] Author and validate 20 high-yield questions for Blood Vessel Histology & Capillaries in `bank.v1.json`
-- [ ] T032 [P] Author and validate 20 high-yield questions for Microbiology (JONES criteria, IE, Myocarditis) in `bank.v1.json`
+## Phase 7: Post-Test Report & Comprehensive Bank Population
+- [x] T027 [P] [US1/US2] Build Post-Test Exam Report view (`src/ui/features/test/PostTestReport.tsx`) with score %, calibration, and curriculum review plan
+- [x] T028 [US1/US2] Implement "Retest Mistakes" action looping back to Session Player with missed questions
+- [x] T029 [P] Author and validate 25 high-yield questions for CVS Anatomy (Chambers, Valves, Coronaries) in `bank.v1.json`
+- [x] T030 [P] Author and validate 25 high-yield questions for Cardiac Embryology (Looping, Septation, Anomalies) in `bank.v1.json`
+- [x] T031 [P] Author and validate 20 high-yield questions for Blood Vessel Histology & Capillaries in `bank.v1.json`
+- [x] T032 [P] Author and validate 20 high-yield questions for Microbiology (JONES criteria, IE, Myocarditis) in `bank.v1.json`
