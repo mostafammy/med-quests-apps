@@ -5,10 +5,15 @@ import { useQuestionStore } from '../../../application/stores/useQuestionStore.t
 import { 
   AlertOctagon, 
   TrendingDown, 
-  Calendar, 
   RotateCcw, 
   Play, 
-  CheckCircle2
+  CheckCircle2,
+  Calendar,
+  Sparkles,
+  ArrowRight,
+  Flame,
+  Layers,
+  ChevronRight
 } from 'lucide-react';
 
 export const ReviewHub: React.FC = () => {
@@ -22,29 +27,45 @@ export const ReviewHub: React.FC = () => {
     resetStats
   } = useStatsStore();
 
-  const [activeTab, setActiveTab] = useState<'mistakes' | 'weak' | 'exam'>('weak');
+  const [activeTab, setActiveTab] = useState<'weak' | 'mistakes'>('weak');
 
   useEffect(() => {
     refreshStats(questions);
   }, [questions, refreshStats]);
 
-  // Filter and sort topics that have been attempted, or show all with unattempted badge
   const attemptedTopics = topicStats.filter((t) => t.totalAttempts > 0);
   const unattemptedTopics = topicStats.filter((t) => t.totalAttempts === 0);
-  
-  // Sort attempted topics by accuracy ascending (lowest mastery first)
   const sortedTopics = [
     ...[...attemptedTopics].sort((a, b) => a.accuracy - b.accuracy),
     ...unattemptedTopics
   ];
 
+  const mistakeQuestions = questions.filter((q) => mistakeQuestionIds.includes(q.id));
+
+  const handleStartMistakeRetest = () => {
+    if (mistakeQuestions.length === 0) return;
+    navigate('/session/retest-session', {
+      state: {
+        mode: 'retest',
+        questionCount: mistakeQuestions.length,
+      },
+    });
+  };
+
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 space-y-6">
-      <div className="border-b border-slate-200 pb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Review Workspaces</h1>
-          <p className="text-sm text-slate-500">
-            Target what you do not know, what you repeatedly get wrong, and high-yield unstable areas.
+    <div className="relative min-h-[calc(100vh-4rem)] py-8 px-4 sm:px-6 lg:px-8 space-y-8 animate-in fade-in duration-300">
+      {/* Top Header Card */}
+      <div className="p-6 md:p-8 rounded-3xl bg-white/65 dark:bg-zinc-900/65 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.06)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all">
+        <div className="space-y-1.5">
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-400/20 text-rose-700 dark:text-rose-400 text-xs font-semibold backdrop-blur-md">
+            <TrendingDown className="w-3.5 h-3.5" />
+            <span>Targeted Weakness Remediation</span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 dark:from-zinc-100 dark:via-zinc-200 dark:to-rose-200 bg-clip-text text-transparent">
+            Review & Remediation Hub
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl leading-relaxed">
+            Diagnose repeated mistakes, identify low-accuracy faculty concepts, and launch focused retests.
           </p>
         </div>
 
@@ -52,250 +73,171 @@ export const ReviewHub: React.FC = () => {
           {totalAttempts > 0 && (
             <button
               onClick={() => resetStats(questions)}
-              className="py-1.5 px-3 bg-slate-100 hover:bg-red-50 hover:text-red-700 text-slate-600 rounded-lg text-xs font-semibold flex items-center space-x-1 transition-all cursor-pointer"
+              className="py-2.5 px-4 bg-white/50 dark:bg-zinc-800/50 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 dark:hover:text-rose-400 text-slate-600 dark:text-zinc-400 rounded-2xl text-xs font-bold flex items-center space-x-1.5 border border-white/80 dark:border-zinc-700/80 backdrop-blur-md shadow-xs transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
             >
-              <RotateCcw className="w-3 h-3" />
-              <span>Reset Stats</span>
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset History</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Workspace Switcher Tabs */}
-      <div className="flex space-x-2">
+      {/* Tabs */}
+      <div className="flex space-x-2 p-1.5 rounded-2xl bg-slate-200/40 dark:bg-zinc-800/40 backdrop-blur-lg border border-white/40 dark:border-zinc-700/40 max-w-md">
         <button
           onClick={() => setActiveTab('weak')}
-          className={`py-2 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+          className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center space-x-2 cursor-pointer ${
             activeTab === 'weak'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60'
+              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100'
           }`}
         >
           <TrendingDown className="w-3.5 h-3.5" />
-          <span>Weak Areas</span>
+          <span>Curriculum Mastery</span>
         </button>
 
         <button
           onClick={() => setActiveTab('mistakes')}
-          className={`py-2 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
+          className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center space-x-2 cursor-pointer ${
             activeTab === 'mistakes'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              ? 'bg-white dark:bg-zinc-900 text-rose-600 dark:text-rose-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60'
+              : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100'
           }`}
         >
           <AlertOctagon className="w-3.5 h-3.5" />
-          <span>Mistakes Workspace ({mistakeQuestionIds.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('exam')}
-          className={`py-2 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
-            activeTab === 'exam'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          <Calendar className="w-3.5 h-3.5" />
-          <span>Exam Review Roadmap</span>
+          <span>Mistakes ({mistakeQuestionIds.length})</span>
         </button>
       </div>
 
-      {/* Tab 1: Weak Areas */}
+      {/* Tab 1: Curriculum Weak Areas */}
       {activeTab === 'weak' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="font-semibold text-slate-900 text-sm">Where are you currently weak?</h3>
-            <span className="text-xs text-slate-500">
-              {attemptedTopics.length > 0
-                ? `${attemptedTopics.length} of ${topicStats.length} topics calibrated`
-                : 'Ordered by calibration status'}
-            </span>
-          </div>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {sortedTopics.map((topic) => {
+              const accuracy = topic.totalAttempts > 0 ? topic.accuracy : null;
+              const isCritical = accuracy !== null && accuracy < 50;
+              const isDeveloping = accuracy !== null && accuracy >= 50 && accuracy < 80;
+              const isMastered = accuracy !== null && accuracy >= 80;
 
-          {totalAttempts === 0 && (
-            <div className="p-8 text-center space-y-3">
-              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl mx-auto flex items-center justify-center">
-                <TrendingDown className="w-6 h-6" />
-              </div>
-              <h4 className="text-base font-bold text-slate-900">No attempts recorded yet</h4>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Your statistics are currently at zero. Take practice questions or a mock exam to populate your topic mastery bands!
-              </p>
-              <button
-                onClick={() => navigate('/test/quick')}
-                className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs inline-flex items-center space-x-1.5 transition-all cursor-pointer"
-              >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Start Practice Drill</span>
-              </button>
-            </div>
-          )}
-
-          {totalAttempts > 0 && (
-            <div className="divide-y divide-slate-100">
-              {sortedTopics.map((topic) => {
-                const isCritical = topic.status === 'critical';
-                const isWeak = topic.status === 'weak';
-                const isDeveloping = topic.status === 'developing';
-                const isMastered = topic.status === 'mastered';
-                const isUnattempted = topic.status === 'unattempted';
-
-                return (
-                  <div key={topic.topicId} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium text-sm text-slate-900">{topic.topicName}</span>
-                        <span className="text-[10px] text-slate-400 uppercase font-mono">{topic.chapterId}</span>
-                      </div>
-                      <div className="flex items-center space-x-2 text-xs text-slate-500">
-                        {isUnattempted ? (
-                          <span className="text-slate-400 italic">Not yet practiced</span>
-                        ) : (
-                          <span>Accuracy: <strong>{topic.accuracy}%</strong> ({topic.correctAttempts}/{topic.totalAttempts} correct)</span>
-                        )}
-                        <span>•</span>
-                        <span>High-Yield Topic</span>
-                      </div>
+              return (
+                <div
+                  key={topic.topicId}
+                  className="p-5 rounded-3xl bg-white/60 dark:bg-zinc-900/60 hover:bg-white/80 dark:hover:bg-zinc-900/80 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.3)] transition-all duration-200 hover:-translate-y-0.5 space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider">
+                        Topic
+                      </span>
+                      <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-sm mt-0.5">
+                        {topic.topicName}
+                      </h3>
                     </div>
 
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <span className="text-sm font-bold">
-                          {isCritical && <span className="text-red-600">{topic.accuracy}% 🔴 Critical</span>}
-                          {isWeak && <span className="text-amber-600">{topic.accuracy}% 🟠 Weak</span>}
-                          {isDeveloping && <span className="text-yellow-600">{topic.accuracy}% 🟡 Developing</span>}
-                          {isMastered && <span className="text-emerald-600">{topic.accuracy}% 🟢 Mastered</span>}
-                          {isUnattempted && <span className="text-slate-400 font-normal text-xs">Unattempted ⚪</span>}
+                    <div className="text-right">
+                      {accuracy !== null ? (
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-black ${
+                          isCritical
+                            ? 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-400/20'
+                            : isDeveloping
+                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-400/20'
+                            : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-400/20'
+                        }`}>
+                          {accuracy}%
                         </span>
-                      </div>
-
-                      <button
-                        onClick={() => navigate('/test/quick')}
-                        className="py-1.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold flex items-center space-x-1 transition-all cursor-pointer"
-                      >
-                        <Play className="w-3 h-3 fill-current" />
-                        <span>Practice</span>
-                      </button>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400">
+                          Unattempted
+                        </span>
+                      )}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
+
+                  {/* Micro Progress Bar */}
+                  {accuracy !== null && (
+                    <div className="w-full h-2 bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          isCritical ? 'bg-rose-500' : isDeveloping ? 'bg-amber-500' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${accuracy}%` }}
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400 pt-1">
+                    <span>{topic.totalAttempts} attempts logged</span>
+                    <button
+                      onClick={() => navigate('/test/quick')}
+                      className="text-blue-600 dark:text-blue-400 font-bold hover:underline flex items-center space-x-1 cursor-pointer"
+                    >
+                      <span>Practice Topic</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
       {/* Tab 2: Mistakes Workspace */}
       {activeTab === 'mistakes' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
-              <div className="text-xs text-slate-500 font-semibold uppercase">Total Mistakes</div>
-              <div className="text-2xl font-bold text-slate-900 mt-1">{mistakeQuestionIds.length} Questions</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">Awaiting resolution</div>
-            </div>
-
-            <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
-              <div className="text-xs text-red-600 font-semibold uppercase">Repeated Errors</div>
-              <div className="text-2xl font-bold text-red-600 mt-1">
-                {Math.round(mistakeQuestionIds.length * 0.4)} Questions
-              </div>
-              <div className="text-[11px] text-red-700 mt-0.5">Missed ≥ 2 times</div>
-            </div>
-
-            <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
-              <div className="text-xs text-amber-600 font-semibold uppercase">Danger-Zone</div>
-              <div className="text-2xl font-bold text-amber-600 mt-1">
-                {Math.round(mistakeQuestionIds.length * 0.2)} Questions
-              </div>
-              <div className="text-[11px] text-amber-700 mt-0.5">Confident mistakes</div>
-            </div>
-
-            <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
-              <div className="text-xs text-purple-600 font-semibold uppercase">Overdue Review</div>
-              <div className="text-2xl font-bold text-purple-600 mt-1">0 Questions</div>
-              <div className="text-[11px] text-purple-700 mt-0.5">Spaced repetition queue</div>
-            </div>
-          </div>
-
-          {mistakeQuestionIds.length === 0 ? (
-            <div className="p-8 bg-white rounded-2xl border border-slate-200 text-center space-y-3">
-              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl mx-auto flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6" />
-              </div>
-              <h4 className="text-base font-bold text-slate-900">Zero Unresolved Mistakes!</h4>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                {totalAttempts === 0
-                  ? 'You have not taken any tests yet. Answer questions in practice mode or mock exam to log mistakes.'
-                  : 'You have answered all attempted questions correctly or already resolved your mistakes!'}
-              </p>
-              <button
-                onClick={() => navigate('/test/quick')}
-                className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs inline-flex items-center space-x-1.5 transition-all cursor-pointer"
-              >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Practice Questions</span>
-              </button>
-            </div>
-          ) : (
-            <div className="p-6 bg-slate-900 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="font-bold text-lg">Launch Focused Mistake Review Session</h3>
-                <p className="text-xs text-slate-300">
-                  Creates a targeted test containing only your {mistakeQuestionIds.length} unresolved mistake questions.
-                </p>
-              </div>
-              <button
-                onClick={() => navigate('/test/quick')}
-                className="py-2.5 px-5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm flex items-center space-x-2 shrink-0 cursor-pointer"
-              >
-                <RotateCcw className="w-4 h-4" />
-                <span>Start Mistake Review ({mistakeQuestionIds.length})</span>
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tab 3: Exam Review Roadmap */}
-      {activeTab === 'exam' && (
-        <div className="space-y-4">
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl text-blue-900 flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Calendar className="w-5 h-5 text-blue-600" />
-              <div>
-                <span className="font-bold text-sm">CVS Block 206 Exam Preparation Roadmap</span>
-                <p className="text-xs text-blue-700">Follow the prioritized roadmap below to master high-yield topics.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {[
-              { priority: 1, title: 'Cardiac Embryology, Septation & Looping', details: 'Highest yield • 27 comprehensive questions in bank' },
-              { priority: 2, title: 'Heart Chambers, Valves & Coronary Circulation', details: 'Core anatomy foundation • 31 questions in bank' },
-              { priority: 3, title: 'Infective Endocarditis & Rheumatic Fever (GAS)', details: 'Microbiology high-yield • 24 questions in bank' },
-              { priority: 4, title: 'Blood Vessel Histology & Capillary Types', details: 'Microscopic anatomy • 26 questions in bank' },
-            ].map((p) => (
-              <div key={p.priority} className="p-5 bg-white rounded-2xl border border-slate-200 flex items-center justify-between shadow-xs">
+          {mistakeQuestions.length > 0 ? (
+            <div className="space-y-4">
+              <div className="p-6 rounded-3xl bg-rose-500/10 dark:bg-rose-950/30 border border-rose-400/20 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                    Priority {p.priority}
-                  </span>
-                  <h4 className="font-bold text-slate-900 text-base mt-1">{p.title}</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">{p.details}</p>
+                  <h3 className="font-extrabold text-rose-900 dark:text-rose-200 text-lg">
+                    {mistakeQuestions.length} Questions Requiring Remediation
+                  </h3>
+                  <p className="text-xs text-rose-700/80 dark:text-rose-300 mt-1">
+                    Questions answered incorrectly in practice or mock exams. Retest until mastered.
+                  </p>
                 </div>
-
                 <button
-                  onClick={() => navigate('/test/quick')}
-                  className="py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer"
+                  onClick={handleStartMistakeRetest}
+                  className="py-3 px-6 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white rounded-2xl text-xs sm:text-sm font-extrabold flex items-center space-x-2 shadow-lg shadow-rose-600/25 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer shrink-0"
                 >
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Drill Topic</span>
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>Launch Mistake Retest</span>
                 </button>
               </div>
-            ))}
-          </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                {mistakeQuestions.map((q, idx) => (
+                  <div
+                    key={q.id}
+                    className="p-5 rounded-3xl bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-xs space-y-2"
+                  >
+                    <div className="flex items-center space-x-2 text-[11px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider">
+                      <AlertOctagon className="w-3.5 h-3.5" />
+                      <span>Mistake #{idx + 1} • {q.concept}</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-zinc-100 leading-snug">
+                      {q.stem}
+                    </p>
+                    {q.evidence && q.evidence[0] && (
+                      <p className="text-xs text-slate-500 dark:text-zinc-400 italic">
+                        Evidence: {q.evidence[0].sourceName} ({q.evidence[0].location})
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="p-12 text-center rounded-3xl bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-base">No Active Mistakes</h3>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">
+                Any questions you miss during Quick Practice or Mock Exams will automatically populate here for targeted remediation.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
