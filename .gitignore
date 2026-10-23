@@ -23,3 +23,4 @@ Thumbs.db
 scratch/
 .eslintcache
 /CVS/
+*.tsbuildinfo
