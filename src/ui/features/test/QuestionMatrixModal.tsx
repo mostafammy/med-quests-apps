@@ -15,7 +15,8 @@ interface QuestionMatrixModalProps {
   flags: Record<string, boolean>;
   bookmarks: Record<string, boolean>;
   isExamMode: boolean;
-  onSelectIndex: (index: number) => void;
+  onSelectIndex?: (index: number) => void;
+  onSelectQuestion?: (index: number) => void;
 }
 
 type FilterTab = 'all' | 'unanswered' | 'answered' | 'flagged';
@@ -30,8 +31,14 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
   bookmarks,
   isExamMode,
   onSelectIndex,
+  onSelectQuestion,
 }) => {
   const [filter, setFilter] = useState<FilterTab>('all');
+
+  const handleSelect = (idx: number) => {
+    onSelectQuestion?.(idx);
+    onSelectIndex?.(idx);
+  };
 
   // Keyboard shortcut: Escape to close
   useEffect(() => {
@@ -187,7 +194,7 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
                   <button
                     key={q.id}
                     onClick={() => {
-                      onSelectIndex(idx);
+                      handleSelect(idx);
                       onClose();
                     }}
                     className={`relative aspect-square rounded-2xl flex flex-col items-center justify-center p-1 text-sm font-bold tabular-nums transition-all duration-150 cursor-pointer ${pillColor}`}
