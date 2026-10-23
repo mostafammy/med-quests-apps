@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Play, ArrowRight, BookOpen, Layers } from 'lucide-react';
+import { Play, BookOpen } from 'lucide-react';
 
 export const CurriculumLibrary: React.FC = () => {
   const navigate = useNavigate();
