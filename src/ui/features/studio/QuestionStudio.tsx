@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CVS_TAXONOMY } from '../../../domain/taxonomy/cvsTaxonomy.ts';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
-import { Copy, Check, Upload, Download, Sparkles, AlertCircle, Database } from 'lucide-react';
+import { Copy, Check, Upload, Download, Sparkles, AlertCircle, Database, CheckCircle2 } from 'lucide-react';
 
 export const QuestionStudio: React.FC = () => {
   const { questions, ingestQuestions, exportBankJson, clearBank } = useQuestionStore();
@@ -79,63 +79,77 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
   const handleCopyPrompt = () => {
     navigator.clipboard.writeText(generatePrompt());
     setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleIngest = async () => {
     if (!jsonInput.trim()) return;
     setIsProcessing(true);
-    const result = await ingestQuestions(jsonInput);
-    setIngestStatus(result);
-    setIsProcessing(false);
-    if (result.count > 0 && result.errors.length === 0) {
-      setJsonInput('');
+    try {
+      const parsed = JSON.parse(jsonInput);
+      const res = await ingestQuestions(Array.isArray(parsed) ? parsed : [parsed]);
+      setIngestStatus(res);
+      if (res.errors.length === 0) {
+        setJsonInput('');
+      }
+    } catch {
+      setIngestStatus({ count: 0, errors: ['Invalid JSON syntax. Ensure valid JSON array.'] });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleDownloadBank = () => {
+  const handleExport = () => {
     const jsonStr = exportBankJson();
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'bank.v1.json';
+    a.download = `cvs-bank-v1-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 space-y-8">
+    <div className="relative min-h-[calc(100vh-4rem)] py-8 px-4 sm:px-6 lg:px-8 space-y-8 animate-in fade-in duration-300">
       {/* Header */}
-      <div className="border-b border-slate-200 pb-5">
-        <div className="flex items-center space-x-3">
-          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-            <Sparkles className="w-6 h-6" />
+      <div className="p-6 md:p-8 rounded-3xl bg-white/65 dark:bg-zinc-900/65 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.06)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all">
+        <div className="space-y-1.5">
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-700 dark:text-indigo-300 text-xs font-semibold backdrop-blur-md">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            <span>Curriculum Grounding & Ingestion Studio</span>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Question Ingestion Studio</h1>
-            <p className="text-sm text-slate-500">
-              Generate fine-tuned prompts for Google AI Studio / Claude, then paste validated JSON directly into your bank.
-            </p>
-          </div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 dark:from-zinc-100 dark:via-zinc-200 dark:to-indigo-200 bg-clip-text text-transparent">
+            Question Authoring Studio
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl leading-relaxed">
+            Generate grounded prompt templates for LLMs, validate against curriculum taxonomy schemas, and ingest into the local IndexedDB bank.
+          </p>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleExport}
+            className="py-2.5 px-4 rounded-2xl bg-white/60 dark:bg-zinc-800/60 hover:bg-white/80 dark:hover:bg-zinc-800 border border-white/80 dark:border-zinc-700/80 text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center space-x-2 shadow-xs transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export Bank ({questions.length})</span>
+          </button>
         </div>
       </div>
 
-      {/* Grid: Workflow */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Step 1: Prompt Generator */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
-              <h2 className="font-semibold text-slate-900">Configure & Copy Prompt</h2>
-            </div>
-            <span className="text-xs px-2.5 py-1 bg-slate-100 text-slate-600 rounded-md font-medium">Free AI Portals</span>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Step 1: Prompt Generator Glass Card */}
+        <div className="p-6 md:p-8 rounded-3xl bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.3)] space-y-5">
+          <div className="flex items-center space-x-2 text-indigo-600 dark:text-indigo-400 font-extrabold text-xs uppercase tracking-wider">
+            <span>Step 1: Grounded Prompt Architect</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Subject</label>
+              <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 mb-1.5 uppercase">
+                Subject
+              </label>
               <select
                 value={selectedSubjectId}
                 onChange={(e) => {
@@ -143,7 +157,7 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
                   const firstChap = CVS_TAXONOMY.chapters.find((c) => c.subjectId === e.target.value);
                   if (firstChap) setSelectedChapterId(firstChap.id);
                 }}
-                className="w-full text-sm rounded-lg border border-slate-300 py-2 px-3 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                className="w-full text-xs font-semibold rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/70 dark:bg-zinc-800/70 backdrop-blur-md py-2.5 px-3 text-slate-800 dark:text-zinc-200"
               >
                 {CVS_TAXONOMY.subjects.map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
@@ -152,11 +166,13 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Chapter</label>
+              <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 mb-1.5 uppercase">
+                Chapter
+              </label>
               <select
                 value={selectedChapterId}
                 onChange={(e) => setSelectedChapterId(e.target.value)}
-                className="w-full text-sm rounded-lg border border-slate-300 py-2 px-3 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                className="w-full text-xs font-semibold rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/70 dark:bg-zinc-800/70 backdrop-blur-md py-2.5 px-3 text-slate-800 dark:text-zinc-200"
               >
                 {availableChapters.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
@@ -165,142 +181,90 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
             </div>
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs space-y-2">
-            <p className="font-semibold text-slate-700">How to use with Google AI Studio (Free):</p>
-            <ol className="list-decimal list-inside space-y-1 text-slate-600">
-              <li>Open <strong>aistudio.google.com</strong> (Gemini 1.5 Pro / 2.0 Flash).</li>
-              <li>Upload the PDF or PPTX for <strong>{activeChapter?.name}</strong>.</li>
-              <li>Click the button below and paste the prompt.</li>
-              <li>Copy the generated JSON output into Step 2.</li>
-            </ol>
+          {/* Generated Prompt Preview Box */}
+          <div className="relative">
+            <textarea
+              readOnly
+              rows={12}
+              value={generatePrompt()}
+              className="w-full text-xs font-mono rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-slate-900/90 text-slate-300 p-4 focus:outline-hidden backdrop-blur-md"
+            />
+            <button
+              onClick={handleCopyPrompt}
+              className="absolute top-3 right-3 py-1.5 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-md cursor-pointer transition-all"
+            >
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copied ? 'Copied to Clipboard!' : 'Copy Prompt'}</span>
+            </button>
           </div>
-
-          <button
-            onClick={handleCopyPrompt}
-            className={`w-full py-2.5 px-4 rounded-xl text-sm font-semibold flex items-center justify-center space-x-2 transition-all ${
-              copied
-                ? 'bg-emerald-600 text-white shadow-emerald-200'
-                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
-            }`}
-          >
-            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            <span>{copied ? 'Prompt Copied to Clipboard!' : 'Copy Master Generation Prompt'}</span>
-          </button>
         </div>
 
-        {/* Step 2: JSON Ingestion */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5">
+        {/* Step 2: JSON Ingestion Glass Card */}
+        <div className="p-6 md:p-8 rounded-3xl bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.3)] space-y-5">
+          <div className="flex items-center space-x-2 text-indigo-600 dark:text-indigo-400 font-extrabold text-xs uppercase tracking-wider">
+            <span>Step 2: Ingest & Validate Items</span>
+          </div>
+
+          <p className="text-xs text-slate-600 dark:text-zinc-400">
+            Paste the raw JSON output from your model below. The ingestion validator guarantees 100% schema compliance before committing to IndexedDB.
+          </p>
+
+          <textarea
+            rows={12}
+            value={jsonInput}
+            onChange={(e) => setJsonInput(e.target.value)}
+            placeholder='[ { "id": "q-cvs-ana-001", "stem": "...", "choices": [...] } ]'
+            className="w-full text-xs font-mono rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/70 dark:bg-zinc-800/70 backdrop-blur-md p-4 text-slate-800 dark:text-zinc-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+          />
+
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">2</span>
-              <h2 className="font-semibold text-slate-900">Validate & Ingest Questions</h2>
-            </div>
-            <span className="text-xs px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-md font-medium">Zod Guard</span>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-              Paste AI-Generated JSON
-            </label>
-            <textarea
-              value={jsonInput}
-              onChange={(e) => setJsonInput(e.target.value)}
-              placeholder="Paste [...] array of questions here..."
-              rows={8}
-              className="w-full text-xs font-mono rounded-lg border border-slate-300 p-3 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-            />
-          </div>
-
-          {ingestStatus && (
-            <div
-              className={`rounded-xl p-4 text-xs space-y-1.5 ${
-                ingestStatus.errors.length === 0
-                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                  : 'bg-amber-50 border border-amber-200 text-amber-900'
-              }`}
-            >
-              <div className="flex items-center space-x-2 font-semibold">
-                {ingestStatus.errors.length === 0 ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                <span>
-                  {ingestStatus.count} question{ingestStatus.count === 1 ? '' : 's'} successfully validated & merged!
-                </span>
-              </div>
-              {ingestStatus.errors.length > 0 && (
-                <ul className="list-disc list-inside space-y-1 text-amber-700 max-h-32 overflow-y-auto">
-                  {ingestStatus.errors.map((err, i) => (
-                    <li key={i}>{err}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-
-          <div className="flex space-x-3">
             <button
               onClick={handleIngest}
               disabled={isProcessing || !jsonInput.trim()}
-              className="flex-1 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl text-sm font-semibold flex items-center justify-center space-x-2"
+              className="py-3 px-6 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-40 text-white rounded-2xl text-xs sm:text-sm font-bold flex items-center space-x-2 shadow-md shadow-indigo-500/20 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
             >
               <Upload className="w-4 h-4" />
-              <span>{isProcessing ? 'Validating...' : 'Validate & Ingest into Bank'}</span>
+              <span>{isProcessing ? 'Validating...' : 'Ingest & Store in IndexedDB'}</span>
             </button>
-          </div>
-        </div>
-      </div>
 
-      {/* Live Bank Statistics & Export */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-              <Database className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-slate-900">Current Question Bank Inventory</h3>
-              <p className="text-xs text-slate-500">
-                Total Loaded Questions: <strong className="text-slate-800">{questions.length}</strong>
-              </p>
-            </div>
-          </div>
-
-          <div className="flex space-x-2">
             <button
-              onClick={handleDownloadBank}
-              disabled={questions.length === 0}
-              className="py-2 px-3.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all"
+              onClick={() => {
+                if (confirm('Clear the local question bank in IndexedDB?')) {
+                  clearBank();
+                }
+              }}
+              className="text-xs font-semibold text-rose-600 hover:underline cursor-pointer"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export Shipped Bank (bank.v1.json)</span>
+              Clear Bank
             </button>
-            {questions.length > 0 && (
-              <button
-                onClick={() => {
-                  if (confirm('Clear all loaded questions in this browser?')) clearBank();
-                }}
-                className="py-2 px-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold"
-              >
-                Clear
-              </button>
-            )}
           </div>
-        </div>
 
-        {/* Chapters Breakdown */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
-          {CVS_TAXONOMY.chapters.map((chap) => {
-            const count = questions.filter((q) => q.chapterId === chap.id).length;
-            return (
-              <div key={chap.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
-                <div className="truncate mr-2">
-                  <div className="text-xs font-medium text-slate-800 truncate">{chap.name}</div>
-                  <div className="text-[10px] text-slate-500 uppercase">{chap.subjectId}</div>
+          {ingestStatus && (
+            <div className={`p-4 rounded-2xl text-xs ${
+              ingestStatus.errors.length === 0
+                ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-400/20'
+                : 'bg-rose-500/10 text-rose-800 dark:text-rose-300 border border-rose-400/20'
+            }`}>
+              {ingestStatus.errors.length === 0 ? (
+                <div className="flex items-center space-x-2 font-bold">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Successfully ingested and indexed {ingestStatus.count} questions!</span>
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${count > 0 ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-500'}`}>
-                  {count}
-                </span>
-              </div>
-            );
-          })}
+              ) : (
+                <div className="space-y-1">
+                  <div className="font-bold flex items-center space-x-1">
+                    <AlertCircle className="w-4 h-4 text-rose-600" />
+                    <span>Failed with {ingestStatus.errors.length} validation errors:</span>
+                  </div>
+                  <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+                    {ingestStatus.errors.map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
