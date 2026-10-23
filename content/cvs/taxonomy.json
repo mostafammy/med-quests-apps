@@ -1,0 +1,81 @@
+{
+  "block": {
+    "id": "cvs",
+    "name": "Cardiovascular System",
+    "shortName": "CVS",
+    "code": "Block 206",
+    "description": "Integrated Cardiovascular Block: Anatomy, Embryology, Histology & Microbiology",
+    "subjectIds": ["anatomy", "histology", "microbiology"]
+  },
+  "subjects": [
+    { "id": "anatomy", "blockId": "cvs", "name": "CVS Anatomy & Embryology", "order": 1 },
+    { "id": "histology", "blockId": "cvs", "name": "CVS Histology", "order": 2 },
+    { "id": "microbiology", "blockId": "cvs", "name": "CVS Microbiology", "order": 3 }
+  ],
+  "chapters": [
+    {
+      "id": "cvs-ana-heart-mediastinum",
+      "blockId": "cvs",
+      "subjectId": "anatomy",
+      "name": "Heart & Mediastinum",
+      "order": 1,
+      "sourceIds": ["SRC-CVS-ANA-01"]
+    },
+    {
+      "id": "cvs-ana-heart-dev",
+      "blockId": "cvs",
+      "subjectId": "anatomy",
+      "name": "Development of the Heart",
+      "order": 2,
+      "sourceIds": ["SRC-CVS-ANA-02"]
+    },
+    {
+      "id": "cvs-ana-fetal-circ-bv",
+      "blockId": "cvs",
+      "subjectId": "anatomy",
+      "name": "Fetal Circulation & Vascular Development",
+      "order": 3,
+      "sourceIds": ["SRC-CVS-ANA-03"]
+    },
+    {
+      "id": "cvs-his-heart",
+      "blockId": "cvs",
+      "subjectId": "histology",
+      "name": "Histology of the Heart (L3)",
+      "order": 4,
+      "sourceIds": ["SRC-CVS-HIS-01"]
+    },
+    {
+      "id": "cvs-his-blood-vessels",
+      "blockId": "cvs",
+      "subjectId": "histology",
+      "name": "Histology of Blood Vessels (L24 & L25)",
+      "order": 5,
+      "sourceIds": ["SRC-CVS-HIS-02"]
+    },
+    {
+      "id": "cvs-mic-rheumatic-fever",
+      "blockId": "cvs",
+      "subjectId": "microbiology",
+      "name": "Rheumatic Fever (L1)",
+      "order": 6,
+      "sourceIds": ["SRC-CVS-MIC-01"]
+    },
+    {
+      "id": "cvs-mic-infective-endocarditis",
+      "blockId": "cvs",
+      "subjectId": "microbiology",
+      "name": "Infective Endocarditis (L2)",
+      "order": 7,
+      "sourceIds": ["SRC-CVS-MIC-01"]
+    },
+    {
+      "id": "cvs-mic-viral-myocarditis",
+      "blockId": "cvs",
+      "subjectId": "microbiology",
+      "name": "Viral Myocarditis (L3)",
+      "order": 8,
+      "sourceIds": ["SRC-CVS-MIC-01"]
+    }
+  ]
+}
