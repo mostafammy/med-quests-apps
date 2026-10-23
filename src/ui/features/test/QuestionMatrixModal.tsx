@@ -3,11 +3,6 @@ import { Question, ChoiceId } from '../../../domain/model/types.ts';
 import { 
   X, 
   Flag, 
-  Bookmark, 
-  CheckCircle2, 
-  XCircle, 
-  Circle, 
-  Sparkles,
   HelpCircle
 } from 'lucide-react';
 
