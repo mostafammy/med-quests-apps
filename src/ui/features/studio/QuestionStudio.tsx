@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CVS_TAXONOMY } from '../../../domain/taxonomy/cvsTaxonomy.ts';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
-import { Copy, Check, Upload, Download, Sparkles, AlertCircle, Database, CheckCircle2 } from 'lucide-react';
+import { Copy, Check, Upload, Download, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export const QuestionStudio: React.FC = () => {
   const { questions, ingestQuestions, exportBankJson, clearBank } = useQuestionStore();
