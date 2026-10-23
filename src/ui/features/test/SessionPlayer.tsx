@@ -590,20 +590,6 @@ export const SessionPlayer: React.FC = () => {
             </button>
           )}
         </div>
-
-        {/* Dynamic Spatial Question Navigator Strip */}
-        <div className="pt-2">
-          <QuestionNavigatorStrip
-            questions={sessionQuestions}
-            currentIndex={currentIndex}
-            answers={answers}
-            flags={flags}
-            bookmarks={bookmarks}
-            isExamMode={isExamMode}
-            onSelectIndex={(idx: number) => setCurrentIndex(idx)}
-            onOpenMatrix={() => setShowMatrixModal(true)}
-          />
-        </div>
       </div>
 
       {/* Full Question Matrix Modal (G shortcut) */}
@@ -616,7 +602,11 @@ export const SessionPlayer: React.FC = () => {
         flags={flags}
         bookmarks={bookmarks}
         isExamMode={isExamMode}
-        onSelectIndex={(idx: number) => setCurrentIndex(idx)}
+        onSelectIndex={(idx: number) => {
+          setCurrentIndex(idx);
+          const targetQ = sessionQuestions[idx];
+          setShowExplanation(!!(targetQ && answers[targetQ.id]));
+        }}
       />
     </div>
   );
