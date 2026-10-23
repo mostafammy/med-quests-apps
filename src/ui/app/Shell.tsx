@@ -14,93 +14,100 @@ import { ThemeToggle } from './ThemeToggle';
 
 export const Shell: React.FC = () => {
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 transition-colors duration-200">
-      {/* Top Navigation Bar with Dynamic Translucency (Apple Material Style) */}
-      <header className="sticky top-0 z-40 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-zinc-800 transition-colors">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 transition-colors duration-300 relative overflow-x-hidden">
+      {/* Universal Ambient Chromatic Glow Background Orbs */}
+      <div className="fixed top-0 left-1/4 w-[36rem] h-[36rem] bg-gradient-to-tr from-blue-400/15 via-indigo-400/10 to-transparent rounded-full blur-3xl pointer-events-none -z-10 animate-pulse duration-[8000ms]" />
+      <div className="fixed bottom-0 right-1/4 w-[32rem] h-[32rem] bg-gradient-to-bl from-purple-400/15 via-pink-400/10 to-transparent rounded-full blur-3xl pointer-events-none -z-10 animate-pulse duration-[10000ms]" />
+      <div className="fixed top-1/2 right-10 w-96 h-96 bg-gradient-to-br from-cyan-400/10 to-emerald-400/10 rounded-full blur-3xl pointer-events-none -z-10" />
+
+      {/* Top Navigation Bar with Frosted Glassmorphism (Apple Material Blur) */}
+      <header className="sticky top-0 z-40 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl border-b border-white/60 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.4)] transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Logo & Platform Name */}
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 dark:from-blue-500 dark:to-indigo-500 flex items-center justify-center text-white shadow-sm shadow-blue-500/20">
+          <NavLink to="/" className="flex items-center space-x-3 group cursor-pointer">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 dark:from-blue-500 dark:to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-105 group-hover:rotate-1 transition-all duration-300">
               <Heart className="w-5 h-5 fill-current" />
             </div>
             <div>
-              <span className="font-bold text-slate-900 dark:text-zinc-50 tracking-tight text-lg">Med Quests</span>
-              <span className="hidden sm:inline-block ml-2 text-[10px] uppercase tracking-wider font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-900/60">
+              <span className="font-extrabold text-slate-900 dark:text-zinc-50 tracking-tight text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                Med Quests
+              </span>
+              <span className="hidden sm:inline-block ml-2 text-[10px] uppercase tracking-wider font-extrabold bg-blue-500/10 dark:bg-blue-400/10 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-full border border-blue-400/20 backdrop-blur-md">
                 Exam Prep
               </span>
             </div>
-          </div>
+          </NavLink>
 
-          {/* Center Navigation Links */}
-          <nav className="hidden md:flex items-center space-x-1">
+          {/* Center Navigation Links with Smooth Liquid Pill Highlights */}
+          <nav className="hidden md:flex items-center space-x-1.5 p-1 rounded-2xl bg-slate-200/40 dark:bg-zinc-800/40 backdrop-blur-lg border border-white/40 dark:border-zinc-700/40">
             <NavLink
               to="/"
               end
               className={({ isActive }) =>
-                `px-3 py-2 rounded-lg text-sm font-medium flex items-center space-x-1.5 transition-colors ${
+                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all duration-200 ${
                   isActive
-                    ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 font-semibold'
-                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-zinc-800/60'
+                    ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 scale-[1.02]'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-zinc-800/60'
                 }`
               }
             >
-              <LayoutDashboard className="w-4 h-4" />
+              <LayoutDashboard className="w-3.5 h-3.5" />
               <span>Dashboard</span>
             </NavLink>
 
             <NavLink
               to="/test"
               className={({ isActive }) =>
-                `px-3 py-2 rounded-lg text-sm font-medium flex items-center space-x-1.5 transition-colors ${
+                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all duration-200 ${
                   isActive
-                    ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 font-semibold'
-                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-zinc-800/60'
+                    ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 scale-[1.02]'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-zinc-800/60'
                 }`
               }
             >
-              <PenTool className="w-4 h-4" />
+              <PenTool className="w-3.5 h-3.5" />
               <span>Test</span>
             </NavLink>
 
             <NavLink
               to="/review"
               className={({ isActive }) =>
-                `px-3 py-2 rounded-lg text-sm font-medium flex items-center space-x-1.5 transition-colors ${
+                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all duration-200 ${
                   isActive
-                    ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 font-semibold'
-                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-zinc-800/60'
+                    ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 scale-[1.02]'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-zinc-800/60'
                 }`
               }
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="w-3.5 h-3.5" />
               <span>Review</span>
             </NavLink>
 
             <NavLink
               to="/curriculum"
               className={({ isActive }) =>
-                `px-3 py-2 rounded-lg text-sm font-medium flex items-center space-x-1.5 transition-colors ${
+                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all duration-200 ${
                   isActive
-                    ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 font-semibold'
-                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-zinc-800/60'
+                    ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 scale-[1.02]'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-zinc-800/60'
                 }`
               }
             >
-              <BookOpen className="w-4 h-4" />
+              <BookOpen className="w-3.5 h-3.5" />
               <span>Curriculum</span>
             </NavLink>
 
             <NavLink
               to="/studio"
               className={({ isActive }) =>
-                `px-3 py-2 rounded-lg text-sm font-medium flex items-center space-x-1.5 transition-colors ${
+                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all duration-200 ${
                   isActive
-                    ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 font-semibold'
-                    : 'text-slate-600 dark:text-zinc-400 hover:text-indigo-900 dark:hover:text-indigo-300 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30'
+                    ? 'bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 scale-[1.02]'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-indigo-900 dark:hover:text-indigo-300 hover:bg-white/50 dark:hover:bg-zinc-800/60'
                 }`
               }
             >
-              <Sparkles className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+              <Sparkles className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
               <span>Studio</span>
             </NavLink>
           </nav>
@@ -110,15 +117,18 @@ export const Shell: React.FC = () => {
             {/* Apple Dynamic Appearance Switcher */}
             <ThemeToggle />
 
-            {/* Active Block Selector */}
-            <div className="flex items-center space-x-2 bg-slate-100/80 dark:bg-zinc-800/80 hover:bg-slate-100 dark:hover:bg-zinc-800 border border-slate-200/80 dark:border-zinc-700/80 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-800 dark:text-zinc-200 cursor-pointer transition-all">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-xs shadow-emerald-500/50"></span>
+            {/* Active Block Glass Pill */}
+            <div className="flex items-center space-x-2 bg-white/60 dark:bg-zinc-800/60 hover:bg-white/80 dark:hover:bg-zinc-800/80 backdrop-blur-md border border-white/80 dark:border-zinc-700/70 px-3.5 py-1.5 rounded-2xl text-xs font-bold text-slate-800 dark:text-zinc-200 cursor-pointer shadow-xs transition-all duration-200 hover:-translate-y-0.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
               <span>CVS: Block 206</span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500" />
             </div>
 
             {/* Keyboard shortcut hint */}
-            <div className="hidden lg:flex items-center text-[11px] font-mono text-slate-400 dark:text-zinc-500 bg-slate-100 dark:bg-zinc-800/60 px-2 py-1 rounded-md border border-slate-200 dark:border-zinc-700">
+            <div className="hidden lg:flex items-center text-[11px] font-mono text-slate-400 dark:text-zinc-500 bg-white/50 dark:bg-zinc-800/50 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/60 dark:border-zinc-700/60 shadow-xs">
               <Keyboard className="w-3 h-3 mr-1 text-slate-400 dark:text-zinc-500" />
               <span>?</span>
             </div>
