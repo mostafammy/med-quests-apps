@@ -4,6 +4,8 @@ import { useQuestionStore } from '../../../application/stores/useQuestionStore.t
 import { Question, ChoiceId } from '../../../domain/model/types.ts';
 import { db } from '../../../infrastructure/storage/db.ts';
 import { PostTestReport } from './PostTestReport.tsx';
+import { QuestionNavigatorStrip } from './QuestionNavigatorStrip.tsx';
+import { QuestionMatrixModal } from './QuestionMatrixModal.tsx';
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -13,7 +15,8 @@ import {
   Clock, 
   CheckCircle2, 
   XCircle, 
-  AlertCircle
+  AlertCircle,
+  LayoutGrid
 } from 'lucide-react';
 
 export const SessionPlayer: React.FC = () => {
@@ -42,6 +45,7 @@ export const SessionPlayer: React.FC = () => {
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
   const [showExplanation, setShowExplanation] = useState(true);
+  const [showMatrixModal, setShowMatrixModal] = useState(false);
   const [sessionStartTime] = useState<number>(() => Date.now());
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(
     (sessionConfig.timeLimitMinutes || 120) * 60
@@ -214,6 +218,7 @@ export const SessionPlayer: React.FC = () => {
       else if (e.key.toLowerCase() === 'f') handleToggleFlag();
       else if (e.key.toLowerCase() === 'b') handleToggleBookmark();
       else if (e.key.toLowerCase() === 'e') setShowExplanation((prev) => !prev);
+      else if (e.key.toLowerCase() === 'g') setShowMatrixModal((prev) => !prev);
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -300,12 +305,41 @@ export const SessionPlayer: React.FC = () => {
             <span className="hidden sm:inline">Exit Session</span>
           </button>
           <div className="h-4 w-px bg-slate-300 dark:bg-slate-700" />
-          <span className="text-sm font-bold tracking-tight">
-            Question {currentIndex + 1} of {sessionQuestions.length}
-          </span>
+          
+          {/* Apple Dynamic Capsule Pill */}
+          <button
+            onClick={() => setShowMatrixModal(true)}
+            className={`group flex items-center space-x-2.5 px-3 py-1.5 rounded-full transition-all border shadow-xs cursor-pointer ${
+              isExamMode
+                ? 'bg-slate-800/90 hover:bg-slate-750 border-slate-700 text-slate-100 hover:border-slate-600'
+                : 'bg-slate-100/90 hover:bg-slate-200/80 border-slate-200/80 text-slate-900 hover:border-slate-300'
+            }`}
+            title="Open Question Grid Overview (G)"
+          >
+            <div className="flex items-center space-x-1 text-xs font-bold tracking-tight">
+              <span className="text-blue-600 dark:text-blue-400 font-mono font-extrabold text-sm">
+                {String(currentIndex + 1).padStart(2, '0')}
+              </span>
+              <span className="text-slate-400 font-normal">/</span>
+              <span className="text-slate-500 font-mono font-semibold text-xs">
+                {String(sessionQuestions.length).padStart(2, '0')}
+              </span>
+            </div>
+
+            {/* Apple Micro Progress Bar inside capsule */}
+            <div className="w-10 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden hidden sm:block">
+              <div 
+                className="h-full bg-blue-600 dark:bg-blue-400 rounded-full transition-all duration-300"
+                style={{ width: `${Math.round(((currentIndex + 1) / sessionQuestions.length) * 100)}%` }}
+              />
+            </div>
+
+            <LayoutGrid className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+          </button>
+
           {currentQ.highYield && (
-            <span className="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 bg-amber-400/10 text-amber-500 border border-amber-400/20 rounded-md">
-              HIGH YIELD
+            <span className="hidden md:inline-flex items-center space-x-1 text-[10px] font-bold px-2 py-0.5 bg-amber-400/10 text-amber-500 border border-amber-400/20 rounded-md">
+              <span>HIGH YIELD</span>
             </span>
           )}
         </div>
@@ -364,14 +398,44 @@ export const SessionPlayer: React.FC = () => {
         </div>
       </div>
 
+      {/* Apple Interactive Question Navigator Strip */}
+      <QuestionNavigatorStrip
+        questions={sessionQuestions}
+        currentIndex={currentIndex}
+        answers={answers}
+        flags={flags}
+        bookmarks={bookmarks}
+        isExamMode={isExamMode}
+        onSelectIndex={(newIdx) => {
+          setCurrentIndex(newIdx);
+          const targetQ = sessionQuestions[newIdx];
+          setShowExplanation(!!(targetQ && answers[targetQ.id]));
+        }}
+        onOpenMatrix={() => setShowMatrixModal(true)}
+      />
+
       {/* Main Question Workspace */}
       <div className="max-w-4xl w-full mx-auto p-4 sm:p-8 flex-1 flex flex-col justify-between space-y-6">
         <div className="space-y-6">
-          {/* Question Meta */}
-          <div className="flex items-center space-x-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            <span>{currentQ.subjectId}</span>
-            <span>•</span>
-            <span className="text-slate-400">{currentQ.chapterId}</span>
+          {/* Question Meta & Pill Counter */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center space-x-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <span className="px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 font-mono font-bold text-[11px] border border-blue-200/60 dark:border-blue-800/60">
+                Question {currentIndex + 1}
+              </span>
+              <span>•</span>
+              <span className="text-slate-700 dark:text-slate-300">{currentQ.subjectId}</span>
+              <span>•</span>
+              <span className="text-slate-400">{currentQ.chapterId}</span>
+            </div>
+
+            <div className="flex items-center space-x-2 text-xs text-slate-400 font-mono">
+              <span className="hidden sm:inline">Pacing: Target &lt;60s</span>
+              <span className="hidden sm:inline">•</span>
+              <span className="font-semibold text-slate-600 dark:text-slate-300">
+                {Math.round(((currentIndex + 1) / sessionQuestions.length) * 100)}% Complete
+              </span>
+            </div>
           </div>
 
           {/* Question Stem */}
@@ -526,7 +590,34 @@ export const SessionPlayer: React.FC = () => {
             </button>
           )}
         </div>
+
+        {/* Dynamic Spatial Question Navigator Strip */}
+        <div className="pt-2">
+          <QuestionNavigatorStrip
+            questions={sessionQuestions}
+            currentIndex={currentIndex}
+            answers={answers}
+            flags={flags}
+            bookmarks={bookmarks}
+            isExamMode={isExamMode}
+            onSelectIndex={(idx: number) => setCurrentIndex(idx)}
+            onOpenMatrix={() => setShowMatrixModal(true)}
+          />
+        </div>
       </div>
+
+      {/* Full Question Matrix Modal (G shortcut) */}
+      <QuestionMatrixModal
+        isOpen={showMatrixModal}
+        onClose={() => setShowMatrixModal(false)}
+        questions={sessionQuestions}
+        currentIndex={currentIndex}
+        answers={answers}
+        flags={flags}
+        bookmarks={bookmarks}
+        isExamMode={isExamMode}
+        onSelectIndex={(idx: number) => setCurrentIndex(idx)}
+      />
     </div>
   );
 };
