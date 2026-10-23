@@ -9,7 +9,8 @@ interface QuestionNavigatorStripProps {
   flags: Record<string, boolean>;
   bookmarks: Record<string, boolean>;
   isExamMode: boolean;
-  onSelectIndex: (index: number) => void;
+  onSelectIndex?: (index: number) => void;
+  onSelectQuestion?: (index: number) => void;
   onOpenMatrix: () => void;
 }
 
@@ -20,10 +21,16 @@ export const QuestionNavigatorStrip: React.FC<QuestionNavigatorStripProps> = ({
   flags,
   isExamMode,
   onSelectIndex,
+  onSelectQuestion,
   onOpenMatrix,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const activePillRef = useRef<HTMLButtonElement>(null);
+
+  const handleSelect = (idx: number) => {
+    onSelectQuestion?.(idx);
+    onSelectIndex?.(idx);
+  };
 
   // Smoothly center the active pill in the horizontal strip
   useEffect(() => {
@@ -101,7 +108,7 @@ export const QuestionNavigatorStrip: React.FC<QuestionNavigatorStripProps> = ({
               <button
                 key={q.id}
                 ref={isActive ? activePillRef : null}
-                onClick={() => onSelectIndex(idx)}
+                onClick={() => handleSelect(idx)}
                 className={`relative shrink-0 w-8 h-8 rounded-lg text-xs font-semibold tabular-nums flex items-center justify-center transition-all duration-150 cursor-pointer ${pillStyle}`}
                 title={`Question ${idx + 1}${isFlagged ? ' (Flagged)' : ''}${isAnswered ? ' (Answered)' : ''}`}
               >
