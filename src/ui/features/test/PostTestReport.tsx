@@ -189,15 +189,21 @@ export const PostTestReport: React.FC<{
                     <span className="text-xs font-bold font-mono text-slate-400 mt-0.5">#{idx + 1}</span>
                     <div className="space-y-1">
                       <div className="flex items-center space-x-2">
-                        {isCorrect ? (
-                          <span className="inline-flex items-center space-x-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Correct</span>
-                          </span>
+                        {ans ? (
+                          isCorrect ? (
+                            <span className="inline-flex items-center space-x-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Correct</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center space-x-1 text-xs font-semibold text-red-700 bg-red-50 px-2 py-0.5 rounded-md">
+                              <XCircle className="w-3.5 h-3.5" />
+                              <span>Incorrect</span>
+                            </span>
+                          )
                         ) : (
-                          <span className="inline-flex items-center space-x-1 text-xs font-semibold text-red-700 bg-red-50 px-2 py-0.5 rounded-md">
-                            <XCircle className="w-3.5 h-3.5" />
-                            <span>Incorrect</span>
+                          <span className="inline-flex items-center space-x-1 text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                            <span>Unanswered</span>
                           </span>
                         )}
                         <span className="text-[11px] text-slate-400 uppercase font-mono">{q.chapterId}</span>

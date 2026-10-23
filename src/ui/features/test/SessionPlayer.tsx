@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 import { Question, ChoiceId } from '../../../domain/model/types.ts';
@@ -21,13 +21,16 @@ export const SessionPlayer: React.FC = () => {
   const navigate = useNavigate();
   const { questions: allQuestions } = useQuestionStore();
 
-  const sessionConfig = (location.state as {
-    mode?: 'practice' | 'mock' | 'rapid' | 'retest' | 'exam';
-    subjectId?: string;
-    chapterId?: string;
-    questionCount?: number;
-    timeLimitMinutes?: number;
-  }) || { mode: 'practice', questionCount: 20 };
+  const sessionConfig = useMemo(() => {
+    return (location.state as {
+      mode?: 'practice' | 'mock' | 'rapid' | 'retest' | 'exam';
+      subjectId?: string;
+      chapterId?: string;
+      questionCount?: number;
+      timeLimitMinutes?: number;
+      highYieldOnly?: boolean;
+    }) || { mode: 'practice', questionCount: 20 };
+  }, [location.state]);
 
   const mode = sessionConfig.mode || 'practice';
   const isExamMode = mode === 'mock' || mode === 'exam';
@@ -39,6 +42,7 @@ export const SessionPlayer: React.FC = () => {
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
   const [showExplanation, setShowExplanation] = useState(true);
+  const [sessionStartTime] = useState<number>(() => Date.now());
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(
     (sessionConfig.timeLimitMinutes || 120) * 60
   );
@@ -53,9 +57,45 @@ export const SessionPlayer: React.FC = () => {
     if (sessionConfig.chapterId && sessionConfig.chapterId !== 'all') {
       pool = pool.filter((q) => q.chapterId === sessionConfig.chapterId);
     }
+    if (sessionConfig.highYieldOnly) {
+      const hyPool = pool.filter((q) => q.highYield);
+      if (hyPool.length > 0) {
+        pool = hyPool;
+      }
+    }
     const count = sessionConfig.questionCount || 20;
     setSessionQuestions(pool.slice(0, count));
   }, [allQuestions, sessionConfig]);
+
+  const currentQ = sessionQuestions[currentIndex];
+  const currentAnswer = currentQ ? answers[currentQ.id] : undefined;
+  const isAnswered = !!currentAnswer;
+  const isLastQuestion = sessionQuestions.length > 0 && currentIndex === sessionQuestions.length - 1;
+
+  const handleSubmitExam = useCallback(async () => {
+    try {
+      // Record attempts in IndexedDB
+      const records = Object.entries(answers).map(([qId, ans]) => ({
+        id: `att-${Date.now()}-${qId}`,
+        questionId: qId,
+        blockId: 'cvs',
+        sessionId: `sess-${Date.now()}`,
+        mode,
+        selectedChoiceId: ans.choiceId,
+        isCorrect: ans.isCorrect,
+        confidence: 'unsure' as const,
+        responseTimeMs: 30000,
+        answeredAt: new Date().toISOString(),
+      }));
+      if (records.length > 0) {
+        await db.attempts.bulkPut(records);
+      }
+    } catch (err) {
+      console.error('Failed to save exam attempts in DB:', err);
+    } finally {
+      setIsSubmitted(true);
+    }
+  }, [answers, mode]);
 
   // Countdown timer for Exam Mode
   useEffect(() => {
@@ -71,11 +111,7 @@ export const SessionPlayer: React.FC = () => {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isExamMode, isSubmitted]);
-
-  const currentQ = sessionQuestions[currentIndex];
-  const currentAnswer = currentQ ? answers[currentQ.id] : undefined;
-  const isAnswered = !!currentAnswer;
+  }, [isExamMode, isSubmitted, handleSubmitExam]);
 
   // Immediate Commit Answer handler
   const handleSelectAnswer = useCallback((choiceId: ChoiceId) => {
@@ -93,22 +129,40 @@ export const SessionPlayer: React.FC = () => {
 
     if (!isExamMode) {
       setShowExplanation(true);
+      db.attempts.put({
+        id: `att-${Date.now()}-${currentQ.id}`,
+        questionId: currentQ.id,
+        blockId: currentQ.blockId || 'cvs',
+        sessionId: `practice-session`,
+        mode: 'practice',
+        selectedChoiceId: choiceId,
+        isCorrect,
+        confidence: 'unsure',
+        responseTimeMs: 0,
+        answeredAt: new Date().toISOString(),
+      });
     }
   }, [currentQ, isExamMode, isAnswered]);
 
   const handleNext = useCallback(() => {
     if (currentIndex < sessionQuestions.length - 1) {
-      setCurrentIndex((i) => i + 1);
-      setShowExplanation(false);
+      const nextIndex = currentIndex + 1;
+      setCurrentIndex(nextIndex);
+      const nextQ = sessionQuestions[nextIndex];
+      setShowExplanation(!!(nextQ && answers[nextQ.id]));
+    } else {
+      handleSubmitExam();
     }
-  }, [currentIndex, sessionQuestions.length]);
+  }, [currentIndex, sessionQuestions, answers, handleSubmitExam]);
 
   const handlePrev = useCallback(() => {
     if (currentIndex > 0) {
-      setCurrentIndex((i) => i - 1);
-      setShowExplanation(false);
+      const prevIndex = currentIndex - 1;
+      setCurrentIndex(prevIndex);
+      const prevQ = sessionQuestions[prevIndex];
+      setShowExplanation(!!(prevQ && answers[prevQ.id]));
     }
-  }, [currentIndex]);
+  }, [currentIndex, sessionQuestions, answers]);
 
   const handleToggleFlag = useCallback(() => {
     if (!currentQ) return;
@@ -120,26 +174,6 @@ export const SessionPlayer: React.FC = () => {
     setBookmarks((prev) => ({ ...prev, [currentQ.id]: !prev[currentQ.id] }));
   }, [currentQ]);
 
-  const handleSubmitExam = async () => {
-    // Record attempts in IndexedDB
-    const records = Object.entries(answers).map(([qId, ans]) => ({
-      id: `att-${Date.now()}-${qId}`,
-      questionId: qId,
-      blockId: 'cvs',
-      sessionId: `sess-${Date.now()}`,
-      mode,
-      selectedChoiceId: ans.choiceId,
-      isCorrect: ans.isCorrect,
-      confidence: 'unsure' as const,
-      responseTimeMs: 30000,
-      answeredAt: new Date().toISOString(),
-    }));
-    if (records.length > 0) {
-      await db.attempts.bulkPut(records);
-    }
-    setIsSubmitted(true);
-  };
-
   // Keyboard Navigation: Spatial Model (1-4 for choices, arrows, F, B, E, Enter)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -150,10 +184,32 @@ export const SessionPlayer: React.FC = () => {
       else if (e.key === '2') handleSelectAnswer('b');
       else if (e.key === '3') handleSelectAnswer('c');
       else if (e.key === '4') handleSelectAnswer('d');
-      else if (e.key === 'ArrowRight') handleNext();
+      else if (e.key === 'ArrowRight') {
+        if (isLastQuestion) {
+          if (!isExamMode && isAnswered) {
+            handleSubmitExam();
+          } else if (isExamMode) {
+            handleSubmitExam();
+          }
+        } else {
+          handleNext();
+        }
+      }
       else if (e.key === 'ArrowLeft') handlePrev();
       else if (e.key === 'Enter') {
-        if (!isExamMode && isAnswered) handleNext();
+        if (!isExamMode && isAnswered) {
+          if (isLastQuestion) {
+            handleSubmitExam();
+          } else {
+            handleNext();
+          }
+        } else if (isExamMode) {
+          if (isLastQuestion) {
+            handleSubmitExam();
+          } else {
+            handleNext();
+          }
+        }
       }
       else if (e.key.toLowerCase() === 'f') handleToggleFlag();
       else if (e.key.toLowerCase() === 'b') handleToggleBookmark();
@@ -162,7 +218,17 @@ export const SessionPlayer: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSelectAnswer, handleNext, handlePrev, handleToggleFlag, handleToggleBookmark, isExamMode, isAnswered]);
+  }, [
+    handleSelectAnswer,
+    handleNext,
+    handlePrev,
+    handleSubmitExam,
+    handleToggleFlag,
+    handleToggleBookmark,
+    isExamMode,
+    isAnswered,
+    isLastQuestion,
+  ]);
 
   if (sessionQuestions.length === 0) {
     return (
@@ -191,13 +257,16 @@ export const SessionPlayer: React.FC = () => {
           result={{
             sessionQuestions,
             answers,
-            timeSpentSeconds: (sessionConfig.timeLimitMinutes || 120) * 60 - timeLeftSeconds,
+            timeSpentSeconds: isExamMode
+              ? (sessionConfig.timeLimitMinutes || 120) * 60 - timeLeftSeconds
+              : Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000)),
             mode,
           }}
           onRetestMistakes={(mistakes) => {
             setSessionQuestions(mistakes);
             setCurrentIndex(0);
             setAnswers({});
+            setShowExplanation(false);
             setIsSubmitted(false);
           }}
         />
@@ -373,7 +442,11 @@ export const SessionPlayer: React.FC = () => {
                 </div>
 
                 <div className="text-xs text-slate-500 font-mono">
-                  Press <strong>Enter ⏎</strong> for next question
+                  {isLastQuestion ? (
+                    <>Press <strong>Enter ⏎</strong> to finish & view results</>
+                  ) : (
+                    <>Press <strong>Enter ⏎</strong> for next question</>
+                  )}
                 </div>
               </div>
 
@@ -418,17 +491,40 @@ export const SessionPlayer: React.FC = () => {
 
           {/* Keyboard hint */}
           <span className="hidden sm:inline font-mono text-[11px]">
-            Keys: <strong>1, 2, 3, 4</strong> to answer • <strong>← / →</strong> navigate
+            {isLastQuestion ? (
+              isExamMode ? (
+                <span>Press <strong>Submit Exam</strong> when finished</span>
+              ) : isAnswered ? (
+                <span>Press <strong>Enter ⏎</strong> to finish & view results</span>
+              ) : (
+                <span>Keys: <strong>1, 2, 3, 4</strong> to answer</span>
+              )
+            ) : (
+              <span>Keys: <strong>1, 2, 3, 4</strong> to answer • <strong>← / →</strong> navigate</span>
+            )}
           </span>
 
-          <button
-            onClick={handleNext}
-            disabled={currentIndex === sessionQuestions.length - 1}
-            className="py-2 px-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold flex items-center space-x-1 cursor-pointer"
-          >
-            <span>Next (→)</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          {isLastQuestion ? (
+            <button
+              onClick={handleSubmitExam}
+              className={`py-2 px-4 rounded-lg font-bold flex items-center space-x-1.5 cursor-pointer shadow-xs transition-all ${
+                isExamMode
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
+            >
+              <span>{isExamMode ? 'Submit Exam' : 'Finish & View Results'}</span>
+              <CheckCircle2 className="w-4 h-4" />
+            </button>
+          ) : (
+            <button
+              onClick={handleNext}
+              className="py-2 px-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold flex items-center space-x-1 cursor-pointer"
+            >
+              <span>Next (→)</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
     </div>
