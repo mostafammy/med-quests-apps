@@ -10,11 +10,7 @@ import {
   AlertTriangle,
   Award,
   BookOpen,
-  Target,
   Zap,
-  TrendingUp,
-  Flame,
-  CheckCircle2,
   Clock
 } from 'lucide-react';
 
