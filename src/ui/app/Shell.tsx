@@ -15,18 +15,19 @@ import { ThemeToggle } from './ThemeToggle';
 export const Shell: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 transition-colors duration-300 relative overflow-x-hidden">
-      {/* Universal Ambient Chromatic Glow Background Orbs */}
-      <div className="fixed top-0 left-1/4 w-[36rem] h-[36rem] bg-gradient-to-tr from-blue-400/15 via-indigo-400/10 to-transparent rounded-full blur-3xl pointer-events-none -z-10 animate-pulse duration-[8000ms]" />
-      <div className="fixed bottom-0 right-1/4 w-[32rem] h-[32rem] bg-gradient-to-bl from-purple-400/15 via-pink-400/10 to-transparent rounded-full blur-3xl pointer-events-none -z-10 animate-pulse duration-[10000ms]" />
-      <div className="fixed top-1/2 right-10 w-96 h-96 bg-gradient-to-br from-cyan-400/10 to-emerald-400/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      {/* Universal Ambient Chromatic Glow Background Orbs with Apple Fluid Kinetic Floating */}
+      <div className="fixed -top-12 left-1/4 w-[40rem] h-[40rem] bg-gradient-to-tr from-blue-400/20 via-indigo-400/15 to-transparent rounded-full blur-3xl pointer-events-none -z-10 animate-float-fluid opacity-80 dark:opacity-40" />
+      <div className="fixed -bottom-16 right-1/4 w-[36rem] h-[36rem] bg-gradient-to-bl from-purple-400/20 via-pink-400/15 to-transparent rounded-full blur-3xl pointer-events-none -z-10 animate-float-fluid-reverse opacity-75 dark:opacity-35" />
+      <div className="fixed top-1/3 right-10 w-96 h-96 bg-gradient-to-br from-cyan-400/15 to-emerald-400/15 rounded-full blur-3xl pointer-events-none -z-10 animate-float-fluid opacity-60 dark:opacity-30" />
 
       {/* Top Navigation Bar with Frosted Glassmorphism (Apple Material Blur) */}
-      <header className="sticky top-0 z-40 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl border-b border-white/60 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.4)] transition-all duration-300">
+      <header className="sticky top-0 z-40 bg-white/75 dark:bg-zinc-900/75 backdrop-blur-2xl border-b border-white/60 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.4)] transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Logo & Platform Name */}
           <NavLink to="/" className="flex items-center space-x-3 group cursor-pointer">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 dark:from-blue-500 dark:to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-105 group-hover:rotate-1 transition-all duration-300">
-              <Heart className="w-5 h-5 fill-current" />
+            <div className="relative w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-indigo-700 dark:from-blue-500 dark:to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+              <Heart className="w-5 h-5 fill-current animate-heartbeat" />
+              <span className="absolute -inset-0.5 rounded-2xl bg-blue-400/30 blur-xs -z-10 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
             <div>
               <span className="font-extrabold text-slate-900 dark:text-zinc-50 tracking-tight text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
