@@ -1,15 +1,51 @@
 @import "tailwindcss";
 
 @layer base {
-  body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  :root {
+    color-scheme: light;
+
+    /* Apple HIG Palette - Semantic Tokens (Light) */
+    --color-system-canvas: #f8fafc;
+    --color-system-surface: #ffffff;
+    --color-system-surface-secondary: #f1f5f9;
+    --color-system-surface-elevated: #ffffff;
+    --color-system-separator: rgba(148, 163, 184, 0.25);
+    --color-system-border: #e2e8f0;
+
+    --color-label-primary: #0f172a;
+    --color-label-secondary: #475569;
+    --color-label-tertiary: #94a3b8;
   }
+
+  :root.dark {
+    color-scheme: dark;
+
+    /* Apple HIG Palette - Semantic Tokens (Dark Mode: OLED & Elevated Layers) */
+    --color-system-canvas: #09090b;
+    --color-system-surface: #18181b;
+    --color-system-surface-secondary: #27272a;
+    --color-system-surface-elevated: #27272a;
+    --color-system-separator: rgba(255, 255, 255, 0.08);
+    --color-system-border: #27272a;
+
+    --color-label-primary: #f4f4f5;
+    --color-label-secondary: #a1a1aa;
+    --color-label-tertiary: #71717a;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', "Segoe UI", Roboto, sans-serif;
+    background-color: var(--color-system-canvas);
+    color: var(--color-label-primary);
+    transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
   code, kbd, samp, pre {
     font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   }
 }
 
-/* Custom Scrollbar for study sessions */
+/* Apple-style smooth scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -23,4 +59,11 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
 }
