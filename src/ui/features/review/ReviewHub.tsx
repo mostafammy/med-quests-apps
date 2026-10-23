@@ -8,11 +8,6 @@ import {
   RotateCcw, 
   Play, 
   CheckCircle2,
-  Calendar,
-  Sparkles,
-  ArrowRight,
-  Flame,
-  Layers,
   ChevronRight
 } from 'lucide-react';
 
@@ -117,7 +112,6 @@ export const ReviewHub: React.FC = () => {
               const accuracy = topic.totalAttempts > 0 ? topic.accuracy : null;
               const isCritical = accuracy !== null && accuracy < 50;
               const isDeveloping = accuracy !== null && accuracy >= 50 && accuracy < 80;
-              const isMastered = accuracy !== null && accuracy >= 80;
 
               return (
                 <div
