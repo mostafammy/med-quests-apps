@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production build output
+dist/
+build/
+
+# Operating System & IDE junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Environment & Local secrets
+.env
+.env.local
+.env.*.local
+*.log
+
+# Temporary scratchpads & caches
+scratch/
+.eslintcache
+/CVS/
