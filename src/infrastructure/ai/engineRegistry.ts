@@ -94,12 +94,13 @@ export function resolveAiProvider(settings: AiSettings): AnyCloudProvider {
   }
 
   // 2. Automatic smart fallback to any configured provider
-  if (groqKey) {
-    return new GroqProvider(groqKey, settings.groqModel);
-  }
-
+  // Prefer Gemini (1,000,000 TPM quota) over Groq (6,000 TPM quota) to avoid rate limits
   if (geminiKey) {
     return new GeminiProvider(geminiKey, settings.geminiModel);
+  }
+
+  if (groqKey) {
+    return new GroqProvider(groqKey, settings.groqModel);
   }
 
   if (openRouterKey) {
@@ -108,4 +109,33 @@ export function resolveAiProvider(settings: AiSettings): AnyCloudProvider {
 
   // 3. Default to OpenRouter instance (will surface clear key requirement prompt if unconfigured)
   return new OpenRouterProvider(openRouterKey, settings.openRouterModel);
+}
+
+/**
+ * Resolves an alternate live cloud provider when the current provider encounters a rate limit (HTTP 429).
+ */
+export function getAvailableFallbackProvider(
+  settings: AiSettings,
+  failedProviderId: string
+): AnyCloudProvider | null {
+  const geminiKey = getGeminiKey(settings);
+  const groqKey = getGroqKey(settings);
+  const openRouterKey = getOpenRouterKey(settings);
+
+  // 1. Google Gemini (1M TPM quota - ideal failover for rate-limited Groq or OpenRouter)
+  if (failedProviderId !== 'gemini' && geminiKey) {
+    return new GeminiProvider(geminiKey, settings.geminiModel || 'gemini-2.5-flash');
+  }
+
+  // 2. Groq (if Groq was not the failing provider)
+  if (failedProviderId !== 'groq' && groqKey) {
+    return new GroqProvider(groqKey, settings.groqModel || 'openai/gpt-oss-20b');
+  }
+
+  // 3. OpenRouter (if configured and not the failing provider)
+  if (failedProviderId !== 'openrouter' && openRouterKey) {
+    return new OpenRouterProvider(openRouterKey, settings.openRouterModel);
+  }
+
+  return null;
 }
