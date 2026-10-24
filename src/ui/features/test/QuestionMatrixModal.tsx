@@ -67,13 +67,16 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-md">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/50 backdrop-blur-md">
       <div 
-        className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 flex flex-col max-h-[88vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-t-[28px] sm:rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[88vh] overflow-hidden animate-sheet-slide-up sm:animate-in sm:zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Apple Mobile Sheet Handle Bar */}
+        <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto my-2 sm:hidden shrink-0" />
+
         {/* Apple-style Sheet Header */}
-        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div className="space-y-1">
             <div className="flex items-center space-x-2">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
@@ -84,14 +87,14 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
                 {answeredCount} of {totalCount} Completed ({progressPercent}%)
               </span>
             </div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
               Question Navigator
             </h2>
           </div>
 
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer apple-tap"
             title="Close (Esc)"
           >
             <X className="w-4 h-4" />
@@ -107,8 +110,8 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
         </div>
 
         {/* Apple Segmented Filter Control */}
-        <div className="p-4 bg-slate-50/70 dark:bg-slate-950/40 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex p-1 bg-slate-200/70 dark:bg-slate-800/80 rounded-xl max-w-md mx-auto text-xs font-semibold">
+        <div className="p-3 sm:p-4 bg-slate-50/70 dark:bg-slate-950/40 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex p-1 bg-slate-200/70 dark:bg-slate-800/80 rounded-xl max-w-md mx-auto text-xs font-semibold overflow-x-auto scrollbar-none">
             <button
               onClick={() => setFilter('all')}
               className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer ${
@@ -154,14 +157,14 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
         </div>
 
         {/* Matrix Grid */}
-        <div className="p-6 overflow-y-auto flex-1">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 pb-[max(1.5rem,env(safe-area-inset-bottom))] scroll-momentum">
           {filteredQuestions.length === 0 ? (
             <div className="py-12 text-center text-slate-400 space-y-2">
               <HelpCircle className="w-8 h-8 mx-auto opacity-50" />
               <p className="text-sm font-medium">No questions match this filter</p>
             </div>
           ) : (
-            <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2.5">
+            <div className="grid grid-cols-5 xs:grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2 sm:gap-2.5">
               {filteredQuestions.map(({ q, idx }) => {
                 const isActive = idx === currentIndex;
                 const ans = answers[q.id];
@@ -197,7 +200,7 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
                       handleSelect(idx);
                       onClose();
                     }}
-                    className={`relative aspect-square rounded-2xl flex flex-col items-center justify-center p-1 text-sm font-bold tabular-nums transition-all duration-150 cursor-pointer ${pillColor}`}
+                    className={`relative aspect-square rounded-2xl flex flex-col items-center justify-center p-1 text-sm font-bold tabular-nums transition-all duration-150 cursor-pointer apple-tap ${pillColor}`}
                     title={`Question ${idx + 1}`}
                   >
                     <span>{idx + 1}</span>
