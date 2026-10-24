@@ -63,15 +63,15 @@ export const CurriculumLibrary: React.FC = () => {
   ];
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] py-8 px-4 sm:px-6 lg:px-8 space-y-8 animate-in fade-in duration-300">
+    <div className="relative min-h-[calc(100vh-4rem)] py-6 sm:py-8 px-3 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 animate-apple-entrance">
       {/* Top Header Card */}
-      <div className="p-6 md:p-8 rounded-3xl bg-white/65 dark:bg-zinc-900/65 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.06)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all">
+      <div className="p-5 sm:p-7 md:p-8 rounded-3xl bg-white/65 dark:bg-zinc-900/65 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.06)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all">
         <div className="space-y-1.5">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-700 dark:text-blue-300 text-xs font-semibold backdrop-blur-md">
             <BookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
             <span>Cardiovascular Block 206 Curriculum</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 dark:from-zinc-100 dark:via-zinc-200 dark:to-blue-200 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 dark:from-zinc-100 dark:via-zinc-200 dark:to-blue-200 bg-clip-text text-transparent">
             Faculty Curriculum Library
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl leading-relaxed">
@@ -79,17 +79,17 @@ export const CurriculumLibrary: React.FC = () => {
           </p>
         </div>
 
-        <div className="px-4 py-2 rounded-2xl bg-white/60 dark:bg-zinc-800/60 backdrop-blur-md border border-white/80 dark:border-zinc-700/80 text-xs font-bold text-slate-800 dark:text-zinc-200 shadow-xs">
+        <div className="px-4 py-2 rounded-2xl bg-white/60 dark:bg-zinc-800/60 backdrop-blur-md border border-white/80 dark:border-zinc-700/80 text-xs font-bold text-slate-800 dark:text-zinc-200 shadow-xs self-start md:self-auto">
           6 Handouts Indexed
         </div>
       </div>
 
       {/* Documents Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
         {documents.map((doc) => (
           <div
             key={doc.id}
-            className="p-6 rounded-3xl bg-white/60 dark:bg-zinc-900/60 hover:bg-white/80 dark:hover:bg-zinc-900/80 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.3)] transition-all duration-300 hover:-translate-y-1 space-y-4"
+            className="p-5 sm:p-6 rounded-3xl bg-white/60 dark:bg-zinc-900/60 hover:bg-white/80 dark:hover:bg-zinc-900/80 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.3)] transition-all duration-300 space-y-4"
           >
             <div className="flex items-start justify-between">
               <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-blue-500/10 dark:bg-blue-400/10 text-blue-700 dark:text-blue-300 border border-blue-400/20 backdrop-blur-md">
