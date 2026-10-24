@@ -1,10 +1,36 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "med-quests-apps",
+  "main": "./src/worker/index.ts",
   "compatibility_date": "2026-10-19",
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application",
     "html_handling": "auto-trailing-slash"
+  },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "BETTER_AUTH_URL": "https://med-quests-apps.mostafa-yaser-developer.workers.dev"
+  },
+  "d1_databases": [
+    {
+      "binding": "MED_QUESTS_DB",
+      "database_name": "med_quests_db",
+      "database_id": "0bb4ea27-4130-49ef-bc8d-3ed88a3d2fe8",
+      "migrations_dir": "./src/worker/migrations"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "MED_QUESTS_AUTH_KV",
+      "id": "a5b932a09dba44e7860785ceeac5db06"
+    }
+  ],
+  "observability": {
+    "logs": {
+      "enabled": false,
+      "invocation_logs": true
+    }
   }
 }
