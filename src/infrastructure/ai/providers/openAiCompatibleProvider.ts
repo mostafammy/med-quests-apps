@@ -43,6 +43,11 @@ export abstract class OpenAiCompatibleProvider {
     signal: AbortSignal
   ): AsyncIterable<LlmStreamEvent> {
     if (!this.apiKey.trim()) {
+      if (this.providerId === 'openrouter') {
+        throw new Error(
+          'OpenRouter API Key is missing. OpenRouter requires a free API key (openrouter.ai/keys) even for :free models. Please enter your key in Co-Pilot Settings, or switch to Google Gemini (pre-configured).'
+        );
+      }
       throw new Error(`API Key for ${this.providerId.toUpperCase()} is missing. Configure it in Co-Pilot settings.`);
     }
 
@@ -148,7 +153,7 @@ export abstract class OpenAiCompatibleProvider {
           throw new Error(`Invalid ${this.providerId.toUpperCase()} API Key. Please verify your key in Co-Pilot settings.`);
         }
         if (response.status === 429) {
-          throw new Error(`${this.providerId.toUpperCase()} rate limit exceeded. Please wait a moment.`);
+          throw new Error(`${this.providerId.toUpperCase()} rate limit exceeded. Please wait a moment, or switch to Google Gemini (high limits) in Co-Pilot Settings.`);
         }
         try {
           const parsed = JSON.parse(finalErr);
