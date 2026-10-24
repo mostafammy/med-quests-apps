@@ -38,6 +38,7 @@ export const AiCopilotDrawer: React.FC = () => {
     messages,
     isStreaming,
     activeDiagnosticTool,
+    activeResolvedEngine,
     error,
     sendUserMessage,
     abortStreaming,
@@ -156,13 +157,15 @@ export const AiCopilotDrawer: React.FC = () => {
 
                 {/* Model Engine Pill */}
                 {(() => {
+                  const effectiveEngine = (activeResolvedEngine || settings.engine) as 'groq' | 'gemini' | 'openrouter';
+                  const isFallback = Boolean(activeResolvedEngine && activeResolvedEngine !== settings.engine);
                   const activeModelId =
-                    settings.engine === 'groq'
+                    effectiveEngine === 'groq'
                       ? settings.groqModel
-                      : settings.engine === 'gemini'
+                      : effectiveEngine === 'gemini'
                       ? settings.geminiModel
                       : settings.openRouterModel;
-                  const friendlyModelName = getModelDisplayName(settings.engine, activeModelId);
+                  const friendlyModelName = getModelDisplayName(effectiveEngine, activeModelId);
 
                   return (
                     <button
@@ -170,20 +173,20 @@ export const AiCopilotDrawer: React.FC = () => {
                       className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 dark:bg-indigo-400/15 text-indigo-700 dark:text-indigo-300 font-extrabold border border-indigo-500/20 flex items-center space-x-1 cursor-pointer hover:bg-indigo-500/20 transition-colors"
                       title="Change engine or model in settings"
                     >
-                      {settings.engine === 'openrouter' ? (
+                      {effectiveEngine === 'openrouter' ? (
                         <>
                           <Globe className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
-                          <span>OPENROUTER • {friendlyModelName}</span>
+                          <span>OPENROUTER{isFallback ? ' (Backup)' : ''} • {friendlyModelName}</span>
                         </>
-                      ) : settings.engine === 'groq' ? (
+                      ) : effectiveEngine === 'groq' ? (
                         <>
                           <Cpu className="w-2.5 h-2.5 text-amber-500 shrink-0" />
-                          <span>GROQ • {friendlyModelName}</span>
+                          <span>GROQ{isFallback ? ' (Backup)' : ''} • {friendlyModelName}</span>
                         </>
                       ) : (
                         <>
                           <Sparkles className="w-2.5 h-2.5 text-purple-500 shrink-0" />
-                          <span>GEMINI • {friendlyModelName}</span>
+                          <span>GEMINI{isFallback ? ' (Backup)' : ''} • {friendlyModelName}</span>
                         </>
                       )}
                     </button>
