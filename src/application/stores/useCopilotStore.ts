@@ -13,6 +13,8 @@ import { useAiSettingsStore } from './useAiSettingsStore.ts';
 import { useQuestionStore } from './useQuestionStore.ts';
 import { useStatsStore } from './useStatsStore.ts';
 import { db } from '../../infrastructure/storage/db.ts';
+import { powerActionCacheService } from '../../domain/ai/powerActionCacheService.ts';
+import { POWER_ACTIONS, type PowerActionKey } from '../../domain/ai/powerActions.ts';
 
 interface CopilotState {
   // Drawer visibility & size
@@ -28,6 +30,12 @@ interface CopilotState {
   activeDiagnosticTool: string | null;
   error: string | null;
 
+  // Power Actions & Instant Cache
+  cachedActionKeys: Set<string>;
+  loadCachedActionKeys: (questionId: string) => Promise<void>;
+  clearQuestionAiCache: () => Promise<void>;
+  executePowerAction: (actionKey: PowerActionKey, promptOverride?: string) => Promise<void>;
+
   // Actions
   openDrawer: () => void;
   closeDrawer: () => void;
@@ -35,7 +43,7 @@ interface CopilotState {
   toggleExpanded: () => void;
 
   setSurface: (surface: CopilotSurface | null) => void;
-  sendUserMessage: (text: string) => Promise<void>;
+  sendUserMessage: (text: string, cacheActionKey?: string) => Promise<void>;
   abortStreaming: () => void;
   clearMessages: () => void;
 }
@@ -53,11 +61,82 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
   isStreaming: false,
   activeDiagnosticTool: null,
   error: null,
+  cachedActionKeys: new Set<string>(),
 
   openDrawer: () => set({ isOpen: true }),
   closeDrawer: () => set({ isOpen: false }),
   toggleDrawer: () => set((state) => ({ isOpen: !state.isOpen })),
   toggleExpanded: () => set((state) => ({ isExpanded: !state.isExpanded })),
+
+  loadCachedActionKeys: async (questionId: string) => {
+    if (!questionId) {
+      set({ cachedActionKeys: new Set() });
+      return;
+    }
+    try {
+      const keys = await powerActionCacheService.getCachedActionKeys(questionId);
+      set({ cachedActionKeys: keys });
+    } catch {
+      set({ cachedActionKeys: new Set() });
+    }
+  },
+
+  clearQuestionAiCache: async () => {
+    const { activeQuestionId } = get();
+    if (!activeQuestionId) return;
+    await powerActionCacheService.clearQuestionCache(activeQuestionId);
+    set({ cachedActionKeys: new Set() });
+  },
+
+  executePowerAction: async (actionKey: PowerActionKey, promptOverride?: string) => {
+    const { surface, isStreaming, activeQuestionId } = get();
+    if (!surface || surface.kind !== 'session' || isStreaming || !activeQuestionId) return;
+
+    const actionDef = POWER_ACTIONS.find((a) => a.key === actionKey);
+    if (!actionDef) return;
+
+    // Check if we already have an instant 0ms cached answer in IndexedDB
+    const cachedRecord = await powerActionCacheService.getCachedAction(activeQuestionId, actionKey);
+    if (cachedRecord && cachedRecord.responseParts.length > 0) {
+      const userMsg: ChatMessage = {
+        id: `msg-user-${Date.now()}`,
+        role: 'user',
+        parts: [{ kind: 'text', text: cachedRecord.prompt || actionDef.label }],
+        status: 'complete',
+        engine: null,
+        createdAt: Date.now(),
+        latencyMs: 0,
+      };
+
+      const assistantMsg: ChatMessage = {
+        id: `msg-ai-${Date.now() + 1}`,
+        role: 'assistant',
+        parts: cachedRecord.responseParts,
+        status: 'complete',
+        engine: cachedRecord.engine ?? 'cached',
+        createdAt: Date.now() + 1,
+        latencyMs: 0,
+      };
+
+      set((state) => ({
+        messages: [...state.messages, userMsg, assistantMsg],
+        error: null,
+      }));
+      return;
+    }
+
+    // Not cached yet: generate deterministic clinical prompt
+    const prompt =
+      promptOverride ||
+      actionDef.generatePrompt({
+        questionStem: surface.question.stem,
+        choices: surface.question.choices,
+        correctChoiceId: surface.question.correctChoiceId,
+        selectedChoiceId: surface.selectedChoiceId,
+      });
+
+    await get().sendUserMessage(prompt, actionKey);
+  },
 
   setSurface: (surface) => {
     const prev = get().surface;
@@ -74,8 +153,16 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
         threadId: `question:${qId}`,
         activeDiagnosticTool: null,
       });
+
+      // Load cached actions for this active question
+      get().loadCachedActionKeys(qId);
     } else {
       set({ surface });
+      if (qId) {
+        get().loadCachedActionKeys(qId);
+      } else {
+        set({ cachedActionKeys: new Set() });
+      }
     }
   },
 
@@ -89,7 +176,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
     set({ isStreaming: false, activeDiagnosticTool: null });
   },
 
-  sendUserMessage: async (userText: string) => {
+  sendUserMessage: async (userText: string, cacheActionKey?: string) => {
     const { surface, messages, isStreaming } = get();
     if (!surface || isStreaming || !userText.trim()) return;
 
@@ -259,6 +346,12 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
       if (rafId !== null) cancelAnimationFrame(rafId);
       flushUpdatesToStore();
 
+      const finalParts: MessagePart[] = [];
+      if (accumulatedText) {
+        finalParts.push({ kind: 'text', text: accumulatedText });
+      }
+      finalParts.push(...partsBuffer);
+
       set((state) => ({
         isStreaming: false,
         activeDiagnosticTool: null,
@@ -266,6 +359,18 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
           m.id === assistantMsgId ? { ...m, status: 'complete' } : m
         ),
       }));
+
+      // Cache power action response in local IndexedDB for 0ms instant future retrieval
+      if (cacheActionKey && activeQuestion?.id && finalParts.length > 0) {
+        await powerActionCacheService.saveCachedAction(
+          activeQuestion.id,
+          cacheActionKey,
+          userText,
+          finalParts,
+          resolvedEngineId
+        );
+        await get().loadCachedActionKeys(activeQuestion.id);
+      }
     } catch (err) {
       if ((err as Error).name === 'AbortError') {
         set((state) => ({
