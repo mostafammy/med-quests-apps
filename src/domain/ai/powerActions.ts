@@ -39,7 +39,7 @@ export const POWER_ACTIONS: readonly PowerActionDefinition[] = [
     generatePrompt: ({ choices, correctChoiceId }) => {
       const correctChoice = choices.find((c) => c.id === correctChoiceId);
       const targetText = correctChoice ? `Option ${correctChoice.id.toUpperCase()} (${correctChoice.text})` : 'the correct choice';
-      return `Explain in depth why ${targetText} is the correct answer. Break down the core pathophysiology and why it specifically matches the clinical presentation.`;
+      return `Explain in depth why ${targetText} is the correct answer. Break down the core pathophysiology using first-principles and why it specifically matches the clinical presentation.`;
     },
   },
   {
@@ -108,6 +108,17 @@ export const POWER_ACTIONS: readonly PowerActionDefinition[] = [
     visibleWhen: 'sealed',
     generatePrompt: () => {
       return `I am torn between the choices. Without revealing which option is correct, what fundamental physiological principle distinguishes the top possibilities in this vignette?`;
+    },
+  },
+  {
+    key: 'sealed_pivot_clues',
+    label: 'Pivot Clues (Pre-Commit)',
+    shortLabel: 'Pivot Clues',
+    iconType: 'search',
+    tooltip: 'Highlight the decisive physical exam and vital sign pivot clues without spoiling the answer',
+    visibleWhen: 'sealed',
+    generatePrompt: () => {
+      return `Without spoiling the answer, guide me to the key clinical pivot clues (vital signs, murmur characteristics, chronicity) in this vignette that I should focus on.`;
     },
   },
 ];
