@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   Laptop,
   Smartphone,
+  ExternalLink,
 } from 'lucide-react';
 import {
   useAuthStore,
@@ -237,14 +238,26 @@ export const AdminGovernanceDrawer: React.FC = () => {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={closeGovernanceDrawer}
-            aria-label="Close Governance Command Center"
-            className="flex h-8 w-8 items-center justify-center self-end rounded-xl text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 sm:self-auto dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              href="/admin"
+              onClick={closeGovernanceDrawer}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold transition-colors cursor-pointer"
+              title="Open full-screen Admin Dashboard page"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Open Full Page</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={closeGovernanceDrawer}
+              aria-label="Close Governance Command Center"
+              className="flex h-8 w-8 items-center justify-center rounded-xl text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Navigation Tabs */}
