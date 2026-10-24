@@ -1,0 +1,584 @@
+import React, { useState, useMemo } from 'react';
+import {
+  Shield,
+  Sliders,
+  AlertTriangle,
+  Lock,
+  Unlock,
+  CheckCircle,
+  History,
+  Users,
+  BarChart3,
+  Sparkles,
+  Globe,
+  Cpu,
+  Search,
+  Activity,
+  Ban,
+  GraduationCap,
+  CheckCircle2,
+  Laptop,
+  Smartphone,
+  Loader2,
+  LogIn,
+} from 'lucide-react';
+import { useAuthStore, type GovernanceViewTab } from '../../../application/stores/useAuthStore.ts';
+import type { UserRole, FeatureFlagKey, PerformanceOverrideMode } from '../../../domain/auth/types.ts';
+import { ROLE_ENTITLEMENT_POLICIES } from '../../../domain/auth/entitlements.ts';
+import {
+  computePlatformAnalytics,
+  filterManagedUsers,
+  type AiFeatureFilterMode,
+  type RestrictionFilterMode,
+} from '../../../domain/auth/governanceAnalytics.ts';
+
+const FEATURE_FLAG_META: ReadonlyArray<{
+  readonly key: FeatureFlagKey;
+  readonly title: string;
+  readonly description: string;
+}> = [
+  {
+    key: 'ai_cloud_streaming_quota',
+    title: 'Cloud AI Co-Pilot Streaming',
+    description:
+      'Activates high-speed Groq/Gemini cloud reasoning. Turn OFF to exclude this user and restrict to local offline tutor.',
+  },
+  {
+    key: 'question_studio_author',
+    title: 'Question Studio Authoring (/studio)',
+    description:
+      'Grants access to author, edit, and verify clinical vignettes in the faculty Question Studio.',
+  },
+  {
+    key: 'multi_block_unlock',
+    title: 'Multi-Block Curriculum Access',
+    description:
+      'Unlocks early access to upcoming organ system blocks alongside Cardiovascular (CVS).',
+  },
+  {
+    key: 'cloud_sync_backup',
+    title: 'Cloud CRDT Progress Synchronization',
+    description:
+      'Enables cross-device background synchronization of attempts, SM-2 cards, and notes.',
+  },
+];
+
+export const AdminDashboardPage: React.FC = () => {
+  const {
+    authState,
+    activeGovernanceTab,
+    managedUsers,
+    selectedManagedUserId,
+    auditLogs,
+    setGovernanceTab,
+    selectManagedUser,
+    updateUserRole,
+    setUserRestriction,
+    quarantineAnomalousAccounts,
+    performanceOverride,
+    setPerformanceOverride,
+    signInWithGoogle,
+  } = useAuthStore();
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
+  const [restrictionFilter, setRestrictionFilter] = useState<RestrictionFilterMode>('all');
+  const [aiFeatureFilter, setAiFeatureFilter] = useState<AiFeatureFilterMode>('all');
+  const [blockReasonInput, setBlockReasonInput] = useState('');
+  const [selectedSessionIdx, setSelectedSessionIdx] = useState(0);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  const analytics = useMemo(() => computePlatformAnalytics(managedUsers), [managedUsers]);
+
+  const filteredUsers = useMemo(
+    () =>
+      filterManagedUsers(managedUsers, {
+        searchQuery,
+        roleFilter,
+        restrictionFilter,
+        aiFeatureFilter,
+      }),
+    [managedUsers, searchQuery, roleFilter, restrictionFilter, aiFeatureFilter]
+  );
+
+  const handleAdminSignIn = async () => {
+    setIsSigningIn(true);
+    try {
+      await signInWithGoogle('mostafa.yaser.developer@gmail.com');
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
+  const isAdmin = authState.status === 'authenticated-active' && authState.user.role === 'admin';
+
+  // =========================================================================
+  // GUEST / NON-ADMIN ACCESS GATE
+  // =========================================================================
+  if (!isAdmin) {
+    return (
+      <div className="min-h-[75vh] flex items-center justify-center p-4">
+        <div className="glass-surface relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-amber-500/30 p-6 sm:p-8 text-center shadow-2xl space-y-5">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-tr from-amber-500/20 via-orange-500/20 to-red-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 shadow-inner">
+            <Shield className="h-8 w-8" />
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+              Platform Owner Portal
+            </span>
+            <h2 className="text-xl sm:text-2xl font-bold font-heading text-zinc-900 dark:text-zinc-100">
+              Admin Governance & Analytics
+            </h2>
+            <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
+              This console is restricted to the Platform Owner and Administrators. Sign in with your registered administrator Google account to continue.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/80 dark:border-zinc-800 dark:bg-zinc-900/60 p-4 text-xs space-y-2">
+            <div className="flex items-center justify-between text-[11px] text-zinc-500">
+              <span>Authoritative Platform Owner</span>
+              <span className="font-mono font-bold text-amber-600 dark:text-amber-400">Owner Access</span>
+            </div>
+            <div className="font-mono text-xs font-semibold text-zinc-800 dark:text-zinc-200 break-all text-left bg-white dark:bg-zinc-950 p-2.5 rounded-xl border border-zinc-200/60 dark:border-zinc-800">
+              mostafa.yaser.developer@gmail.com
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void handleAdminSignIn()}
+            disabled={isSigningIn}
+            className="w-full flex items-center justify-center gap-3 rounded-2xl bg-zinc-900 hover:bg-black dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 py-3.5 px-4 font-semibold text-sm shadow-lg transition-all duration-200 disabled:opacity-50 cursor-pointer apple-tap"
+          >
+            {isSigningIn ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin text-amber-500" />
+                <span>Authenticating with Google...</span>
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                </svg>
+                <span>Sign in as Platform Owner</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // AUTHENTICATED PLATFORM OWNER & ADMIN DASHBOARD VIEW
+  // =========================================================================
+  const selectedRecord =
+    managedUsers.find((u) => u.profile.id === selectedManagedUserId) ??
+    filteredUsers[0] ??
+    managedUsers[0];
+
+  const targetUser = selectedRecord?.profile;
+  const targetEntitlements = selectedRecord?.entitlements;
+  const targetStats = selectedRecord?.studyTelemetry;
+  const isTargetBlocked = targetUser?.restriction.status === 'blocked';
+  const isTargetSuspended = targetUser?.restriction.status === 'suspended';
+
+  const handleRoleChange = async (newRole: UserRole) => {
+    if (!targetUser) return;
+    await updateUserRole(targetUser.id, newRole);
+  };
+
+  const handleToggleFeature = async (flag: FeatureFlagKey) => {
+    if (!targetUser || !targetEntitlements) return;
+    const currentVal = Boolean(targetEntitlements[flag]);
+    await updateUserRole(targetUser.id, targetUser.role, { [flag]: !currentVal });
+  };
+
+  const handleEnforceRestriction = async (status: 'active' | 'blocked' | 'suspended') => {
+    if (!targetUser) return;
+    const defaultReason =
+      status === 'blocked'
+        ? 'Administrative security ban: policy violation / credential sharing.'
+        : status === 'suspended'
+        ? 'Temporary 24h security hold: anomalous multi-region session activity.'
+        : null;
+    const untilIso =
+      status === 'suspended'
+        ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        : null;
+
+    await setUserRestriction(
+      targetUser.id,
+      status,
+      blockReasonInput.trim() || defaultReason,
+      untilIso
+    );
+    setBlockReasonInput('');
+  };
+
+  return (
+    <div className="space-y-6 animate-apple-entrance">
+      {/* Top Page Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-zinc-200/80 dark:border-zinc-800/80 pb-5">
+        <div className="flex items-center gap-3.5">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-500/20 via-orange-500/20 to-red-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 shadow-inner">
+            <Sliders className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-bold font-heading text-zinc-900 dark:text-zinc-100">
+                Enterprise Governance & Analytics
+              </h1>
+              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                Platform Owner Active
+              </span>
+            </div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Live Cloudflare edge telemetry across {analytics.totalUsers} scholars • Per-user AI quota management & instantaneous KV session enforcement
+            </p>
+          </div>
+        </div>
+
+        {/* Global Edge Health Badge */}
+        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+          <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Workers KV Latency: ~{analytics.globalAvgEdgeLatencyMs}ms</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Tabs */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200/60 pb-3 dark:border-zinc-800/60">
+        {[
+          {
+            id: 'cohort-analytics' as const,
+            label: 'Global Cohort & Telemetry Stats',
+            icon: BarChart3,
+            badge: `${analytics.totalUsers} Users`,
+          },
+          {
+            id: 'user-directory' as const,
+            label: 'User Directory, AI Toggles & Bans',
+            icon: Users,
+            badge: `${analytics.aiCloudEnabledUsersCount} AI Active`,
+          },
+          {
+            id: 'audit-trail' as const,
+            label: 'Security Audit Log',
+            icon: History,
+            badge: `${auditLogs.length} Events`,
+          },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeGovernanceTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setGovernanceTab(tab.id as GovernanceViewTab)}
+              className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
+                isActive
+                  ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
+                  : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-850 dark:hover:bg-zinc-800 dark:text-zinc-300'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{tab.label}</span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  isActive
+                    ? 'bg-white/20 text-white'
+                    : 'bg-zinc-200/80 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300'
+                }`}
+              >
+                {tab.badge}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* TAB 1: COHORT ANALYTICS */}
+      {activeGovernanceTab === 'cohort-analytics' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-2xl border border-zinc-200/70 bg-white/70 p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+              <span className="text-[11px] font-medium text-zinc-500">Total Scholars</span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-bold font-heading text-zinc-900 dark:text-zinc-100">
+                  {analytics.totalUsers}
+                </span>
+                <span className="text-[10px] font-semibold text-emerald-600">Active</span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-200/70 bg-white/70 p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+              <span className="text-[11px] font-medium text-zinc-500">Global Questions Practiced</span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-bold font-heading text-blue-600 dark:text-blue-400">
+                  {analytics.globalTotalAttempts.toLocaleString()}
+                </span>
+                <span className="text-[10px] font-semibold text-blue-500">Attempts</span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-200/70 bg-white/70 p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+              <span className="text-[11px] font-medium text-zinc-500">Cloud AI Active Scholars</span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-bold font-heading text-indigo-600 dark:text-indigo-400">
+                  {analytics.aiCloudEnabledUsersCount}
+                </span>
+                <span className="text-[10px] font-semibold text-zinc-400">
+                  / {analytics.aiCloudExcludedUsersCount} Excluded
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-200/70 bg-white/70 p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
+              <span className="text-[11px] font-medium text-zinc-500">Global Average Accuracy</span>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-2xl font-bold font-heading text-emerald-600 dark:text-emerald-400">
+                  {analytics.globalAverageAccuracy}%
+                </span>
+                <span className="text-[10px] font-semibold text-emerald-500">CVS Block</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Colos & Hardware Breakdown */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-zinc-200/70 bg-white/70 p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-500">
+                <Globe className="h-4 w-4 text-blue-500" />
+                <span>Cloudflare Global Edge Traffic (Top Colos)</span>
+              </div>
+              <div className="space-y-2">
+                {analytics.topColos.map((colo) => (
+                  <div key={colo.colo} className="flex items-center justify-between text-xs">
+                    <span className="font-mono font-semibold">{colo.colo} ({colo.countryCode})</span>
+                    <span className="text-zinc-500">{colo.count} active sessions</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-200/70 bg-white/70 p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-500">
+                <Cpu className="h-4 w-4 text-indigo-500" />
+                <span>Hardware Compositor Adaptation</span>
+              </div>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span>Ultra Tier (120Hz ProMotion Spring)</span>
+                  <span className="font-mono font-bold text-indigo-500">{analytics.tierBreakdown.ultra} devices</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Balanced Tier (60fps GPU Compositor)</span>
+                  <span className="font-mono font-bold text-blue-500">{analytics.tierBreakdown.balanced} devices</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Low-Spec Saver (&lt;16ms Input)</span>
+                  <span className="font-mono font-bold text-emerald-500">{analytics.tierBreakdown['low-spec']} devices</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: USER DIRECTORY & CONTROLS */}
+      {activeGovernanceTab === 'user-directory' && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/* User Directory List */}
+          <div className="space-y-3 lg:col-span-5">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search name, email, university, colo..."
+                className="w-full rounded-xl border border-zinc-200/80 bg-white pl-9 pr-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500/40 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { label: 'All Users', mode: 'all' as const },
+                { label: 'AI Active', mode: 'ai-enabled' as const },
+                { label: 'AI Excluded', mode: 'ai-excluded' as const },
+              ].map((pill) => (
+                <button
+                  key={pill.mode}
+                  type="button"
+                  onClick={() => setAiFeatureFilter(pill.mode)}
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer ${
+                    aiFeatureFilter === pill.mode
+                      ? 'bg-amber-600 text-white'
+                      : 'bg-zinc-200/60 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                  }`}
+                >
+                  {pill.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+              {filteredUsers.map((record) => {
+                const u = record.profile;
+                const isSelected = u.id === selectedRecord?.profile.id;
+                const isAiAllowed = Boolean(record.entitlements.ai_cloud_streaming_quota);
+                return (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => selectManagedUser(u.id)}
+                    className={`w-full rounded-2xl border p-3 text-left transition-all cursor-pointer ${
+                      isSelected
+                        ? 'border-amber-500/80 bg-amber-500/10 shadow-sm dark:bg-amber-500/15'
+                        : 'border-zinc-200/70 bg-white hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-850'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="font-bold text-xs text-zinc-900 dark:text-zinc-100">{u.displayName}</div>
+                      <span className="text-[10px] uppercase font-bold text-amber-600 dark:text-amber-400 font-mono">
+                        {u.role}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-zinc-500 truncate">{u.email}</div>
+                    <div className="mt-1 flex items-center justify-between text-[10px] text-zinc-400">
+                      <span>{record.studyTelemetry.totalAttempts} attempts</span>
+                      <span className={isAiAllowed ? 'text-indigo-600 font-bold' : 'text-zinc-400'}>
+                        {isAiAllowed ? 'AI Cloud Enabled' : 'AI Excluded'}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* User Details & Controls */}
+          {targetUser && (
+            <div className="space-y-5 lg:col-span-7">
+              <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-heading text-base font-bold text-zinc-900 dark:text-zinc-100">
+                      {targetUser.displayName}
+                    </h3>
+                    <p className="text-xs text-zinc-500">{targetUser.email} • {targetUser.universityName}</p>
+                  </div>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
+                    targetUser.restriction.status === 'active'
+                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                      : 'bg-red-500/20 text-red-700 dark:text-red-300'
+                  }`}>
+                    {targetUser.restriction.status}
+                  </span>
+                </div>
+
+                {/* Per-User Feature Overrides */}
+                <div className="space-y-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
+                  <h4 className="text-xs font-bold uppercase text-zinc-400">Feature Access & AI Quotas</h4>
+                  {FEATURE_FLAG_META.map((item) => {
+                    const enabled = Boolean(targetEntitlements?.[item.key]);
+                    return (
+                      <div key={item.key} className="flex items-center justify-between p-2.5 rounded-xl border border-zinc-200/60 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850">
+                        <div>
+                          <div className="font-semibold text-xs text-zinc-800 dark:text-zinc-200">{item.title}</div>
+                          <div className="text-[11px] text-zinc-500">{item.description}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void handleToggleFeature(item.key)}
+                          className={`h-6 w-11 rounded-full p-0.5 transition-colors cursor-pointer shrink-0 ${
+                            enabled ? 'bg-amber-500' : 'bg-zinc-300 dark:bg-zinc-700'
+                          }`}
+                        >
+                          <div className={`h-5 w-5 rounded-full bg-white transition-transform ${
+                            enabled ? 'translate-x-5' : 'translate-x-0'
+                          }`} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Ban / Suspension Controls */}
+                <div className="rounded-2xl border border-red-500/25 bg-red-500/5 p-4 dark:border-red-500/30 dark:bg-red-950/20 space-y-3">
+                  <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-bold text-xs uppercase">
+                    <Ban className="h-4 w-4" />
+                    <span>Platform Access Enforcement (Ban or Suspend)</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={blockReasonInput}
+                    onChange={(e) => setBlockReasonInput(e.target.value)}
+                    placeholder="Enforcement reason (e.g. Terms violation)"
+                    className="w-full rounded-xl border border-red-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:outline-none dark:border-red-900 dark:bg-zinc-900 dark:text-zinc-100"
+                  />
+                  <div className="flex gap-2">
+                    {targetUser.restriction.status !== 'active' ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleEnforceRestriction('active')}
+                        className="rounded-xl bg-emerald-600 text-white px-3 py-1.5 text-xs font-bold hover:bg-emerald-700 cursor-pointer"
+                      >
+                        Reactivate Account
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void handleEnforceRestriction('suspended')}
+                          className="rounded-xl bg-amber-600 text-white px-3 py-1.5 text-xs font-bold hover:bg-amber-700 cursor-pointer"
+                        >
+                          Suspend (24h)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleEnforceRestriction('blocked')}
+                          className="rounded-xl bg-red-600 text-white px-3 py-1.5 text-xs font-bold hover:bg-red-700 cursor-pointer"
+                        >
+                          Permanently Ban
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: AUDIT TRAIL */}
+      {activeGovernanceTab === 'audit-trail' && (
+        <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900 shadow-sm space-y-3">
+          <h3 className="font-heading text-sm font-bold text-zinc-800 dark:text-zinc-200">
+            Immutable Security Audit Ledger
+          </h3>
+          <div className="space-y-2 max-h-[600px] overflow-y-auto">
+            {auditLogs.map((log) => (
+              <div key={log.id} className="p-3 rounded-xl border border-zinc-200/60 dark:border-zinc-800 text-xs flex items-center justify-between">
+                <div>
+                  <span className="font-bold text-amber-600 dark:text-amber-400">{log.action}</span>
+                  <span className="text-zinc-500 ml-2">{log.description}</span>
+                </div>
+                <span className="text-[10px] text-zinc-400 font-mono">
+                  {new Date(log.timestamp).toLocaleTimeString()} • Colo: {log.edgeColo}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
