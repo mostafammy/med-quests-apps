@@ -99,35 +99,35 @@ export const TestHub: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] py-10 px-4 sm:px-6 lg:px-8 space-y-10 animate-in fade-in duration-500">
+    <div className="relative min-h-[calc(100vh-4rem)] py-6 sm:py-10 px-3 sm:px-6 lg:px-8 space-y-6 sm:space-y-10 animate-apple-entrance">
       {/* 1. Header Hero Card with Specular Rim Highlight */}
-      <div className="glass-surface rounded-3xl p-7 sm:p-9 relative overflow-hidden group">
+      <div className="glass-surface rounded-3xl p-5 sm:p-7 lg:p-9 relative overflow-hidden group">
         {/* Subtle decorative inner corner glow */}
         <div className="absolute -top-16 -right-16 w-64 h-64 bg-blue-500/10 dark:bg-blue-400/10 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 sm:gap-6 relative z-10">
           <div className="space-y-2">
             <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-blue-500/10 dark:bg-blue-400/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-bold tracking-wide backdrop-blur-md">
               <Compass className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
               <span>Cardiovascular Block 206 Exam Platform</span>
             </div>
-            <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.1]">
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.1]">
               Examination & Test Hub
             </h1>
-            <p className="text-sm sm:text-base text-slate-600 dark:text-zinc-400 max-w-xl font-normal leading-relaxed">
+            <p className="text-xs sm:text-base text-slate-600 dark:text-zinc-400 max-w-xl font-normal leading-relaxed">
               Targeted high-speed micro-practice or full faculty exam simulations backed by authoritative curriculum sources.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="glass-pill-luxury px-5 py-3 rounded-2xl flex items-center space-x-3">
+            <div className="glass-pill-luxury px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl flex items-center space-x-3">
               <span className="relative flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
               </span>
               <div>
                 <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-zinc-400">Question Pool</div>
-                <div className="text-sm font-extrabold text-slate-900 dark:text-zinc-100">
+                <div className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-zinc-100">
                   {questions.length} Grounded Qs
                 </div>
               </div>
@@ -138,28 +138,28 @@ export const TestHub: React.FC = () => {
 
       {/* 2. Mode Selector - Glass Interactive Cards */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between px-1">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-1 gap-1">
           <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 flex items-center space-x-2">
             <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             <span>1. Choose Testing Mode</span>
           </label>
-          <span className="text-xs font-medium text-slate-400 dark:text-zinc-400">Zero mouse clicks required during tests</span>
+          <span className="text-[11px] sm:text-xs font-medium text-slate-400 dark:text-zinc-500">Touch or keyboard keys (1–4) supported</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
           {/* Quick Practice Mode Card */}
           <button
             type="button"
             onClick={() => setSelectedMode('practice')}
-            className={`glass-card-interactive text-left p-7 rounded-3xl relative cursor-pointer ${
+            className={`glass-card-interactive text-left p-5 sm:p-7 rounded-3xl relative cursor-pointer apple-tap ${
               selectedMode === 'practice'
                 ? '!bg-white/85 dark:!bg-zinc-800/90 !border-blue-500/60 shadow-[0_16px_40px_rgba(59,130,246,0.18)] dark:shadow-[0_16px_40px_rgba(59,130,246,0.3)] ring-2 ring-blue-500/30'
                 : ''
             }`}
           >
             <div className="flex items-start justify-between">
-              <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-blue-500/20 to-indigo-500/10 border border-blue-400/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-inner">
-                <Zap className="w-6 h-6 fill-blue-500/20" />
+              <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl bg-gradient-to-tr from-blue-500/20 to-indigo-500/10 border border-blue-400/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-inner">
+                <Zap className="w-5 h-5 sm:w-6 sm:h-6 fill-blue-500/20" />
               </div>
               {selectedMode === 'practice' ? (
                 <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/40">
@@ -169,11 +169,11 @@ export const TestHub: React.FC = () => {
                 <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
               )}
             </div>
-            <h3 className="font-extrabold text-slate-900 dark:text-white text-xl mt-5">Quick Practice</h3>
+            <h3 className="font-extrabold text-slate-900 dark:text-white text-lg sm:text-xl mt-4 sm:mt-5">Quick Practice</h3>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 mt-2 leading-relaxed">
               Instant feedback mode. Press <kbd className="px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-zinc-700 font-mono text-[11px] font-bold">1</kbd>–<kbd className="px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-zinc-700 font-mono text-[11px] font-bold">4</kbd> to commit choices with immediate faculty rationale slides.
             </p>
-            <div className="mt-5 pt-4 border-t border-slate-200/50 dark:border-zinc-800 flex items-center gap-2 text-xs font-bold text-blue-700 dark:text-blue-400">
+            <div className="mt-4 sm:mt-5 pt-3.5 sm:pt-4 border-t border-slate-200/50 dark:border-zinc-800 flex items-center gap-2 text-xs font-bold text-blue-700 dark:text-blue-400">
               <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               <span>Immediate Answer Feedback</span>
             </div>
@@ -183,15 +183,15 @@ export const TestHub: React.FC = () => {
           <button
             type="button"
             onClick={() => setSelectedMode('mock')}
-            className={`glass-card-interactive text-left p-7 rounded-3xl relative cursor-pointer ${
+            className={`glass-card-interactive text-left p-5 sm:p-7 rounded-3xl relative cursor-pointer apple-tap ${
               selectedMode === 'mock'
                 ? '!bg-white/85 dark:!bg-zinc-800/90 !border-indigo-500/60 shadow-[0_16px_40px_rgba(99,102,241,0.18)] dark:shadow-[0_16px_40px_rgba(99,102,241,0.3)] ring-2 ring-indigo-500/30'
                 : ''
             }`}
           >
             <div className="flex items-start justify-between">
-              <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-indigo-500/20 to-purple-500/10 border border-indigo-400/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-inner">
-                <Award className="w-6 h-6" />
+              <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl bg-gradient-to-tr from-indigo-500/20 to-purple-500/10 border border-indigo-400/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-inner">
+                <Award className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               {selectedMode === 'mock' ? (
                 <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/40">
@@ -201,11 +201,11 @@ export const TestHub: React.FC = () => {
                 <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
               )}
             </div>
-            <h3 className="font-extrabold text-slate-900 dark:text-white text-xl mt-5">Faculty Mock Exam</h3>
+            <h3 className="font-extrabold text-slate-900 dark:text-white text-lg sm:text-xl mt-4 sm:mt-5">Faculty Mock Exam</h3>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 mt-2 leading-relaxed">
               Standardized 50-question simulation under authentic 2-hour timed conditions with delayed score calibration.
             </p>
-            <div className="mt-5 pt-4 border-t border-slate-200/50 dark:border-zinc-800 flex items-center gap-2 text-xs font-bold text-indigo-700 dark:text-indigo-400">
+            <div className="mt-4 sm:mt-5 pt-3.5 sm:pt-4 border-t border-slate-200/50 dark:border-zinc-800 flex items-center gap-2 text-xs font-bold text-indigo-700 dark:text-indigo-400">
               <Clock className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               <span>50 Qs • 120 Mins • Strict Exam</span>
             </div>
@@ -215,15 +215,15 @@ export const TestHub: React.FC = () => {
           <button
             type="button"
             onClick={() => setSelectedMode('rapid')}
-            className={`glass-card-interactive text-left p-7 rounded-3xl relative cursor-pointer ${
+            className={`glass-card-interactive text-left p-5 sm:p-7 rounded-3xl relative cursor-pointer apple-tap ${
               selectedMode === 'rapid'
                 ? '!bg-white/85 dark:!bg-zinc-800/90 !border-amber-500/60 shadow-[0_16px_40px_rgba(245,158,11,0.18)] dark:shadow-[0_16px_40px_rgba(245,158,11,0.3)] ring-2 ring-amber-500/30'
                 : ''
             }`}
           >
             <div className="flex items-start justify-between">
-              <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-orange-500/10 border border-amber-400/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-inner">
-                <Flame className="w-6 h-6" />
+              <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-orange-500/10 border border-amber-400/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-inner">
+                <Flame className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               {selectedMode === 'rapid' ? (
                 <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/40">
@@ -233,11 +233,11 @@ export const TestHub: React.FC = () => {
                 <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 transition-colors" />
               )}
             </div>
-            <h3 className="font-extrabold text-slate-900 dark:text-white text-xl mt-5">High-Yield Sprint</h3>
+            <h3 className="font-extrabold text-slate-900 dark:text-white text-lg sm:text-xl mt-4 sm:mt-5">High-Yield Sprint</h3>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 mt-2 leading-relaxed">
               15 high-frequency questions strictly derived from heavily tested curriculum exam objectives in a blitz.
             </p>
-            <div className="mt-5 pt-4 border-t border-slate-200/50 dark:border-zinc-800 flex items-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-400">
+            <div className="mt-4 sm:mt-5 pt-3.5 sm:pt-4 border-t border-slate-200/50 dark:border-zinc-800 flex items-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-400">
               <Flame className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               <span>15 Qs • 15 Mins Rapid Blitz</span>
             </div>
@@ -442,10 +442,10 @@ export const TestHub: React.FC = () => {
       )}
 
       {/* 4. Luxury Obsidian Capsule Action Footer */}
-      <div className="glass-dark-capsule rounded-3xl p-7 sm:p-9 flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative overflow-hidden">
+      <div className="glass-dark-capsule rounded-3xl p-5 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5 sm:gap-6 relative overflow-hidden">
         <div className="space-y-1 relative z-10">
-          <div className="text-[11px] text-slate-400 uppercase font-black tracking-widest">Ready to launch</div>
-          <div className="text-xl sm:text-2xl font-black text-white flex items-center space-x-2">
+          <div className="text-[10px] sm:text-[11px] text-slate-400 uppercase font-black tracking-widest">Ready to launch</div>
+          <div className="text-lg sm:text-2xl font-black text-white flex items-center space-x-2">
             <span>
               {selectedMode === 'mock' 
                 ? '50 Questions • 120 Mins Timed Mock' 
@@ -455,21 +455,21 @@ export const TestHub: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-slate-400 font-normal">
-            Press <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded-md text-[11px] text-slate-300 font-mono font-bold">1</kbd>–<kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded-md text-[11px] text-slate-300 font-mono font-bold">4</kbd> during test to commit choices without mouse clicks
+            Press <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded-md text-[11px] text-slate-300 font-mono font-bold">1</kbd>–<kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded-md text-[11px] text-slate-300 font-mono font-bold">4</kbd> during test or tap directly on mobile
           </p>
         </div>
 
         <button
           onClick={handleLaunchSession}
           disabled={matchingQuestionCount === 0}
-          className={`py-4 px-9 rounded-2xl text-sm font-black flex items-center justify-center space-x-3 transition-all duration-300 cursor-pointer shadow-xl relative z-10 ${
+          className={`w-full sm:w-auto py-3.5 sm:py-4 px-6 sm:px-9 rounded-2xl text-sm font-black flex items-center justify-center space-x-3 transition-all duration-300 cursor-pointer shadow-xl relative z-10 apple-tap ${
             matchingQuestionCount === 0
               ? 'bg-slate-800 text-slate-500 cursor-not-allowed shadow-none'
               : selectedMode === 'mock'
-              ? 'bg-gradient-to-r from-indigo-500 via-indigo-600 to-indigo-700 hover:from-indigo-400 hover:to-indigo-600 text-white shadow-indigo-500/30 hover:scale-[1.02]'
+              ? 'bg-gradient-to-r from-indigo-500 via-indigo-600 to-indigo-700 hover:from-indigo-400 hover:to-indigo-600 text-white shadow-indigo-500/30'
               : selectedMode === 'rapid'
-              ? 'bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-black shadow-amber-500/30 hover:scale-[1.02]'
-              : 'bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-500/30 hover:scale-[1.02]'
+              ? 'bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-black shadow-amber-500/30'
+              : 'bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-500/30'
           }`}
         >
           <Play className="w-4 h-4 fill-current" />
