@@ -31,20 +31,20 @@ export const QuickPractice: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 space-y-6">
-      <div className="border-b border-slate-200 dark:border-zinc-800 pb-5 flex items-center justify-between">
+    <div className="max-w-4xl mx-auto py-6 sm:py-8 px-3.5 sm:px-6 space-y-5 sm:space-y-6 animate-apple-entrance">
+      <div className="border-b border-slate-200 dark:border-zinc-800 pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-zinc-100 tracking-tight">Quick Practice</h1>
-          <p className="text-sm text-slate-500 dark:text-zinc-400">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 tracking-tight">Quick Practice</h1>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400">
             Configure your focus and start testing immediately. No unnecessary setup screens.
           </p>
         </div>
-        <span className="text-xs font-semibold px-3 py-1 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded-full border border-blue-200 dark:border-blue-900/60">
+        <span className="self-start sm:self-auto text-xs font-semibold px-3 py-1 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded-full border border-blue-200 dark:border-blue-900/60">
           Immediate Answer Feedback
         </span>
       </div>
 
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-800 p-6 shadow-xs space-y-6">
+      <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl rounded-3xl border border-slate-200 dark:border-zinc-800 p-5 sm:p-6 shadow-xs space-y-6">
         {/* Filters */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -130,16 +130,16 @@ export const QuickPractice: React.FC = () => {
         </div>
 
         {/* Start Button */}
-        <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between">
+        <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="text-xs text-slate-500 dark:text-zinc-400">
             Available in Bank: <strong className="text-slate-800 dark:text-zinc-200">{questions.length}</strong> questions
           </div>
           <button
             onClick={handleStartTest}
-            className="py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center space-x-2 shadow-xs transition-all cursor-pointer"
+            className="w-full sm:w-auto py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold flex items-center justify-center space-x-2 shadow-xs transition-all cursor-pointer apple-tap"
           >
             <Play className="w-4 h-4 fill-current" />
-            <span>Start Practice (Enter ⏎)</span>
+            <span>Start Practice</span>
           </button>
         </div>
       </div>
