@@ -314,3 +314,329 @@
 .dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* ==========================================================================
+   Adaptive Hardware Compositor & 60/120fps Spring Motion Architecture
+   ========================================================================== */
+
+/* Keyframes for GPU-Composited Spring Entrances */
+@keyframes spring-modal-enter {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0) scale(0.975);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes drawer-slide-enter {
+  0% {
+    opacity: 0;
+    transform: translate3d(100%, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes drawer-bottom-enter {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 100%, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-spring-modal-in {
+  animation: spring-modal-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-drawer-slide-in {
+  animation: drawer-slide-enter 220ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-drawer-bottom-in {
+  animation: drawer-bottom-enter 240ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* 1. ULTRA TIER: 120fps ProMotion, Rich Specular Glass & Full Ambient Dynamics */
+html[data-perf-tier="ultra"] {
+  --perf-transition-speed: 220ms;
+}
+
+/* 2. BALANCED TIER: 60fps GPU Transform/Opacity, Pauses Ambient Background Thrash */
+html[data-perf-tier="balanced"] {
+  --perf-transition-speed: 160ms;
+}
+
+html[data-perf-tier="balanced"] .animate-float-fluid,
+html[data-perf-tier="balanced"] .animate-float-fluid-reverse {
+  animation-play-state: paused !important;
+}
+
+/* 3. LOW-SPEC TIER: Zero-Blur Overdraw, High-Contrast Solid Surfaces & <70ms Fast Transitions */
+html[data-perf-tier="low-spec"] {
+  --perf-transition-speed: 60ms;
+}
+
+html[data-perf-tier="low-spec"] .glass-surface,
+html[data-perf-tier="low-spec"] .glass-card-interactive,
+html[data-perf-tier="low-spec"] .glass-pill-luxury,
+html[data-perf-tier="low-spec"] .glass-dark-capsule {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08) !important;
+}
+
+html[data-perf-tier="low-spec"].dark .glass-surface,
+html[data-perf-tier="low-spec"].dark .glass-card-interactive,
+html[data-perf-tier="low-spec"].dark .glass-pill-luxury,
+html[data-perf-tier="low-spec"].dark .glass-dark-capsule {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background-color: rgba(24, 24, 27, 0.98) !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4) !important;
+}
+
+html[data-perf-tier="low-spec"] .animate-float-fluid,
+html[data-perf-tier="low-spec"] .animate-float-fluid-reverse,
+html[data-perf-tier="low-spec"] .animate-heartbeat,
+html[data-perf-tier="low-spec"] .shimmer-active::after {
+  animation: none !important;
+}
+
+/* 4. REDUCED MOTION: Instant State Transitions (0ms) */
+@media (prefers-reduced-motion: reduce) {
+  html, body, *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+/* ==========================================================================
+   AI Co-Pilot Viewport Fluid Animations (60fps GPU Composited)
+   ========================================================================== */
+@keyframes clue-sweep {
+  0% {
+    background-size: 0% 100%;
+    opacity: 0.6;
+  }
+  100% {
+    background-size: 100% 100%;
+    opacity: 1;
+  }
+}
+
+.animate-clue-highlight {
+  background-repeat: no-repeat;
+  background-position: left bottom;
+  animation: clue-sweep 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes strikethrough-grow {
+  0% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+.animate-choice-strikethrough {
+  transform-origin: left;
+  animation: strikethrough-grow 180ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ==========================================================================
+   AI Co-Pilot High-Energy Visual Aura & Kinetic Keyframes
+   ========================================================================== */
+
+@keyframes laser-glow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: translateY(-20%);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translateY(20%);
+  }
+}
+
+.animate-laser-glow {
+  animation: laser-glow 4s ease-in-out infinite alternate;
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 16s linear infinite;
+}
+
+@keyframes radar-pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.animate-radar-pulse {
+  animation: radar-pulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+}
+
+@keyframes holographic-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-hologram-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(99, 102, 241, 0.15) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: holographic-shimmer 2.5s infinite;
+}
+
+.dark .animate-hologram-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(168, 85, 247, 0.25) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: holographic-shimmer 2.5s infinite;
+}
+
+/* Luminous Specular Border for Co-Pilot Drawer */
+.luminous-copilot-border {
+  border-left: 1px solid rgba(99, 102, 241, 0.35);
+  box-shadow: 
+    -1px 0 0 0 rgba(255, 255, 255, 0.6) inset,
+    -12px 0 40px -8px rgba(79, 70, 229, 0.15),
+    -24px 0 80px -15px rgba(147, 51, 234, 0.12);
+}
+
+.dark .luminous-copilot-border {
+  border-left: 1px solid rgba(129, 140, 248, 0.25);
+  box-shadow: 
+    -1px 0 0 0 rgba(255, 255, 255, 0.08) inset,
+    -16px 0 60px -10px rgba(99, 102, 241, 0.28),
+    -32px 0 100px -20px rgba(168, 85, 247, 0.2);
+}
+
+/* ==========================================================================
+   Apple Human Interface (HIG) Mobile Responsiveness & Safe Area Engine
+   ========================================================================== */
+
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+/* Disable blue tap highlight on iOS Safari */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Optimize touch responsiveness and eliminate 300ms tap delay */
+button, a, input, select, textarea, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Apple iOS Native Spring Tap */
+.apple-tap {
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.16s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.apple-tap:active {
+  transform: scale(0.965);
+  opacity: 0.88;
+}
+
+/* Apple Dynamic Bottom Sheet Slide-Up */
+@keyframes apple-sheet-slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0.7;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-sheet-slide-up {
+  animation: apple-sheet-slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Safe Area Inset Helpers */
+.pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+.pt-safe {
+  padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+}
+
+.safe-inset-bottom {
+  bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Smooth Momentum Touch Scrolling */
+.scroll-momentum {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Prevent iOS Safari 16px font-size auto-zoom jump on focus */
+@media screen and (max-width: 640px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="search"],
+  input[type="password"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+
+
