@@ -17,7 +17,11 @@ import {
   agentToolRegistry,
   type AgentToolExecutionEnvelope,
 } from '../../domain/ai/tools/toolRegistry.ts';
-import { resolveAiProvider, type AnyCloudProvider } from './engineRegistry.ts';
+import {
+  resolveAiProvider,
+  getAvailableFallbackProvider,
+  type AnyCloudProvider,
+} from './engineRegistry.ts';
 import type { LlmMessage } from './providers/openAiCompatibleProvider.ts';
 
 export interface OrchestratorRequest {
@@ -55,7 +59,7 @@ export class AgenticOrchestrator {
     } = request;
 
     // 1. Resolve Provider
-    const provider = providerOverride ?? resolveAiProvider(settings);
+    let provider = providerOverride ?? resolveAiProvider(settings);
     yield {
       type: 'engine-resolved',
       providerId: provider.providerId,
@@ -99,15 +103,60 @@ export class AgenticOrchestrator {
 
       let turnText = '';
       const turnToolCalls: Array<{ callId: string; name: string; argsJson: string }> = [];
+      let streamedAnyChunks = false;
 
-      for await (const chunk of provider.streamTurn(conversationMessages, toolDeclarations, signal)) {
-        if (signal.aborted) break;
+      try {
+        for await (const chunk of provider.streamTurn(conversationMessages, toolDeclarations, signal)) {
+          if (signal.aborted) break;
 
-        if (chunk.type === 'text') {
-          turnText += chunk.delta;
-          yield { type: 'text-delta', delta: chunk.delta };
-        } else if (chunk.type === 'tool-call') {
-          turnToolCalls.push(chunk);
+          if (chunk.type === 'text') {
+            streamedAnyChunks = true;
+            turnText += chunk.delta;
+            yield { type: 'text-delta', delta: chunk.delta };
+          } else if (chunk.type === 'tool-call') {
+            streamedAnyChunks = true;
+            turnToolCalls.push(chunk);
+          }
+        }
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') throw err;
+
+        const errMsg = ((err as Error).message || '').toLowerCase();
+        const isRateLimit =
+          errMsg.includes('rate limit') ||
+          errMsg.includes('429') ||
+          errMsg.includes('quota') ||
+          errMsg.includes('resource exhausted');
+
+        // Automatically fail over to an available high-capacity provider (e.g. Gemini)
+        if (isRateLimit && !streamedAnyChunks) {
+          const fallback = getAvailableFallbackProvider(settings, provider.providerId);
+          if (fallback) {
+            console.warn(
+              `[AgenticOrchestrator] ${provider.providerId} rate limited. Auto-failing over to ${fallback.providerId} (${fallback.modelId}).`
+            );
+            provider = fallback;
+            yield {
+              type: 'engine-resolved',
+              providerId: provider.providerId,
+              modelId: provider.modelId,
+            };
+
+            for await (const chunk of provider.streamTurn(conversationMessages, toolDeclarations, signal)) {
+              if (signal.aborted) break;
+
+              if (chunk.type === 'text') {
+                turnText += chunk.delta;
+                yield { type: 'text-delta', delta: chunk.delta };
+              } else if (chunk.type === 'tool-call') {
+                turnToolCalls.push(chunk);
+              }
+            }
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
         }
       }
 
