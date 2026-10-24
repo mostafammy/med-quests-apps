@@ -52,12 +52,12 @@ export const QuestionNavigatorStrip: React.FC<QuestionNavigatorStripProps> = ({
         ? 'bg-slate-900/80 border-slate-800/80 backdrop-blur-xl text-slate-200' 
         : 'bg-white/80 border-slate-200/70 backdrop-blur-xl text-slate-800'
     }`}>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-12 flex items-center justify-between gap-3">
+      <div className="max-w-6xl mx-auto px-2.5 sm:px-6 h-12 flex items-center justify-between gap-2 sm:gap-3">
         {/* Left: Interactive Grid Trigger Pill */}
         <button
           onClick={onOpenMatrix}
           title="Open Question Overview Grid (Press G)"
-          className={`shrink-0 flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all duration-150 cursor-pointer ${
+          className={`shrink-0 flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-2.5 py-1 rounded-full text-xs font-semibold transition-all duration-150 cursor-pointer apple-tap ${
             isExamMode
               ? 'bg-slate-800/80 hover:bg-slate-750 text-slate-300 border border-slate-700/60 shadow-xs'
               : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200/70 shadow-xs'
@@ -73,7 +73,7 @@ export const QuestionNavigatorStrip: React.FC<QuestionNavigatorStripProps> = ({
         {/* Center: Sleek Horizontal Question Pills with smooth auto-scroll */}
         <div 
           ref={containerRef}
-          className="flex-1 flex items-center space-x-1.5 overflow-x-auto py-1 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex-1 flex items-center space-x-1.5 overflow-x-auto py-1 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden scroll-momentum"
         >
           {questions.map((q, idx) => {
             const isActive = idx === currentIndex;
@@ -109,7 +109,7 @@ export const QuestionNavigatorStrip: React.FC<QuestionNavigatorStripProps> = ({
                 key={q.id}
                 ref={isActive ? activePillRef : null}
                 onClick={() => handleSelect(idx)}
-                className={`relative shrink-0 w-8 h-8 rounded-lg text-xs font-semibold tabular-nums flex items-center justify-center transition-all duration-150 cursor-pointer ${pillStyle}`}
+                className={`relative shrink-0 w-8 h-8 rounded-xl text-xs font-bold tabular-nums flex items-center justify-center transition-all duration-150 cursor-pointer apple-tap ${pillStyle}`}
                 title={`Question ${idx + 1}${isFlagged ? ' (Flagged)' : ''}${isAnswered ? ' (Answered)' : ''}`}
               >
                 <span>{idx + 1}</span>
