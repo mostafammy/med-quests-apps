@@ -81,6 +81,7 @@ export const AdminGovernanceDrawer: React.FC = () => {
     quarantineAnomalousAccounts,
     performanceOverride,
     setPerformanceOverride,
+    signInWithGoogle,
   } = useAuthStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,20 +114,40 @@ export const AdminGovernanceDrawer: React.FC = () => {
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
           onClick={closeGovernanceDrawer}
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm"
         />
-        <div className="glass-surface relative z-10 max-w-md rounded-2xl p-6 text-center shadow-xl">
-          <Shield className="mx-auto h-10 w-10 text-red-500" />
-          <h3 className="mt-3 font-heading text-base font-semibold">Access Denied</h3>
-          <p className="mt-1 text-xs text-zinc-500">
-            This console requires Platform Administrator privileges.
-          </p>
+        <div className="glass-surface relative z-10 max-w-md w-full rounded-3xl p-6 sm:p-7 text-center shadow-2xl space-y-4 border border-amber-500/30">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shadow-inner">
+            <Shield className="h-7 w-7" />
+          </div>
+          <div>
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase text-amber-700 dark:text-amber-300">
+              Platform Owner Portal
+            </span>
+            <h3 className="mt-1 font-heading text-lg font-bold text-zinc-900 dark:text-zinc-100">
+              Admin Governance Console
+            </h3>
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              Restricted to Platform Owner (mostafa.yaser.developer@gmail.com) and administrators.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await signInWithGoogle('mostafa.yaser.developer@gmail.com');
+            }}
+            className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-zinc-900 hover:bg-black dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 py-3 px-4 font-semibold text-xs shadow-md cursor-pointer transition-all apple-tap"
+          >
+            <span>Sign in as Platform Owner</span>
+          </button>
+
           <button
             type="button"
             onClick={closeGovernanceDrawer}
-            className="mt-4 rounded-xl bg-zinc-800 px-4 py-2 text-xs font-medium text-white dark:bg-zinc-200 dark:text-zinc-900"
+            className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer"
           >
-            Close
+            Cancel
           </button>
         </div>
       </div>
