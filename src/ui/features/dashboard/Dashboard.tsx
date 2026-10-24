@@ -45,16 +45,16 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] py-8 px-4 sm:px-6 lg:px-8 space-y-8 animate-apple-entrance">
+    <div className="relative min-h-[calc(100vh-4rem)] py-4 sm:py-8 px-2.5 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 animate-apple-entrance">
       {/* Top Banner: Rich Glassmorphic Hub Card with Vivid Chromatic Gradients */}
-      <div className="p-6 md:p-8 rounded-3xl glass-surface space-y-6 relative overflow-hidden">
+      <div className="p-4 sm:p-6 md:p-8 rounded-3xl glass-surface space-y-5 sm:space-y-6 relative overflow-hidden">
         {/* Subtle Ambient Color Splash */}
         <div className="pointer-events-none absolute -right-16 -top-16 w-80 h-80 bg-gradient-to-br from-blue-500/20 via-indigo-500/15 to-purple-500/10 rounded-full blur-3xl -z-10" />
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-5">
           <div className="space-y-1.5">
             <div className="flex items-center space-x-2">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-500/15 dark:bg-blue-400/15 px-2.5 py-0.5 rounded-full border border-blue-400/30 backdrop-blur-md">
+              <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-500/15 dark:bg-blue-400/15 px-2.5 py-0.5 rounded-full border border-blue-400/30 backdrop-blur-md">
                 Exam Preparation
               </span>
               <span className="text-xs text-slate-300 dark:text-zinc-600">•</span>
@@ -63,10 +63,10 @@ export const Dashboard: React.FC = () => {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span>Local-First IndexedDB Engine</span>
+                <span className="hidden xs:inline sm:inline">IndexedDB Engine</span>
               </span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-400 dark:via-indigo-300 dark:to-purple-300 bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-400 dark:via-indigo-300 dark:to-purple-300 bg-clip-text text-transparent">
               CVS Block Mastery
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl leading-relaxed">
@@ -74,58 +74,60 @@ export const Dashboard: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              onClick={() => setShowResetConfirm(true)}
-              className="py-2.5 px-3.5 glass-pill-luxury text-slate-600 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-2xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer"
-              title="Reset all test attempts and mastery statistics"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Stats</span>
-            </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowResetConfirm(true)}
+                className="py-2.5 px-3 glass-pill-luxury text-slate-600 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-2xl text-xs font-bold flex items-center justify-center space-x-1.5 cursor-pointer apple-tap flex-1 sm:flex-none"
+                title="Reset all test attempts and mastery statistics"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset</span>
+              </button>
+              <button
+                onClick={() => navigate('/test/mock')}
+                className="py-2.5 px-4 bg-gradient-to-r from-slate-900 to-indigo-950 dark:from-zinc-800 dark:to-zinc-900 hover:from-slate-800 hover:to-indigo-900 text-white rounded-2xl text-xs sm:text-sm font-bold border border-indigo-500/30 dark:border-indigo-500/20 backdrop-blur-md shadow-md shadow-indigo-950/20 transition-all cursor-pointer flex items-center justify-center space-x-1.5 apple-tap flex-1 sm:flex-none"
+              >
+                <Clock className="w-4 h-4 text-amber-400" />
+                <span>Mock Exam</span>
+              </button>
+            </div>
             <button
               onClick={() => navigate('/test/quick')}
-              className="shimmer-active py-2.5 px-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl text-xs sm:text-sm font-bold flex items-center space-x-2 shadow-lg shadow-blue-500/25 transition-all duration-300 hover:-translate-y-1 hover:shadow-blue-500/40 cursor-pointer"
+              className="shimmer-active py-2.5 px-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl text-xs sm:text-sm font-extrabold flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/25 transition-all cursor-pointer apple-tap w-full sm:w-auto"
             >
               <Play className="w-4 h-4 fill-current text-white" />
               <span>{totalAttempts > 0 ? 'Continue Practice' : 'Start Practice'}</span>
-            </button>
-            <button
-              onClick={() => navigate('/test/mock')}
-              className="py-2.5 px-5 bg-gradient-to-r from-slate-900 to-indigo-950 dark:from-zinc-800 dark:to-zinc-900 hover:from-slate-800 hover:to-indigo-900 text-white rounded-2xl text-xs sm:text-sm font-bold border border-indigo-500/30 dark:border-indigo-500/20 backdrop-blur-md shadow-md shadow-indigo-950/20 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl cursor-pointer flex items-center space-x-2"
-            >
-              <Clock className="w-4 h-4 text-amber-400" />
-              <span>Start Exam (2h)</span>
             </button>
           </div>
         </div>
 
         {/* 5 Key Metric Cards with Apple-Caliber Distinct Vivid Tinting */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5 pt-4 border-t border-slate-200/60 dark:border-zinc-800/60">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3.5 pt-4 border-t border-slate-200/60 dark:border-zinc-800/60">
           {/* Overall Mastery - Emerald Tinted Glass */}
-          <div className="p-4 rounded-2xl glass-card-interactive bg-emerald-500/5 dark:bg-emerald-950/20 border-emerald-400/30 dark:border-emerald-700/40 hover:border-emerald-400/60 transition-all">
+          <div className="p-3.5 sm:p-4 rounded-2xl glass-card-interactive bg-emerald-500/5 dark:bg-emerald-950/20 border-emerald-400/30 dark:border-emerald-700/40 hover:border-emerald-400/60 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-emerald-800 dark:text-emerald-300 font-bold uppercase tracking-wider">Overall Mastery</span>
-              <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-[10px] sm:text-[11px] text-emerald-800 dark:text-emerald-300 font-bold uppercase tracking-wider">Overall Mastery</span>
+              <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <div className="text-2xl font-black text-emerald-900 dark:text-emerald-200 mt-1">
+            <div className="text-xl sm:text-2xl font-black text-emerald-900 dark:text-emerald-200 mt-1">
               {masteryPercentage}%
             </div>
-            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
-              {totalAttempts > 0 ? `${masteryPercentage}% mastered` : 'No attempts yet'}
+            <div className="text-[10px] sm:text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
+              {totalAttempts > 0 ? `${masteryPercentage}% mastered` : 'No attempts'}
             </div>
           </div>
 
           {/* Active Bank - Sapphire Blue Tinted Glass */}
-          <div className="p-4 rounded-2xl glass-card-interactive bg-blue-500/5 dark:bg-blue-950/20 border-blue-400/30 dark:border-blue-700/40 hover:border-blue-400/60 transition-all">
+          <div className="p-3.5 sm:p-4 rounded-2xl glass-card-interactive bg-blue-500/5 dark:bg-blue-950/20 border-blue-400/30 dark:border-blue-700/40 hover:border-blue-400/60 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-blue-800 dark:text-blue-300 font-bold uppercase tracking-wider">Active Bank</span>
-              <BookOpen className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <span className="text-[10px] sm:text-[11px] text-blue-800 dark:text-blue-300 font-bold uppercase tracking-wider">Active Bank</span>
+              <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 dark:text-blue-400" />
             </div>
-            <div className="text-2xl font-black text-blue-950 dark:text-blue-100 mt-1">
+            <div className="text-xl sm:text-2xl font-black text-blue-950 dark:text-blue-100 mt-1">
               {questions.length} <span className="text-xs font-normal text-slate-400 dark:text-zinc-500">Qs</span>
             </div>
-            <div className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold mt-1">
+            <div className="text-[10px] sm:text-[11px] text-blue-600 dark:text-blue-400 font-semibold mt-1">
               <span onClick={() => navigate('/studio')} className="cursor-pointer hover:underline">
                 Manage in Studio →
               </span>
@@ -133,45 +135,45 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Attempts Logged - Royal Indigo Tinted Glass */}
-          <div className="p-4 rounded-2xl glass-card-interactive bg-indigo-500/5 dark:bg-indigo-950/20 border-indigo-400/30 dark:border-indigo-700/40 hover:border-indigo-400/60 transition-all">
+          <div className="p-3.5 sm:p-4 rounded-2xl glass-card-interactive bg-indigo-500/5 dark:bg-indigo-950/20 border-indigo-400/30 dark:border-indigo-700/40 hover:border-indigo-400/60 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-indigo-800 dark:text-indigo-300 font-bold uppercase tracking-wider">Attempts Logged</span>
-              <CheckCircle2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <span className="text-[10px] sm:text-[11px] text-indigo-800 dark:text-indigo-300 font-bold uppercase tracking-wider">Attempts</span>
+              <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400" />
             </div>
-            <div className="text-2xl font-black text-indigo-950 dark:text-indigo-100 mt-1">
+            <div className="text-xl sm:text-2xl font-black text-indigo-950 dark:text-indigo-100 mt-1">
               {totalAttempts}
             </div>
-            <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold mt-1">
-              {totalAttempts > 0 ? `${overallAccuracy}% accuracy` : 'Awaiting 1st attempt'}
+            <div className="text-[10px] sm:text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold mt-1">
+              {totalAttempts > 0 ? `${overallAccuracy}% accuracy` : 'Awaiting start'}
             </div>
           </div>
 
           {/* Weak Areas - Coral Rose Tinted Glass */}
-          <div className="p-4 rounded-2xl glass-card-interactive bg-rose-500/5 dark:bg-rose-950/20 border-rose-400/30 dark:border-rose-700/40 hover:border-rose-400/60 transition-all">
+          <div className="p-3.5 sm:p-4 rounded-2xl glass-card-interactive bg-rose-500/5 dark:bg-rose-950/20 border-rose-400/30 dark:border-rose-700/40 hover:border-rose-400/60 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-rose-800 dark:text-rose-300 font-bold uppercase tracking-wider">Weak Areas</span>
-              <Flame className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+              <span className="text-[10px] sm:text-[11px] text-rose-800 dark:text-rose-300 font-bold uppercase tracking-wider">Weak Areas</span>
+              <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-600 dark:text-rose-400" />
             </div>
-            <div className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
+            <div className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
               {weakTopicsCount}
             </div>
-            <div className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-1">
+            <div className="text-[10px] sm:text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-1">
               <span onClick={() => navigate('/review')} className="cursor-pointer hover:underline">
-                {weakTopicsCount > 0 ? 'Remediate now →' : 'No weak areas'}
+                {weakTopicsCount > 0 ? 'Remediate →' : 'Zero weak areas'}
               </span>
             </div>
           </div>
 
           {/* Due Reviews - Amber Gold Tinted Glass */}
-          <div className="p-4 rounded-2xl glass-card-interactive bg-amber-500/5 dark:bg-amber-950/20 border-amber-400/30 dark:border-amber-700/40 hover:border-amber-400/60 col-span-2 sm:col-span-1 transition-all">
+          <div className="p-3.5 sm:p-4 rounded-2xl glass-card-interactive bg-amber-500/5 dark:bg-amber-950/20 border-amber-400/30 dark:border-amber-700/40 hover:border-amber-400/60 col-span-2 sm:col-span-1 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-amber-800 dark:text-amber-300 font-bold uppercase tracking-wider">Due Reviews</span>
-              <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span className="text-[10px] sm:text-[11px] text-amber-800 dark:text-amber-300 font-bold uppercase tracking-wider">Due Reviews</span>
+              <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 dark:text-amber-400" />
             </div>
-            <div className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">
+            <div className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">
               {dueReviewsCount}
             </div>
-            <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-1">
+            <div className="text-[10px] sm:text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-1">
               <span onClick={() => navigate('/review')} className="cursor-pointer hover:underline">
                 Spaced repetition →
               </span>
@@ -181,17 +183,17 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Dynamic Recommendation Banner: Electric Indigo to Cobalt Blue Gradient */}
-      <div className="relative rounded-3xl p-6 sm:p-8 text-white shadow-xl overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 border border-white/20">
+      <div className="relative rounded-3xl p-5 sm:p-8 text-white shadow-xl overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 border border-white/20">
         <div className="absolute right-0 top-0 bottom-0 w-2/5 bg-gradient-to-l from-white/10 to-transparent pointer-events-none" />
         <div className="absolute -left-10 -bottom-10 w-48 h-48 bg-pink-500/20 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="max-w-2xl space-y-4 relative z-10">
+        <div className="max-w-2xl space-y-3 sm:space-y-4 relative z-10">
           <div className="inline-flex items-center space-x-1.5 px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-extrabold tracking-wide uppercase border border-white/30 text-white">
             <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
             <span>Recommended Next Action</span>
           </div>
 
-          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-white leading-tight">
             {totalAttempts === 0
               ? 'Start Your 15-Question Baseline Practice Drill'
               : weakTopicsCount > 0
@@ -208,7 +210,7 @@ export const Dashboard: React.FC = () => {
           <div className="pt-2">
             <button
               onClick={() => navigate('/test/quick')}
-              className="py-3 px-6 bg-white text-indigo-700 hover:bg-blue-50 font-extrabold rounded-2xl text-sm flex items-center space-x-2 shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer"
+              className="w-full sm:w-auto py-3 px-6 bg-white text-indigo-700 hover:bg-blue-50 font-extrabold rounded-2xl text-sm flex items-center justify-center space-x-2 shadow-lg transition-all apple-tap cursor-pointer"
             >
               <span>{totalAttempts === 0 ? 'Start Diagnostic Practice' : 'Continue Practice'}</span>
               <ArrowRight className="w-4 h-4" />
