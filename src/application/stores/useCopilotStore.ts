@@ -126,12 +126,13 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
     }
 
     // Not cached yet: generate deterministic clinical prompt
+    const correctChoiceId = surface.question.choices.find((c) => c.isCorrect)?.id ?? 'a';
     const prompt =
       promptOverride ||
       actionDef.generatePrompt({
         questionStem: surface.question.stem,
         choices: surface.question.choices,
-        correctChoiceId: surface.question.correctChoiceId,
+        correctChoiceId,
         selectedChoiceId: surface.selectedChoiceId,
       });
 
