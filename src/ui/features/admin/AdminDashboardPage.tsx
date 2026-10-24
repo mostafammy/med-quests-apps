@@ -2,29 +2,17 @@ import React, { useState, useMemo } from 'react';
 import {
   Shield,
   Sliders,
-  AlertTriangle,
-  Lock,
-  Unlock,
-  CheckCircle,
   History,
   Users,
   BarChart3,
-  Sparkles,
   Globe,
   Cpu,
   Search,
-  Activity,
   Ban,
-  GraduationCap,
-  CheckCircle2,
-  Laptop,
-  Smartphone,
   Loader2,
-  LogIn,
 } from 'lucide-react';
 import { useAuthStore, type GovernanceViewTab } from '../../../application/stores/useAuthStore.ts';
-import type { UserRole, FeatureFlagKey, PerformanceOverrideMode } from '../../../domain/auth/types.ts';
-import { ROLE_ENTITLEMENT_POLICIES } from '../../../domain/auth/entitlements.ts';
+import type { UserRole, FeatureFlagKey } from '../../../domain/auth/types.ts';
 import {
   computePlatformAnalytics,
   filterManagedUsers,
@@ -74,9 +62,6 @@ export const AdminDashboardPage: React.FC = () => {
     selectManagedUser,
     updateUserRole,
     setUserRestriction,
-    quarantineAnomalousAccounts,
-    performanceOverride,
-    setPerformanceOverride,
     signInWithGoogle,
   } = useAuthStore();
 
@@ -85,7 +70,6 @@ export const AdminDashboardPage: React.FC = () => {
   const [restrictionFilter, setRestrictionFilter] = useState<RestrictionFilterMode>('all');
   const [aiFeatureFilter, setAiFeatureFilter] = useState<AiFeatureFilterMode>('all');
   const [blockReasonInput, setBlockReasonInput] = useState('');
-  const [selectedSessionIdx, setSelectedSessionIdx] = useState(0);
   const [isSigningIn, setIsSigningIn] = useState(false);
 
   const analytics = useMemo(() => computePlatformAnalytics(managedUsers), [managedUsers]);
@@ -183,14 +167,6 @@ export const AdminDashboardPage: React.FC = () => {
 
   const targetUser = selectedRecord?.profile;
   const targetEntitlements = selectedRecord?.entitlements;
-  const targetStats = selectedRecord?.studyTelemetry;
-  const isTargetBlocked = targetUser?.restriction.status === 'blocked';
-  const isTargetSuspended = targetUser?.restriction.status === 'suspended';
-
-  const handleRoleChange = async (newRole: UserRole) => {
-    if (!targetUser) return;
-    await updateUserRole(targetUser.id, newRole);
-  };
 
   const handleToggleFeature = async (flag: FeatureFlagKey) => {
     if (!targetUser || !targetEntitlements) return;
@@ -358,10 +334,10 @@ export const AdminDashboardPage: React.FC = () => {
                 <span>Cloudflare Global Edge Traffic (Top Colos)</span>
               </div>
               <div className="space-y-2">
-                {analytics.topColos.map((colo) => (
+                {analytics.coloDistribution.slice(0, 5).map((colo) => (
                   <div key={colo.colo} className="flex items-center justify-between text-xs">
                     <span className="font-mono font-semibold">{colo.colo} ({colo.countryCode})</span>
-                    <span className="text-zinc-500">{colo.count} active sessions</span>
+                    <span className="text-zinc-500">{colo.activeSessionsCount} active sessions</span>
                   </div>
                 ))}
               </div>
@@ -407,7 +383,7 @@ export const AdminDashboardPage: React.FC = () => {
               />
             </div>
 
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               {[
                 { label: 'All Users', mode: 'all' as const },
                 { label: 'AI Active', mode: 'ai-enabled' as const },
@@ -426,6 +402,30 @@ export const AdminDashboardPage: React.FC = () => {
                   {pill.label}
                 </button>
               ))}
+
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value as UserRole | 'all')}
+                className="rounded-lg px-2 py-1 text-[11px] font-semibold bg-zinc-200/60 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-none outline-none"
+              >
+                <option value="all">All Roles</option>
+                <option value="scholar">Scholars</option>
+                <option value="faculty">Faculty</option>
+                <option value="contributor">Contributors</option>
+                <option value="fellow">Fellows</option>
+                <option value="admin">Admins</option>
+              </select>
+
+              <select
+                value={restrictionFilter}
+                onChange={(e) => setRestrictionFilter(e.target.value as RestrictionFilterMode)}
+                className="rounded-lg px-2 py-1 text-[11px] font-semibold bg-zinc-200/60 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-none outline-none"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active Only</option>
+                <option value="restricted">Restricted / Banned</option>
+                <option value="anomalous">Anomalous</option>
+              </select>
             </div>
 
             <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
@@ -569,10 +569,10 @@ export const AdminDashboardPage: React.FC = () => {
               <div key={log.id} className="p-3 rounded-xl border border-zinc-200/60 dark:border-zinc-800 text-xs flex items-center justify-between">
                 <div>
                   <span className="font-bold text-amber-600 dark:text-amber-400">{log.action}</span>
-                  <span className="text-zinc-500 ml-2">{log.description}</span>
+                  <span className="text-zinc-500 ml-2">{log.summary}</span>
                 </div>
                 <span className="text-[10px] text-zinc-400 font-mono">
-                  {new Date(log.timestamp).toLocaleTimeString()} • Colo: {log.edgeColo}
+                  {new Date(log.createdAt).toLocaleTimeString()} • Colo: {log.edgeColo}
                 </span>
               </div>
             ))}
