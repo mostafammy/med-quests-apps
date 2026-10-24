@@ -111,15 +111,15 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] py-8 px-4 sm:px-6 lg:px-8 space-y-8 animate-in fade-in duration-300">
+    <div className="relative min-h-[calc(100vh-4rem)] py-6 sm:py-8 px-3 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 animate-apple-entrance">
       {/* Header */}
-      <div className="p-6 md:p-8 rounded-3xl bg-white/65 dark:bg-zinc-900/65 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.06)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all">
+      <div className="p-5 sm:p-7 md:p-8 rounded-3xl bg-white/65 dark:bg-zinc-900/65 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.06)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all">
         <div className="space-y-1.5">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-700 dark:text-indigo-300 text-xs font-semibold backdrop-blur-md">
             <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>Curriculum Grounding & Ingestion Studio</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 dark:from-zinc-100 dark:via-zinc-200 dark:to-indigo-200 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 dark:from-zinc-100 dark:via-zinc-200 dark:to-indigo-200 bg-clip-text text-transparent">
             Question Authoring Studio
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl leading-relaxed">
@@ -127,10 +127,10 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 self-start md:self-auto">
           <button
             onClick={handleExport}
-            className="py-2.5 px-4 rounded-2xl bg-white/60 dark:bg-zinc-800/60 hover:bg-white/80 dark:hover:bg-zinc-800 border border-white/80 dark:border-zinc-700/80 text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center space-x-2 shadow-xs transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
+            className="py-2.5 px-4 rounded-2xl bg-white/60 dark:bg-zinc-800/60 hover:bg-white/80 dark:hover:bg-zinc-800 border border-white/80 dark:border-zinc-700/80 text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center space-x-2 shadow-xs transition-all duration-200 cursor-pointer apple-tap"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export Bank ({questions.length})</span>
@@ -138,9 +138,9 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
         {/* Step 1: Prompt Generator Glass Card */}
-        <div className="p-6 md:p-8 rounded-3xl bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.3)] space-y-5">
+        <div className="p-5 sm:p-7 md:p-8 rounded-3xl bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.3)] space-y-5">
           <div className="flex items-center space-x-2 text-indigo-600 dark:text-indigo-400 font-extrabold text-xs uppercase tracking-wider">
             <span>Step 1: Grounded Prompt Architect</span>
           </div>
@@ -210,18 +210,18 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
           </p>
 
           <textarea
-            rows={12}
+            rows={10}
             value={jsonInput}
             onChange={(e) => setJsonInput(e.target.value)}
             placeholder='[ { "id": "q-cvs-ana-001", "stem": "...", "choices": [...] } ]'
-            className="w-full text-xs font-mono rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/70 dark:bg-zinc-800/70 backdrop-blur-md p-4 text-slate-800 dark:text-zinc-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+            className="w-full text-base sm:text-xs font-mono rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/70 dark:bg-zinc-800/70 backdrop-blur-md p-3.5 sm:p-4 text-slate-800 dark:text-zinc-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all"
           />
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <button
               onClick={handleIngest}
               disabled={isProcessing || !jsonInput.trim()}
-              className="py-3 px-6 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-40 text-white rounded-2xl text-xs sm:text-sm font-bold flex items-center space-x-2 shadow-md shadow-indigo-500/20 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
+              className="w-full sm:w-auto py-3 px-6 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-40 text-white rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center space-x-2 shadow-md shadow-indigo-500/20 transition-all cursor-pointer apple-tap"
             >
               <Upload className="w-4 h-4" />
               <span>{isProcessing ? 'Validating...' : 'Ingest & Store in IndexedDB'}</span>
