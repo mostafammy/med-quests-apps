@@ -12,6 +12,7 @@ import {
   Database,
   ShieldCheck,
   Loader2,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuthStore } from '../../../application/stores/useAuthStore.ts';
 import { ROLE_ENTITLEMENT_POLICIES } from '../../../domain/auth/entitlements.ts';
@@ -250,9 +251,19 @@ export const AuthSecurityModal: React.FC = () => {
                   </div>
 
                   {/* Security & End-to-End Privacy Footnote */}
-                  <div className="flex items-center justify-center gap-1.5 pt-2 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Passwordless Google Identity • Cloudflare Edge Zero Trust Verified</span>
+                  <div className="flex flex-col items-center justify-center gap-2 pt-2 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
+                    <div className="flex items-center gap-1.5">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                      <span>Passwordless Google Identity • Cloudflare Edge Zero Trust Verified</span>
+                    </div>
+                    <a
+                      href="/admin"
+                      onClick={closeModal}
+                      className="inline-flex items-center gap-1 font-semibold text-amber-600 dark:text-amber-400 hover:underline"
+                    >
+                      <Shield className="h-3 w-3" />
+                      <span>Platform Owner or Administrator? Open Admin Dashboard &rarr;</span>
+                    </a>
                   </div>
                 </div>
               ) : authState.status === 'authenticated-active' ? (
@@ -330,7 +341,7 @@ export const AuthSecurityModal: React.FC = () => {
                   {/* Admin Governance Quick Action */}
                   {authState.entitlements.security_governance_admin && (
                     <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 dark:border-amber-500/40 dark:bg-amber-950/20">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div>
                           <h4 className="text-xs font-semibold text-amber-900 dark:text-amber-200">
                             Security & Governance Console
@@ -339,17 +350,27 @@ export const AuthSecurityModal: React.FC = () => {
                             You have administrator privileges. Inspect user telemetry, change roles, and enforce instant blocks.
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            closeModal();
-                            openGovernanceDrawer();
-                          }}
-                          className="flex items-center gap-1 rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-amber-700 cursor-pointer"
-                        >
-                          <Sliders className="h-3.5 w-3.5" />
-                          <span>Open Console</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href="/admin"
+                            onClick={closeModal}
+                            className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow hover:bg-amber-700 cursor-pointer transition-all apple-tap"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            <span>Go to /admin</span>
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              closeModal();
+                              openGovernanceDrawer();
+                            }}
+                            className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-white/60 dark:bg-zinc-800 px-3 py-2 text-xs font-semibold text-amber-800 dark:text-amber-200 hover:bg-amber-100/50 cursor-pointer transition-all apple-tap"
+                          >
+                            <Sliders className="h-3.5 w-3.5" />
+                            <span>Drawer</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
