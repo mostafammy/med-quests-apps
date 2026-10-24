@@ -28,6 +28,7 @@ interface CopilotState {
   messages: ChatMessage[];
   isStreaming: boolean;
   activeDiagnosticTool: string | null;
+  activeResolvedEngine: string | null;
   error: string | null;
 
   // Power Actions & Instant Cache
@@ -60,6 +61,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
   messages: [],
   isStreaming: false,
   activeDiagnosticTool: null,
+  activeResolvedEngine: null,
   error: null,
   cachedActionKeys: new Set<string>(),
 
