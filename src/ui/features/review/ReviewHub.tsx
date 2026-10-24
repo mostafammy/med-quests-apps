@@ -48,15 +48,15 @@ export const ReviewHub: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] py-8 px-4 sm:px-6 lg:px-8 space-y-8 animate-in fade-in duration-300">
+    <div className="relative min-h-[calc(100vh-4rem)] py-6 sm:py-8 px-3 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 animate-apple-entrance">
       {/* Top Header Card */}
-      <div className="p-6 md:p-8 rounded-3xl bg-white/65 dark:bg-zinc-900/65 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.06)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all">
+      <div className="p-5 sm:p-7 md:p-8 rounded-3xl bg-white/65 dark:bg-zinc-900/65 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.06)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all">
         <div className="space-y-1.5">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-400/20 text-rose-700 dark:text-rose-400 text-xs font-semibold backdrop-blur-md">
             <TrendingDown className="w-3.5 h-3.5" />
             <span>Targeted Weakness Remediation</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 dark:from-zinc-100 dark:via-zinc-200 dark:to-rose-200 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 dark:from-zinc-100 dark:via-zinc-200 dark:to-rose-200 bg-clip-text text-transparent">
             Review & Remediation Hub
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl leading-relaxed">
@@ -68,7 +68,7 @@ export const ReviewHub: React.FC = () => {
           {totalAttempts > 0 && (
             <button
               onClick={() => resetStats(questions)}
-              className="py-2.5 px-4 bg-white/50 dark:bg-zinc-800/50 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 dark:hover:text-rose-400 text-slate-600 dark:text-zinc-400 rounded-2xl text-xs font-bold flex items-center space-x-1.5 border border-white/80 dark:border-zinc-700/80 backdrop-blur-md shadow-xs transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
+              className="py-2.5 px-4 bg-white/50 dark:bg-zinc-800/50 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 dark:hover:text-rose-400 text-slate-600 dark:text-zinc-400 rounded-2xl text-xs font-bold flex items-center space-x-1.5 border border-white/80 dark:border-zinc-700/80 backdrop-blur-md shadow-xs transition-all duration-200 cursor-pointer apple-tap"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Reset History</span>
@@ -78,12 +78,12 @@ export const ReviewHub: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex space-x-2 p-1.5 rounded-2xl bg-slate-200/40 dark:bg-zinc-800/40 backdrop-blur-lg border border-white/40 dark:border-zinc-700/40 max-w-md">
+      <div className="flex space-x-1.5 p-1.5 rounded-2xl bg-slate-200/40 dark:bg-zinc-800/40 backdrop-blur-lg border border-white/40 dark:border-zinc-700/40 w-full sm:max-w-md">
         <button
           onClick={() => setActiveTab('weak')}
-          className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center space-x-2 cursor-pointer ${
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center space-x-2 cursor-pointer apple-tap ${
             activeTab === 'weak'
-              ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60'
+              ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 font-extrabold'
               : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100'
           }`}
         >
@@ -93,9 +93,9 @@ export const ReviewHub: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('mistakes')}
-          className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center space-x-2 cursor-pointer ${
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center space-x-2 cursor-pointer apple-tap ${
             activeTab === 'mistakes'
-              ? 'bg-white dark:bg-zinc-900 text-rose-600 dark:text-rose-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60'
+              ? 'bg-white dark:bg-zinc-900 text-rose-600 dark:text-rose-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 font-extrabold'
               : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100'
           }`}
         >
