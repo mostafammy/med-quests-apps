@@ -1,0 +1,44 @@
+# ==============================================================================
+# Cloudflare Worker & Edge Auth Local Environment Variables Template
+# Copy this file to `.dev.vars` for local development with `npx wrangler dev`
+# DO NOT commit `.dev.vars` or production secrets to source control.
+# ==============================================================================
+
+# 1. Master Encryption Secret (generate via `openssl rand -base64 32`)
+BETTER_AUTH_SECRET="your-32-byte-base64-random-secret-here"
+
+# 2. Application Base URL
+BETTER_AUTH_URL="http://localhost:5173"
+
+# ==============================================================================
+# Google Cloud Identity Credentials
+# ==============================================================================
+# Obtain from Google Cloud Console: https://console.cloud.google.com/apis/credentials
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
+
+# ==============================================================================
+# Apple Developer Sign in with Apple Credentials
+# ==============================================================================
+# 1. Apple Developer Team ID (10-character string found in developer.apple.com account)
+APPLE_TEAM_ID=""
+
+# 2. Apple Services ID Identifier (e.g. org.medquests.web)
+APPLE_CLIENT_ID=""
+
+# 3. Apple Key ID (10-character key identifier from Keys section)
+APPLE_KEY_ID=""
+
+# 4. Apple Private Key (.p8 file contents, base64 encoded or PEM string)
+APPLE_PRIVATE_KEY=""
+
+# ==============================================================================
+# Optional: BYO Cloud AI Provider Keys (for AI Socratic Tutor Cloud Streaming)
+# ==============================================================================
+# Tested & Recommended Gemini Models:
+# - gemini-3.5-flash-lite (Fastest / Lowest Latency - Recommended Default)
+# - gemini-2.5-flash (Standard clinical reasoning)
+# - gemini-3.8-flash (High reasoning & thinking capabilities)
+# Note: Avoid aliases like gemini-flash-latest to avoid 503 high demand shedding.
+# GROQ_API_KEY=""
+# GEMINI_API_KEY=""
