@@ -9,21 +9,29 @@ import { SessionPlayer } from './ui/features/test/SessionPlayer.tsx';
 import { ReviewHub } from './ui/features/review/ReviewHub.tsx';
 import { CurriculumLibrary } from './ui/features/curriculum/CurriculumLibrary.tsx';
 import { QuestionStudio } from './ui/features/studio/QuestionStudio.tsx';
+import { AdminDashboardPage } from './ui/features/admin/AdminDashboardPage.tsx';
 import { useQuestionStore } from './application/stores/useQuestionStore.ts';
 import { useThemeStore } from './application/stores/useThemeStore.ts';
+import { useAuthStore } from './application/stores/useAuthStore.ts';
 
 export const App: React.FC = () => {
   const { loadQuestions } = useQuestionStore();
   const { initTheme } = useThemeStore();
+  const { init: initAuth } = useAuthStore();
 
   useEffect(() => {
     // Synchronize and initialize dynamic appearance listener
-    const cleanup = initTheme();
+    const cleanupTheme = initTheme();
+    // Synchronize hardware capability detector and background edge revalidation
+    const cleanupAuth = initAuth();
     // Initialise and load stored questions for active block (CVS)
     loadQuestions('cvs');
 
-    return () => cleanup?.();
-  }, [loadQuestions, initTheme]);
+    return () => {
+      cleanupTheme?.();
+      cleanupAuth?.();
+    };
+  }, [loadQuestions, initTheme, initAuth]);
 
   return (
     <BrowserRouter>
@@ -40,6 +48,7 @@ export const App: React.FC = () => {
           <Route path="review" element={<ReviewHub />} />
           <Route path="curriculum" element={<CurriculumLibrary />} />
           <Route path="studio" element={<QuestionStudio />} />
+          <Route path="admin" element={<AdminDashboardPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
