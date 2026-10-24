@@ -17,6 +17,8 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+.dev.vars
+.wrangler/
 *.log
 
 # Temporary scratchpads & caches
