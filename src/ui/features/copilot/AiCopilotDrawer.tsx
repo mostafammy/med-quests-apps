@@ -18,6 +18,7 @@ import { useCopilotStore } from '../../../application/stores/useCopilotStore.ts'
 import { useAiSettingsStore } from '../../../application/stores/useAiSettingsStore.ts';
 import { CopilotSettingsModal } from './CopilotSettingsModal.tsx';
 import { CopilotMarkdownView } from './CopilotMarkdownView.tsx';
+import { QuickPowerActionsBar } from './QuickPowerActionsBar.tsx';
 import { HemodynamicPvLoopCard } from './cards/HemodynamicPvLoopCard.tsx';
 import { CardiovascularEquationCard } from './cards/CardiovascularEquationCard.tsx';
 import { PeerCohortTrapCard } from './cards/PeerCohortTrapCard.tsx';
@@ -367,6 +368,9 @@ export const AiCopilotDrawer: React.FC = () => {
 
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Ready-to-Use High Yield Power Actions Strip */}
+        <QuickPowerActionsBar />
 
         {/* Clean Input Bar */}
         <div className="p-3.5 border-t border-slate-200/60 dark:border-zinc-800/60 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl">
