@@ -8,7 +8,6 @@ import {
   BookOpen, 
   Sparkles, 
   ChevronDown,
-  Sliders,
   Shield,
   X
 } from 'lucide-react';
@@ -30,7 +29,7 @@ const AdminGovernanceDrawer = lazy(() =>
 export const Shell: React.FC = () => {
   const location = useLocation();
   const { setSurface } = useCopilotStore();
-  const { authState, openGovernanceDrawer, notificationToast, clearToast } = useAuthStore();
+  const { authState, notificationToast, clearToast } = useAuthStore();
   const isAdmin = authState.status === 'authenticated-active' && authState.user.role === 'admin';
 
   useEffect(() => {
@@ -172,6 +171,18 @@ export const Shell: React.FC = () => {
             {/* Identity, Cloudflare Edge & Hardware Tier Pill */}
             <IdentityStatusPill />
 
+            {/* Mobile Admin Shortcut Button for Authenticated Admins */}
+            {isAdmin && (
+              <NavLink
+                to="/admin"
+                className="md:hidden flex items-center justify-center h-8 px-2.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300 text-xs font-bold gap-1 shadow-xs"
+                title="Admin Dashboard"
+              >
+                <Shield className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span className="text-[11px]">Admin</span>
+              </NavLink>
+            )}
+
             {/* AI Co-Pilot Trigger Capsule */}
             <CopilotTriggerButton />
 
@@ -218,7 +229,7 @@ export const Shell: React.FC = () => {
         aria-label="Mobile Bottom Navigation"
         className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/85 dark:bg-zinc-950/85 backdrop-blur-2xl border-t border-slate-200/80 dark:border-zinc-800/80 px-2 pt-1.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] shadow-[0_-4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.6)] transition-all select-none touch-manipulation"
       >
-        <div className="max-w-md mx-auto grid grid-cols-5 gap-1">
+        <div className={`max-w-md mx-auto grid ${isAdmin ? 'grid-cols-6' : 'grid-cols-5'} gap-1`}>
           <NavLink
             to="/"
             end
@@ -334,6 +345,31 @@ export const Shell: React.FC = () => {
               </>
             )}
           </NavLink>
+
+          {isAdmin && (
+            <NavLink
+              to="/admin"
+              className={({ isActive }) =>
+                `flex flex-col items-center justify-center py-1 px-1 rounded-2xl transition-all duration-200 apple-tap ${
+                  isActive
+                    ? 'text-amber-600 dark:text-amber-400 font-extrabold'
+                    : 'text-amber-700/80 dark:text-amber-300/80 hover:text-amber-800 dark:hover:text-amber-200'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <div className="relative p-1">
+                    <Shield className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'scale-110' : ''}`} />
+                    {isActive && (
+                      <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-amber-500 shadow-xs shadow-amber-500" />
+                    )}
+                  </div>
+                  <span className="text-[10px] tracking-tight mt-0.5">Admin</span>
+                </>
+              )}
+            </NavLink>
+          )}
         </div>
       </nav>
 
