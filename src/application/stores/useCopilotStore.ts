@@ -333,6 +333,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
 
         if (event.type === 'engine-resolved') {
           resolvedEngineId = event.providerId;
+          set({ activeResolvedEngine: event.providerId });
         } else if (event.type === 'text-delta') {
           accumulatedText += event.delta;
           scheduleFlush();
