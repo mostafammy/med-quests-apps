@@ -7,10 +7,14 @@ import { z } from 'zod';
 export const CloudProviderIdSchema = z.enum(['openrouter', 'groq', 'gemini', 'offline-tutor']);
 export type CloudProviderId = z.infer<typeof CloudProviderIdSchema>;
 
+export const AiChatLanguagePreferenceSchema = z.enum(['auto', 'en', 'ar']);
+export type AiChatLanguagePreference = z.infer<typeof AiChatLanguagePreferenceSchema>;
+
 export const AiSettingsSchema = z.object({
   engine: CloudProviderIdSchema.default('groq'),
+  chatLanguage: AiChatLanguagePreferenceSchema.default('auto'),
   openRouterApiKey: z.string().default(''),
-  openRouterModel: z.string().default('meta-llama/llama-3.1-8b-instruct:free'),
+  openRouterModel: z.string().default('nvidia/nemotron-3.5-lightning:free'),
   groqApiKey: z.string().default(''),
   groqModel: z.string().default('openai/gpt-oss-20b'),
   geminiApiKey: z.string().default(''),
@@ -21,8 +25,9 @@ export type AiSettings = z.infer<typeof AiSettingsSchema>;
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {
   engine: 'groq',
+  chatLanguage: 'auto',
   openRouterApiKey: '',
-  openRouterModel: 'meta-llama/llama-3.1-8b-instruct:free',
+  openRouterModel: 'nvidia/nemotron-3.5-lightning:free',
   groqApiKey: '',
   groqModel: 'openai/gpt-oss-20b',
   geminiApiKey: '',
@@ -48,14 +53,23 @@ export function parseAiSettings(raw: unknown): AiSettings {
           data.geminiModel === 'gemini-2.5-pro' || data.geminiModel === 'gemini-2.5-flash-lite'
             ? 'gemini-3.5-flash-lite'
             : data.geminiModel,
+        openRouterModel:
+          data.openRouterModel === 'meta-llama/llama-3.1-8b-instruct:free' ||
+          data.openRouterModel === 'meta-llama/llama-3-8b-instruct:free'
+            ? 'nvidia/nemotron-3.5-lightning:free'
+            : data.openRouterModel,
       };
     }
     // Auto-migrate decommissioned Gemini models
     if (data.geminiModel === 'gemini-2.5-pro' || data.geminiModel === 'gemini-2.5-flash-lite') {
-      return {
-        ...data,
-        geminiModel: 'gemini-3.5-flash-lite',
-      };
+      data.geminiModel = 'gemini-3.5-flash-lite';
+    }
+    // Auto-migrate decommissioned OpenRouter models
+    if (
+      data.openRouterModel === 'meta-llama/llama-3.1-8b-instruct:free' ||
+      data.openRouterModel === 'meta-llama/llama-3-8b-instruct:free'
+    ) {
+      data.openRouterModel = 'nvidia/nemotron-3.5-lightning:free';
     }
     return data;
   }
