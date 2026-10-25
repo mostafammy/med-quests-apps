@@ -192,12 +192,12 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
                 } else {
                   if (isAnswered) {
                     if (ans.isCorrect) {
-                      pillColor = 'bg-emerald-500/20 dark:bg-emerald-500/30 text-emerald-800 dark:text-emerald-200 border-2 border-emerald-500 dark:border-emerald-400 font-bold hover:bg-emerald-500/35';
+                      pillColor = 'bg-emerald-500/15 dark:bg-emerald-500/25 text-emerald-900 dark:text-emerald-200 border-2 border-emerald-600/70 dark:border-emerald-400/70 font-bold hover:bg-emerald-500/25 dark:hover:bg-emerald-500/35 shadow-2xs';
                     } else {
-                      pillColor = 'bg-rose-500/20 dark:bg-rose-500/30 text-rose-800 dark:text-rose-200 border-2 border-rose-500 dark:border-rose-400 font-bold hover:bg-rose-500/35';
+                      pillColor = 'bg-rose-500/15 dark:bg-rose-500/25 text-rose-900 dark:text-rose-200 border-2 border-rose-600/70 dark:border-rose-400/70 font-bold hover:bg-rose-500/25 dark:hover:bg-rose-500/35 shadow-2xs';
                     }
                   } else {
-                    pillColor = 'glass-pill-luxury text-slate-700 dark:text-zinc-300 border border-slate-300/80 dark:border-zinc-700/80 hover:border-blue-400';
+                    pillColor = 'bg-slate-100/80 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 border border-slate-200/90 dark:border-zinc-700/80 hover:border-blue-400/70 hover:bg-white dark:hover:bg-zinc-700/80 shadow-2xs';
                   }
                 }
 
