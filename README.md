@@ -1,270 +1,453 @@
-# Med Quests Platform — Enterprise Medical Intelligence System
+# Med Quests Platform
 
-[![TypeScript 5.7](https://img.shields.io/badge/TypeScript-5.7-blue.svg?logo=typescript&style=flat-square)](https://www.typescriptlang.org/)
-[![React 19](https://img.shields.io/badge/React-19.3-61dafb.svg?logo=react&style=flat-square)](https://react.dev/)
-[![Cloudflare Workers & D1](https://img.shields.io/badge/Edge-Cloudflare%20Workers%20%2B%20D1-orange.svg?logo=cloudflare&style=flat-square)](https://workers.cloudflare.com/)
-[![Local-First Dexie 4](https://img.shields.io/badge/Storage-IndexedDB%20(Dexie%204)-emerald.svg?style=flat-square)](https://dexie.org/)
-[![Vitest](https://img.shields.io/badge/Vitest-108%20Passing%20Tests-success.svg?logo=vitest&style=flat-square)](https://vitest.dev/)
-[![Apple HIG](https://img.shields.io/badge/Design-Apple%20Human%20Interface%20Caliber-black.svg?logo=apple&style=flat-square)](https://developer.apple.com/design/human-interface-guidelines/)
+[![React](https://img.shields.io/badge/React-19.0-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Vitest](https://img.shields.io/badge/Vitest-3.2.7-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Architecture](https://img.shields.io/badge/Architecture-Clean%20%2F%20Hexagonal-orange)](#system-architecture)
+[![License](https://img.shields.io/badge/License-Proprietary-red)](#)
 
-An enterprise-caliber, local-first medical intelligence and exam preparation platform engineered for medical students and institutional faculty. Designed with strict **Clean Architecture**, sub-millisecond local caching, autonomous multi-turn Socratic AI reasoning, bilingual Arabic/English clinical localization, and global question bank governance.
+A high-performance, local-first medical exam preparation platform engineered for medical students tackling high-stakes university block exams and USMLE Step 1/Step 2 board certifications. 
+
+Engineered with **Apple Human Interface Guidelines (HIG)** aesthetic fidelity, strict **SOLID Principles**, **Clean / Hexagonal Architecture**, and an intelligent **Bilingual (English & Arabic) AI Agentic Copilot** with runtime tool isolation and BiDi script detection.
 
 ---
 
-## 🏛 High-Level Architecture Overview
+## Table of Contents
 
-Med Quests implements a decoupled, event-driven hexagonal architecture that seamlessly bridges offline-first browser storage with ultra-low latency Cloudflare Edge workers.
+1. [Product Vision & Medical Exam Fidelity](#product-vision--medical-exam-fidelity)
+2. [System Architecture & Hexagonal Boundaries](#system-architecture--hexagonal-boundaries)
+3. [Deep Dive: Bilingual Architecture & Chat-Scoped AI Localization](#deep-dive-bilingual-architecture--chat-scoped-ai-localization)
+   - [The Core Challenge: "In The Chat Only" Isolation](#1-the-core-challenge-in-the-chat-only-isolation)
+   - [SOLID Principles Engineering Realization](#2-solid-principles-engineering-realization)
+   - [Gang of Four (GoF) Design Patterns](#3-gang-of-four-gof-design-patterns)
+   - [Architectural Topology & Dataflow (Diagram)](#4-architectural-topology--dataflow)
+   - [Class Hierarchy & Port Contracts (Diagram)](#5-class-hierarchy--port-contracts)
+   - [Chat-Scoped Agentic Turn Sequence (Diagram)](#6-chat-scoped-agentic-turn-sequence)
+   - [BiDi Presentation & Arabic Typography Rules](#7-bidi-presentation--arabic-typography-rules)
+4. [Multi-Model Agentic Copilot & Clinical Tools](#multi-model-agentic-copilot--clinical-tools)
+5. [Local-First Persistence & Storage Topology](#local-first-persistence--storage-topology)
+6. [Repository Structure](#repository-structure)
+7. [Quality Engineering & Verification Matrix](#quality-engineering--verification-matrix)
+8. [Getting Started](#getting-started)
+
+---
+
+## Product Vision & Medical Exam Fidelity
+
+Medical board exams (USMLE Step 1/Step 2, IFOM, university block systems) test diagnostic acumen, pathophysiological causal chains, and rapid clinical decision-making. 
+
+```
+TEST → ANSWER → IMMEDIATE RESULT → UNDERSTAND MISTAKE → IDENTIFY WEAKNESS → REVIEW CURRICULUM → RETEST
+```
+
+- **Zero-Friction Ergonomics:** Spatial keyboard navigation (`1–5` for single-strike answer submission, `←`/`→` for navigation, `↑`/`↓` for option scrolling), rendering immediate sub-50ms feedback.
+- **Cognitive Remediation:** Rather than simple answer reveals, the system orchestrates Socratic dialogue, Hemodynamic Pressure-Volume (P-V) loop simulations, and memory anchor contrast cards.
+- **USMLE Linguistic Fidelity:** Clinical entities (e.g., *Aortic Stenosis*, *Pulsus parvus et tardus*, *MAP*, *Option A*) preserve canonical English nomenclature even during Arabic Socratic debriefs to ensure board exam readiness.
+
+---
+
+## System Architecture & Hexagonal Boundaries
+
+The application is structured under strict **Clean / Hexagonal Architecture (Ports and Adapters)** to decouple medical domain algorithms from UI chrome and LLM infrastructure.
 
 ```mermaid
-flowchart TD
-    subgraph Client["Browser Client (React 19 + TypeScript Strict + Tailwind v4)"]
-        UI["Presentation Layer\n(Apple-Caliber Glassmorphic UI & BiDi Arabic RTL)"]
-        Stores["State Layer (Zustand 5)\nuseAuthStore • useCopilotStore • useQuestionStore • useLocaleStore"]
-        Domain["Domain Core (Zero-Dependency Business Logic)\nAnomalies • Tiers • Quality Gate • P-V Loops • Socratic Prompts"]
-        Storage["Persistence (IndexedDB via Dexie 4)\n0ms Cache • Sync Cursors • User Telemetry • Canonical Bank"]
+graph TB
+    subgraph Presentation_Layer ["Presentation Layer (React 19 + Tailwind v4 + Apple HIG)"]
+        UI_Shell["Shell & Header (LocaleToggle, Theme)"]
+        UI_Session["Session Player (Keyboard Engine, Vignettes)"]
+        UI_Copilot["AI Copilot Drawer (BiDi Chat, Markdown)"]
+        UI_Settings["CopilotSettingsModal (Segmented Cards)"]
+        UI_Report["Post-Test Report & Psychometrics"]
     end
 
-    subgraph Edge["Cloudflare Global Network (300+ Edge Locations)"]
-        Worker["Cloudflare Worker (Hono Router / REST API)"]
-        D1["Cloudflare D1 (Serverless Distributed SQLite)\nCanonical Questions • Submissions • Device Fingerprints • Audit Logs"]
-        KV["Cloudflare KV (Zero-Trust Session Invalidation & Anomaly Flags)"]
+    subgraph Application_Layer ["Application Layer (Zustand State Mesh)"]
+        Store_Locale["useLocaleStore (UI Platform Locale)"]
+        Store_AiSettings["useAiSettingsStore (Chat Language & API Keys)"]
+        Store_Copilot["useCopilotStore (Turn Dispatcher & Event Stream)"]
+        Store_Session["useSessionStore (Question State & Telemetry)"]
     end
 
-    subgraph External["Frontier AI Cloud Providers (BYOK + Failover Engine)"]
-        Groq["Groq LPU (~50ms Instant Inference)"]
-        Gemini["Google Gemini 2.5/3.5/3.8 Flash (Deep Reasoning & Tool Use)"]
-        OpenRouter["OpenRouter (Nemotron 3.5 Lightning / Flint v1.0 MoE)"]
+    subgraph Domain_Layer ["Pure Domain Layer (Zero External Dependencies)"]
+        Domain_i18n["i18n Types & Translation Dictionaries (en, ar)"]
+        Domain_Script["ScriptDetector (Unicode BiDi Engine)"]
+        Domain_Policy["ChatLanguagePolicy (Strategy & Directive Builder)"]
+        Domain_Prompt["SystemPromptBuilder (Fluent Prompt Builder)"]
+        Domain_Power["PowerActions & Bilingual Clinical Prompts"]
+        Domain_Cache["PowerActionCacheService (Namespaced Storage)"]
+        Domain_Tools["Clinical Tool Definitions (Zod Schemas)"]
     end
 
-    UI --> Stores
-    Stores --> Domain
-    Domain --> Storage
-    Stores <--> Worker
-    Worker --> D1
-    Worker --> KV
-    Domain <--> External
+    subgraph Infrastructure_Layer ["Infrastructure & Gateway Layer"]
+        Infra_Orch["AgenticOrchestrator (Multi-Provider Stream)"]
+        Infra_Engines["EngineRegistry (Groq, Gemini, OpenRouter)"]
+        Infra_Storage["IndexedDB Gateway (Dexie.js: Sessions, Cache)"]
+        Infra_Sim["Hemodynamic Simulation Engine (P-V Loops)"]
+    end
+
+    Presentation_Layer --> Application_Layer
+    Application_Layer --> Domain_Layer
+    Infrastructure_Layer --> Domain_Layer
+    Application_Layer --> Infrastructure_Layer
 ```
 
 ---
 
-## 🔬 Core System Capabilities & Technical Depth
+## Deep Dive: Bilingual Architecture & Chat-Scoped AI Localization
 
-### 1. Autonomous Socratic AI Clinical Co-Pilot (`specs/002`)
-* **Multi-Turn Tool Orchestration:** Autonomous reasoning loop with multi-step tool execution:
-  * **Hemodynamic P-V Loop Simulation:** Mathematical modeling of Left Ventricular pressure-volume relationships under preload, afterload, and contractility shifts with interactive SVG visualization.
-  * **Cardiovascular Equations:** Dynamic MAP, Cardiac Output, SVR, and stroke work calculators.
-  * **Peer Distractor Traps & Mnemonics:** Automated distractor trap analysis and high-yield board mnemonics.
-* **Resilient Engine Failover:** Intercepts 429/quota exhaustion and automatically hot-swaps to secondary standby engines (Groq ⇄ Gemini ⇄ OpenRouter) with zero state loss.
-* **Instant Sub-Millisecond Response Cache:** IndexedDB response caching keyed by question, action, and language (`{questionId}:{actionKey}:{lang}`) achieving **0ms latency** on repeated high-yield clinical power actions.
+### 1. The Core Challenge: "In The Chat Only" Isolation
 
-### 2. Edge Auth, Zero-Trust Anomaly Detection & Hardware Telemetry (`specs/003`)
-* **Zero-Dependency Client Hardware Probing:** Evaluates hardware concurrency, device memory, WebGL unmasked GPU renderer, network round-trip time, battery status, and touch capability to classify client hardware tiers (`low-spec`, `balanced`, `high-spec`).
-* **Session Security & Geo-Anomaly Engine:** Detects impossible travel (speed > 900 km/h between Cloudflare edge colos), concurrent device limits, IP threat scores, and JA4 TLS fingerprint alterations.
-* **Institutional Governance Cockpit:** Dedicated administrative dashboard at `/admin` featuring real-time KPI aggregates, device telemetry breakdowns, per-student AI toggles, and one-click demo data purge for audit compliance.
+In high-stakes clinical education, naive whole-app translation breaks clinical fidelity. Medical students frequently require **an English USMLE vignette accompanied by an Arabic Socratic tutor**, or vice versa. 
 
-### 3. Bilingual Medical English / Arabic Localization (`specs/004`)
-* **BiDi Script Detection & Isolation:** Unicode character range analysis (`[\u0600-\u06FF]`) with `unicode-bidi: isolate` ensuring mixed clinical vignettes (e.g. Arabic explanations referencing English anatomical terms) never suffer layout corruption.
-* **Medical Terminology Protection:** Specialized clinical language policies enforce strict retention of USMLE/Board Latin and English terminology in brackets alongside Arabic medical explanations.
-* **Typography:** Tailored font hierarchies with `IBM Plex Sans Arabic`, `SF Arabic`, and `Cairo` fallbacks with letter-spacing normalization.
-
-### 4. Global Question Bank Governance & Peer-Review Pipeline (`specs/005`)
-* **Cryptographic Stem Invariant Deduplication:** Canonical SHA-256 fingerprinting normalizing punctuation, casing, and whitespace for $O(1)$ duplicate collision prevention.
-* **Automated Multi-Stage Quality Gate:** Pre-submission validation guaranteeing strict Zod schema conformance, exactly one correct choice, distractor rationales, and textbook clinical citation evidence.
-* **Three-Way Non-Destructive Delta Sync:** Server revision tracking with non-destructive merge logic that reconciles incoming global bank deltas while strictly preserving student bookmarks, notes, and local attempt telemetry.
+Furthermore, LLM function calling creates an acute engineering hazard:
+- **Machine Contract vs Human Prose:** Function-calling tools (`simulate_hemodynamic_pv_loop`, `calculate_cardiovascular_equation`) require exact ASCII string keys and JSON schemas. Injecting language directives into the tool declarations causes LLMs to translate parameter names into Arabic (e.g., `{"lesion": "aortic_stenosis"}` becomes `{"الآفة": "تضيق_الأبهر"}`), silently failing JSON schema validation.
+- **The Solution:** The AI Agent is made bilingual **strictly within the chat conversational orchestration pipeline**. The UI platform chrome and the AI conversation maintain independent, decoupled state lifecycles.
 
 ---
 
-## 🔄 Detailed Architectural Workflows
+### 2. SOLID Principles Engineering Realization
 
-### Multi-Tier AI Socratic Reasoning & Provider Failover Loop
+| Principle | Architectural Implementation | Code Reference |
+| :--- | :--- | :--- |
+| **S — Single Responsibility (SRP)** | Segregated Unicode script analysis (`ScriptDetector`), language policy resolution (`ChatLanguagePolicy`), UI state (`useLocaleStore`), and namespaced caching (`PowerActionCacheService`). | [`scriptDetector.ts`](src/domain/i18n/scriptDetector.ts)<br>[`languagePolicy.ts`](src/domain/ai/languagePolicy.ts) |
+| **O — Open/Closed (OCP)** | `SystemPromptBuilder` is extended via `.withChatLanguageDirective(ctx)` without altering core prompt logic. New languages are added by registering dictionaries satisfying `TranslationDictionary` without UI refactoring. | [`systemPromptBuilder.ts`](src/domain/ai/systemPromptBuilder.ts) |
+| **L — Liskov Substitution (LSP)** | `enDictionary` and `arDictionary` implement the identical compile-time TypeScript interface `TranslationDictionary`. Any omitted translation key triggers a compilation error (`tsc -b`). | [`dictionaries/en.ts`](src/domain/i18n/dictionaries/en.ts)<br>[`dictionaries/ar.ts`](src/domain/i18n/dictionaries/ar.ts) |
+| **I — Interface Segregation (ISP)** | UI chrome consumes `PlatformLocale` (`'en' \| 'ar'`) and `useDirection()`, while AI chat consumes `AiChatLanguagePreference` (`'auto' \| 'en' \| 'ar'`). Components only depend on the interfaces they require. | [`types.ts`](src/domain/i18n/types.ts) |
+| **D — Dependency Inversion (DIP)** | High-level orchestrators (`AgenticOrchestrator`) depend upon pure domain contracts (`ResolvedChatLanguageContext`) rather than concrete UI state or browser globals (`navigator.language`). | [`agenticOrchestrator.ts`](src/infrastructure/ai/agenticOrchestrator.ts) |
+
+---
+
+### 3. Gang of Four (GoF) Design Patterns
+
+1. **Strategy Pattern (`ChatLanguagePolicy`)**:
+   - `AutoDetectLanguageStrategy`: Computes Arabic Unicode script ratio (`\u0600-\u06FF`). If script density $\ge 25\%$, dynamically resolves turn language to `'ar'`; otherwise defaults to `'en'`.
+   - `ExplicitArabicStrategy` / `ExplicitEnglishStrategy`: Enforces deterministic output regardless of user message language.
+2. **Builder Pattern (`SystemPromptBuilder`)**:
+   - Stepwise fluent assembly of role personas, active telemetry, tool calling rules, and the isolated `CHAT LANGUAGE & BILINGUAL MEDICAL TERMINOLOGY DIRECTIVE`.
+3. **Namespaced Flyweight Cache Pattern (`PowerActionCacheService`)**:
+   - Partitions cached Socratic answers by question ID, action key, and resolved language:
+     $$\text{CacheKey} = \text{questionId} : \text{actionKey} : \text{lang}$$
+   - Precludes cross-lingual cache poisoning when toggling between English and Arabic.
+4. **Adapter Pattern (`DomDirectionAdapter`)**:
+   - Instantaneous synchronous synchronization of `<html dir="ltr|rtl" lang="en|ar">` and font variables to eliminate Flash of Unstyled Content (FOUC).
+
+---
+
+### 4. Architectural Topology & Dataflow
+
+```mermaid
+flowchart TD
+    subgraph UI_Presentation ["Presentation Layer (Apple Glassmorphism)"]
+        User(["Medical Student"])
+        Toggle["LocaleToggle (Header)"]
+        Modal["CopilotSettingsModal (Apple Segmented Cards)"]
+        Pill["Drawer Quick-Pill (AUTO / EN / ع)"]
+        ChatInput["BiDi Chat Input (dir='auto')"]
+        MarkdownView["CopilotMarkdownView (Dynamic BiDi Blocks)"]
+    end
+
+    subgraph State_Mesh ["Application Stores"]
+        LocaleStore["useLocaleStore<br>• locale: 'en' | 'ar'<br>• dir: 'ltr' | 'rtl'"]
+        AiSettingsStore["useAiSettingsStore<br>• chatLanguage: 'auto' | 'en' | 'ar'"]
+        CopilotStore["useCopilotStore<br>• Event Stream & Cache Dispatcher"]
+    end
+
+    subgraph Pure_Domain ["Domain Layer (Ports & Policies)"]
+        Detector["ScriptDetector<br>• Unicode code points (0x0600 - 0x06FF)<br>• Ratio analysis & dominant script"]
+        Policy["ChatLanguagePolicy<br>• resolveChatLanguageContext()<br>• buildChatLanguageDirective()"]
+        PromptGen["SystemPromptBuilder<br>• withChatLanguageDirective()"]
+        CacheSvc["PowerActionCacheService<br>• ${qid}:${action}:${lang}"]
+    end
+
+    subgraph Infrastructure ["Execution & LLM Infrastructure"]
+        Orchestrator["AgenticOrchestrator<br>• Multi-turn streaming gateway"]
+        CloudLLM["Cloud LLM Engine<br>• Groq / Gemini / OpenRouter"]
+        ToolsReg["Clinical Tool Registry<br>• STRICT English JSON Schemas"]
+    end
+
+    User -->|Toggle UI Language| Toggle
+    Toggle -->|Syncs| LocaleStore
+    LocaleStore -->|Sets DOM Attributes| HTML["&lt;html dir='...' lang='...'&gt;"]
+
+    User -->|Set Chat Preference| Modal
+    User -->|Quick Switch| Pill
+    Modal -->|Persists| AiSettingsStore
+    Pill -->|Updates| AiSettingsStore
+
+    User -->|Submits Message / Power Action| ChatInput
+    ChatInput -->|Dispatches| CopilotStore
+    CopilotStore -->|Fetches Settings| AiSettingsStore
+    CopilotStore -->|Inspects Text| Detector
+    CopilotStore -->|Resolves Context| Policy
+    Policy -->|Builds Directive| PromptGen
+
+    CopilotStore -->|Checks Cached Responses| CacheSvc
+    CacheSvc -.->|Hit 0ms| MarkdownView
+
+    CopilotStore -->|Executes Agent Turn| Orchestrator
+    PromptGen -->|Injects System Directive| Orchestrator
+    ToolsReg -->|Injects Canonical Tool Schemas| Orchestrator
+
+    Orchestrator -->|Streams Prompt + Tool Specs| CloudLLM
+    CloudLLM -->|Invokes Tool with English Args| Orchestrator
+    Orchestrator -->|Executes Clinical Tool| ToolsReg
+    ToolsReg -->|Returns Simulation Result| Orchestrator
+    Orchestrator -->|Sends Result to LLM| CloudLLM
+    CloudLLM -->|Streams Localized Socratic Prose| Orchestrator
+    Orchestrator -->|Yields Deltas| CopilotStore
+    CopilotStore -->|Renders Blocks with BiDi Isolation| MarkdownView
+```
+
+---
+
+### 5. Class Hierarchy & Port Contracts
+
+```mermaid
+classDiagram
+    class PlatformLocale {
+        <<enumeration>>
+        en
+        ar
+    }
+
+    class AiChatLanguagePreference {
+        <<enumeration>>
+        auto
+        en
+        ar
+    }
+
+    class ResolvedChatLanguageContext {
+        +PlatformLocale resolvedLanguage
+        +Direction direction
+        +boolean isRtl
+        +boolean preserveEnglishMedicalTerms
+        +string confidenceReason
+    }
+
+    class ScriptDetector {
+        +containsArabic(text: string) boolean
+        +detectDominantLanguage(text: string) PlatformLocale
+        +detectTextDirection(text: string) Direction
+        +detectScriptComposition(text: string) ScriptComposition
+    }
+
+    class ChatLanguagePolicy {
+        +resolveChatLanguageContext(pref: AiChatLanguagePreference, messageText: string, platformLocale: PlatformLocale) ResolvedChatLanguageContext
+        +buildChatLanguageDirective(context: ResolvedChatLanguageContext) string
+    }
+
+    class SystemPromptBuilder {
+        -string[] sections
+        +withRolePersona() this
+        +withSafeContext(context) this
+        +withTelemetrySnapshot(telemetry) this
+        +withToolProtocols(tools) this
+        +withChatLanguageDirective(ctx: ResolvedChatLanguageContext) this
+        +build() string
+    }
+
+    class PowerActionCacheService {
+        +buildCacheKey(questionId: string, actionKey: string, lang: PlatformLocale) string
+        +get(questionId: string, actionKey: string, lang: PlatformLocale) Promise~CacheEntry~
+        +set(questionId: string, actionKey: string, lang: PlatformLocale, entry: CacheEntry) Promise~void~
+    }
+
+    class AgenticOrchestrator {
+        +runAgentTurn(request: OrchestrationRequest) AsyncIterable~AgentEvent~
+    }
+
+    ChatLanguagePolicy ..> ScriptDetector : delegates Unicode inspection
+    ChatLanguagePolicy ..> ResolvedChatLanguageContext : produces
+    SystemPromptBuilder ..> ResolvedChatLanguageContext : consumes
+    AgenticOrchestrator ..> SystemPromptBuilder : assembles prompt
+    AgenticOrchestrator ..> ChatLanguagePolicy : resolves turn language
+    PowerActionCacheService ..> PlatformLocale : namespaces keys
+```
+
+---
+
+### 6. Chat-Scoped Agentic Turn Sequence
+
+The following sequence details how an Arabic-speaking medical student interacts with the AI Copilot. Notice how **tool execution is completely quarantined in canonical English**, preventing LLM hallucinations, while the resulting Socratic response is synthesized in fluent Arabic with USMLE term retention.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Student as Medical Student
-    participant UI as AiCopilotDrawer (React)
-    participant Store as useCopilotStore (Zustand)
-    participant Cache as PowerActionCache (Dexie)
+    participant UI as AiCopilotDrawer / Settings
+    participant Store as useCopilotStore
+    participant Policy as ChatLanguagePolicy
+    participant Builder as SystemPromptBuilder
     participant Orch as AgenticOrchestrator
-    participant Reg as EngineRegistry
-    participant Primary as Primary Provider (Groq)
-    participant Standby as Backup Provider (Gemini)
+    participant LLM as Cloud LLM (Groq / Gemini)
+    participant Sim as Hemodynamic Tool Engine
 
-    Student->>UI: Clicks "Pressure-Volume Loop"
-    UI->>Store: executePowerAction('pv_loop')
-    Store->>Cache: getCachedAction(questionId, 'pv_loop', 'ar')
-    alt Cache Hit (0ms)
-        Cache-->>Store: Return Cached Response & SVG Model
-        Store-->>UI: Instantly render PV-Loop Card
-    else Cache Miss
-        Store->>Orch: streamTurn(messages, tools, context)
-        Orch->>Reg: resolveAiProvider(settings)
-        Reg-->>Orch: Resolved Primary (Groq LPU)
-        Orch->>Primary: Stream SSE Request
-        alt Primary Rate Limited (429 / Quota)
-            Primary-->>Orch: 429 Resource Exhausted
-            Orch->>Reg: getAvailableFallbackProvider('groq')
-            Reg-->>Orch: Fallback to Google Gemini 2.5 Flash
-            Orch-->>UI: Emit 'engine-resolved' (GEMINI Backup)
-            Orch->>Standby: Resume Stream with Clinical Tools
-            Standby-->>Orch: Tool Call: calculatePvLoop({...})
-            Orch->>Orch: Execute Clinical Modeling Tool
-            Orch->>Standby: Return Tool Result
-            Standby-->>Orch: Final Synthesis & Text Stream
-        else Normal Stream
-            Primary-->>Orch: Tokens & Interactive Cards
-        end
-        Orch-->>Store: Dispatch Chunks to UI
-        Store->>Cache: saveCachedAction(questionId, 'pv_loop', parts, 'ar')
-        Store-->>UI: Complete Streaming & Update Drawer
-    end
+    Note over Student, UI: Student studies English vignette on Aortic Stenosis (AS)
+    Student->>UI: Selects Chat Language "العربية" (or types in Arabic)
+    UI->>Store: sendUserMessage("اشرح لي تأثير تضيق الصمام الأبهري على منحنى الضغط والحجم")
+    
+    Store->>Policy: resolveChatLanguageContext(pref: 'ar', text)
+    Policy-->>Store: ResolvedChatLanguageContext { lang: 'ar', dir: 'rtl', preserveEnglish: true }
+    
+    Store->>Builder: new SystemPromptBuilder()...withChatLanguageDirective(context).build()
+    Builder-->>Store: Prompt with [CHAT LANGUAGE & MEDICAL TERMINOLOGY DIRECTIVE]
+    
+    Store->>Orch: runAgentTurn(prompt, canonicalEnglishTools)
+    Orch->>LLM: Stream turn (System Prompt + Canonical English Tool Declarations)
+
+    Note over LLM, Orch: LLM identifies need for hemodynamics simulation
+    LLM-->>Orch: Tool Call: simulate_hemodynamic_pv_loop({ lesion: "aortic_stenosis", state: "decompensated" })
+    
+    Note over Orch, Sim: Tool executes strictly in English ASCII
+    Orch->>Sim: computePvLoopMetrics("aortic_stenosis", "decompensated")
+    Sim-->>Orch: { lvedp: 28, map: 65, strokeVolume: 42, pvr: 1800 }
+    
+    Orch->>LLM: Feed tool result JSON back to LLM context
+    
+    Note over LLM: LLM synthesizes Arabic Socratic guidance while preserving English terms
+    LLM-->>Orch: Stream: "يؤدي تضيق الصمام الأبهري (Aortic Stenosis) إلى زيادة ملحوظة في ضغط البطين الأيسر..."
+    Orch-->>Store: Yield delta chunks
+    Store-->>UI: Render markdown blocks with dir="rtl" + isolated LTR formulas
 ```
 
 ---
 
-### Non-Destructive Global Bank Delta Synchronization
+### 7. BiDi Presentation & Arabic Typography Rules
 
-```mermaid
-flowchart LR
-    subgraph Local["Client IndexedDB"]
-        LocalQuestions["Local Questions Bank"]
-        UserProgress["Bookmarks & Attempt Notes"]
-        LocalCursor["Sync Cursor (Server Rev: 3)"]
-    end
+Rendering Arabic alongside complex medical formulas requires strict CSS and Unicode handling:
 
-    subgraph Network["Cloudflare Edge API"]
-        DeltaEndpoint["GET /api/bank/cvs/delta?since=3"]
-        WorkerRouter["Cloudflare Worker"]
-        D1DB[("Cloudflare D1 Database\nCanonical Revision: 5")]
-    end
+1. **Glyph Ligature Joining Protection:**
+   Tailwind's default negative letter spacing (`tracking-tight`) breaks Arabic cursive ligatures. The platform enforces:
+   ```css
+   :root[dir="rtl"] {
+     letter-spacing: 0 !important;
+     line-height: 1.65;
+     font-family: var(--font-arabic), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+   }
+   ```
+2. **Formula & Code Isolation:**
+   Hemodynamic equations (e.g. $\text{MAP} = \text{DBP} + \frac{1}{3}(\text{SBP} - \text{DBP})$) and code fragments must never inherit RTL sentence direction. The markdown engine wraps them in `.ltr-isolate` with `unicode-bidi: isolate; dir="ltr";`.
+3. **CSS Logical Properties:**
+   All components use bidirectional logical properties (`ps-*`, `pe-*`, `ms-*`, `me-*`, `border-s-*`) instead of physical coordinates (`pl-*`, `pr-*`, `border-l-*`).
 
-    subgraph MergeEngine["Domain Core Merge Engine"]
-        ThreeWayMerge["Three-Way Non-Destructive Merge\n(CanonicalHasher + ProgressMerge)"]
-        UpdatedBank["Updated Unified Bank\n(Preserved User Flags + New Content)"]
-    end
+---
 
-    LocalCursor -->|Query Delta| DeltaEndpoint
-    DeltaEndpoint --> WorkerRouter
-    WorkerRouter --> D1DB
-    D1DB -->|Delta: Revisions 4 & 5| DeltaEndpoint
-    DeltaEndpoint --> ThreeWayMerge
-    LocalQuestions --> ThreeWayMerge
-    UserProgress --> ThreeWayMerge
-    ThreeWayMerge --> UpdatedBank
-    UpdatedBank -->|Atomic Bulk Put| LocalQuestions
+## Multi-Model Agentic Copilot & Clinical Tools
+
+The platform features an extensible **Agentic Orchestrator** capable of executing structured clinical reasoning across multiple inference providers:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Agentic Orchestrator                     │
+└──────────────┬───────────────────────────────┬──────────────┘
+               │                               │
+       ┌───────┴────────┐              ┌───────┴────────┐
+       │ Clinical Tools │              │ Model Gateway  │
+       └───────┬────────┘              └───────┬────────┘
+               │                               ├─ Groq (Llama 3.3 70B, sub-300ms)
+               ├─ simulate_hemodynamic_pv_loop ├─ Google Gemini (Gemini 2.5 Flash)
+               ├─ calculate_cardiovascular_eq  └─ OpenRouter (DeepSeek R1, Claude)
+               └─ remediate_memory_anchor
+```
+
+- **Zero-Latency Power Actions:** Instant cached Socratic breakdowns (`Why Right`, `Rule Out Wrong`, `Pivot Clues`, `Cognitive Bridge`) served in $<10\text{ms}$ from namespaced IndexedDB cache.
+- **Dynamic Model Switching:** Medical students can switch between low-latency local providers (Groq) and frontier reasoning models (Gemini / DeepSeek R1) in settings.
+
+---
+
+## Local-First Persistence & Storage Topology
+
+Data is stored client-side in the browser via **IndexedDB (Dexie.js)** for privacy, instant launch, and full offline capability:
+
+```
+IndexedDB: medquests_cvs_v1
+├── questionCatalog           # Canonical USMLE vignette stems & psychometrics
+├── studentQuestionStates     # Bookmark flags, personal notes, mastery ratings
+├── testSessions              # Completed exam runs, time-per-question, raw scores
+├── studentTelemetryEvents    # Micro-interactions: option hover dwell time, answer revisions
+├── aiPowerActionCache        # Namespaced Socratic responses (${qid}:${action}:${lang})
+└── aiSettings                # Engine preferences, model selection, chatLanguage preference
 ```
 
 ---
 
-## 📊 Comprehensive Release & Commit Engineering Log
-
-Every file in the repository has been committed atomically, step by step, following the **Conventional Commits** specification. Below is the historical audit trail representing the engineering depth of the platform:
+## Repository Structure
 
 ```
-eb3c612 feat(ui): wire full-screen admin route and global modal state in App Shell
-51d0d2e feat(admin): refine institutional admin dashboard with responsive cards and anomaly feeds
-f3f8cf1 feat(auth): enhance governance drawer with direct navigation link to full admin dashboard
-b842cc3 feat(auth): refine authentication security modal with seamless session termination
-49131bf feat(ai): enhance fallback routing and engine recovery telemetry in registry
-85b6cbb test(ai): add unit test suite for multi-tier power action cache service
-0d17576 test(ai): add unit test suite for clinical power action prompt generators
-11dcc9a feat(ai): refine power action definitions with clinical heuristics and fallback handlers
-f7ee012 feat(ai): implement auto-failover to standby provider on stream turn rate limit
-f7829f7 fix(ai): clarify OpenRouter free tier API key requirement and rate limit remediation
-d83b2f5 docs(i18n): document bilingual clinical AI language ports and contracts
-29848d9 feat(state): track active resolved engine in copilot store for failover feedback
-4346235 docs(i18n): document bilingual clinical localization and translation specification
-410bac6 docs(i18n): document bilingual architecture execution and implementation plan
-74d10f6 feat(state): sync activeResolvedEngine on engine-resolved stream events
-6171462 feat(ui): display active fallback engine indicator badge in copilot drawer header
-f508be5 test(ai): add arabic medical directive and tool preservation unit test
-67f2e80 feat(i18n): create Arabic clinical medical dictionary with bilingual terminology mappings
-50cbce5 feat(ai): inject language directive into clinical system prompt in agentic orchestrator
-14e77e0 feat(state): connect power actions execution to active chat language preference
-eb34fdc docs(governance): update governance interface contracts with mutable arrays
-dfeb76a db(migrations): add D1 migrations for canonical question bank and review queue
-6b978fc feat(worker): implement Cloudflare edge endpoints for delta sync & reviews
-e1d4d03 feat(governance): implement cryptographic SHA-256 stem normalizer and hasher
-69aa91f feat(governance): implement multi-stage editorial quality gate pipeline
-59ec254 feat(governance): implement editorial state machine with inline reviewer patch
-2ecbc0c feat(governance): implement three-way non-destructive delta merge strategy
-5be9da8 feat(governance): implement composable query specifications and KPI aggregator
-0ecb968 test(governance): add unit test suite for stem hashing and quality gate
-b90f11d refactor(ai): clean up unused import declarations in tool registry
-6ab1448 feat(ai): enhance clinical system prompt with bilingual directives & RTL
-4010a30 test(ai): add unit test for language directive injection in prompt builder
-8d6ad34 feat(storage): expand Dexie database schema for global bank sync metadata
-5ec8231 feat(infrastructure): implement HTTP client gateway for Edge Question Bank API
-b39e6a9 feat(state): integrate non-destructive delta sync and submission workflows
-51b22e1 feat(state): create Zustand store for editorial review queue and governance
-977f0a8 test(state): add unit test suite for reactive locale store and RTL layout
-ca9a81e style(theme): add bilingual typography styles and BiDi unicode isolation
-0937c89 feat(ui): create Apple-styled bilingual English/Arabic locale toggle button
-c5e8c18 feat(ui): mount bilingual locale toggle and dynamic translated navigation
-1d293ff feat(ui): add script detection and BiDi text directionality in Copilot Markdown
-2a0f8bf feat(ui): render localized Arabic action labels and tooltips in quick actions
-820e118 feat(ui): add language toggle badge and localized prompts in Copilot drawer
-ea74834 feat(ui): create institutional question bank governance review workspace
-796f60a feat(ui): embed question bank review panel tab in governance dashboard
-f8fbce1 feat(ui): add peer review submission and cloud bank sync in Question Studio
-4ad5687 feat(ui): update question matrix modal with localized labels and RTL
-984464c feat(ui): enhance question navigator strip with BiDi isolation and hint badges
-5cb11be feat(ui): support bilingual medical vignettes and RTL layout in Session Player
-f02ef29 feat(ui): support localized score breakdown and remediation in Post-Test report
-5a5c53b feat(auth): add question-bank tab enum to governance view tabs in auth store
-0fa2c4b feat(ai): integrate ChatLanguagePolicy context resolution in cache saving
-762ee71 feat(ui): mount QuestionBankGovernancePanel in slide-over governance drawer
-0beac39 feat(ui): render bilingual language preference cards in Co-Pilot settings
-2cdc5bf style(test): refine question matrix modal pill contrast and glassmorphism
+Med Quests Apps/
+├── .specify/                               # Spec-Kit memory & configuration
+├── .agents/                                # Autonomous engineering agents
+├── BRD.md                                  # Business & Engineering Requirements (1,300+ lines)
+├── specs/                                  # Formal Architecture Specs & Plans
+│   └── 004-bilingual-i18n-ai-localization/ # Bilingual Spec, Plan & Contracts
+├── src/
+│   ├── domain/                             # PURE DOMAIN LAYER (Zero external dependencies)
+│   │   ├── i18n/                           # ScriptDetector, Dictionaries (en, ar), Types
+│   │   ├── ai/                             # ChatLanguagePolicy, SystemPromptBuilder, Tools
+│   │   ├── questionBank/                   # Catalog models & psychometrics
+│   │   └── auth/                           # Role schemas & RBAC contracts
+│   ├── application/                        # APPLICATION STATE LAYER
+│   │   └── stores/                         # useLocaleStore, useAiSettingsStore, useCopilotStore
+│   ├── infrastructure/                     # ADAPTERS & INFRASTRUCTURE
+│   │   ├── ai/                             # AgenticOrchestrator, EngineRegistry (Groq, Gemini)
+│   │   ├── storage/                        # Dexie.js IndexedDB schema & migrations
+│   │   └── questionBank/                   # JSON bank loader & integrity gate
+│   └── ui/                                 # PRESENTATION LAYER (Apple HIG)
+│       ├── app/                            # Shell, Navigation, LocaleToggle
+│       └── features/                       # Copilot, Session Player, Studio, Reports
 ```
 
 ---
 
-## 🛠 Technology Stack Breakdown
+## Quality Engineering & Verification Matrix
 
-| Layer | Technologies & Tools | Engineering Rationale |
-|---|---|---|
-| **Frontend Framework** | **React 19.3.1**, **TypeScript 5.7 (strict: true)** | Compiler-level type safety, React Server Component readiness, and high-performance concurrent hooks. |
-| **State Architecture** | **Zustand 5** | Minimal footprint, reactive selectors, zero unnecessary re-renders, and modular store partitioning. |
-| **Local Persistence** | **Dexie.js 4.0 (IndexedDB)** | Sub-millisecond indexed transactions, offline test persistence, and zero cloud requirement. |
-| **Edge Compute** | **Cloudflare Workers (V8 Edge Runtime)** | 300+ edge datacenter deployments, $0$ cold starts, and geographical request telemetry extraction. |
-| **Edge Database** | **Cloudflare D1 (SQLite Engine)** | Serverless globally distributed relational database for revision-controlled question banks and audit trails. |
-| **AI Inference** | **Groq LPU, Gemini API, OpenRouter** | Multi-provider redundancy with intelligent automated failover and streaming function calling. |
-| **Design Language** | **Apple Human Interface Guidelines (Tailwind v4)** | Glassmorphism, tactile spring physics, dynamic kinetic typography, and fluid responsive drawer views. |
-| **Test Engineering** | **Vitest 3.2** | Blazing-fast parallel test runner executing 108 unit tests across pure domain logic in < 1.5 seconds. |
+Quality is enforced via automated continuous testing with zero warnings or loose types:
 
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Node.js `>= 20.0.0`
-- pnpm `>= 9.0.0`
-- Cloudflare Wrangler CLI (optional, for edge worker deployment)
-
-### Local Development Setup
 ```bash
-# 1. Clone the repository
-git clone https://github.com/mostafammy/med-quests-apps.git
-cd med-quests-apps
+# Execute full Vitest suite (100% green)
+pnpm test
 
-# 2. Install pinned monorepo dependencies
-pnpm install
-
-# 3. Launch local Vite development server
-pnpm dev
-
-# 4. Run automated test suite
-pnpm test --run
-
-# 5. Execute production build
+# Run strict TypeScript compiler checks and Vite production bundle
 pnpm build
 ```
 
+| Verification Check | Standard | Result |
+| :--- | :--- | :--- |
+| **Unit & Integration Suite** | Vitest 3.2.7 | **16 / 16 passed (108 tests green)** |
+| **Type Integrity** | TypeScript 5.7 (`tsc -b`) | **0 errors (Strict Null Checks)** |
+| **Production Build** | Vite 6.1.0 + Rollup | **2.11s build time, clean chunks** |
+| **Internationalization** | Compile-Time LSP Checks | **100% Key Parity (`en` $\leftrightarrow$ `ar`)** |
+
 ---
 
-## 📜 Quality & Governance Summary
-- **Tests:** 16 test suites, **108 unit tests**, 100% pass rate.
-- **TypeScript:** Strict type validation with 0 `any` escapes in domain contracts.
-- **Security:** Zero leaked tokens, automated credential anomaly detection, and client-side privacy adherence.
-- **License:** MIT License. Developed for University Medical Faculties & Academic Scholars.
+## Getting Started
+
+### Prerequisites
+- **Node.js**: `v20.x` or higher
+- **pnpm**: `v9.x` or higher
+
+### Installation & Development
+```bash
+# Clone the repository
+git clone https://github.com/your-org/med-quests-apps.git
+cd med-quests-apps
+
+# Install dependencies
+pnpm install
+
+# Start local development server
+pnpm dev
+
+# Run test suite
+pnpm test
+```
+
+---
+
+## Normative Specification & Documentation
+
+- [BRD.md](BRD.md) — Normative Business & Engineering Requirements Document
+- [Bilingual Architecture Specification](specs/004-bilingual-i18n-ai-localization/spec.md)
+- [Bilingual Engineering Plan](specs/004-bilingual-i18n-ai-localization/plan.md)
+- [i18n and AI Port Contracts](specs/004-bilingual-i18n-ai-localization/contracts/i18n-ai-language-ports.ts)
