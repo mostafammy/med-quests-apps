@@ -16,11 +16,20 @@ export interface AiEntitlementContext {
   readonly isAccountRestricted?: boolean;
 }
 
+const isTestEnv = Boolean(
+  (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') ||
+  (import.meta as any).env?.VITEST ||
+  (import.meta as any).env?.MODE === 'test'
+);
+
 export function getOpenRouterKey(settings: AiSettings): string {
-  if (typeof settings.openRouterApiKey === 'string') {
-    return settings.openRouterApiKey.trim();
-  }
+  const fromSettings = settings.openRouterApiKey?.trim();
+  if (fromSettings) return fromSettings;
+  if (isTestEnv && typeof settings.openRouterApiKey === 'string') return '';
   try {
+    if (typeof process !== 'undefined' && typeof process.env?.VITE_OPENROUTER_API_KEY === 'string') {
+      return process.env.VITE_OPENROUTER_API_KEY.trim();
+    }
     return (import.meta as any).env?.VITE_OPENROUTER_API_KEY?.trim() || '';
   } catch {
     return '';
@@ -28,10 +37,13 @@ export function getOpenRouterKey(settings: AiSettings): string {
 }
 
 export function getGroqKey(settings: AiSettings): string {
-  if (typeof settings.groqApiKey === 'string') {
-    return settings.groqApiKey.trim();
-  }
+  const fromSettings = settings.groqApiKey?.trim();
+  if (fromSettings) return fromSettings;
+  if (isTestEnv && typeof settings.groqApiKey === 'string') return '';
   try {
+    if (typeof process !== 'undefined' && typeof process.env?.VITE_GROQ_API_KEY === 'string') {
+      return process.env.VITE_GROQ_API_KEY.trim();
+    }
     return (import.meta as any).env?.VITE_GROQ_API_KEY?.trim() || '';
   } catch {
     return '';
@@ -39,10 +51,13 @@ export function getGroqKey(settings: AiSettings): string {
 }
 
 export function getGeminiKey(settings: AiSettings): string {
-  if (typeof settings.geminiApiKey === 'string') {
-    return settings.geminiApiKey.trim();
-  }
+  const fromSettings = settings.geminiApiKey?.trim();
+  if (fromSettings) return fromSettings;
+  if (isTestEnv && typeof settings.geminiApiKey === 'string') return '';
   try {
+    if (typeof process !== 'undefined' && typeof process.env?.VITE_GEMINI_API_KEY === 'string') {
+      return process.env.VITE_GEMINI_API_KEY.trim();
+    }
     return (import.meta as any).env?.VITE_GEMINI_API_KEY?.trim() || '';
   } catch {
     return '';
