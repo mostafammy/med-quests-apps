@@ -166,4 +166,23 @@ describe('SystemPromptBuilder (v2 Medical Faculty Builder)', () => {
     expect(prompt).toContain('formulate_clinical_memory_anchor');
     expect(prompt).toContain('prescribe_targeted_micro_curriculum');
   });
+
+  it('injects Arabic medical language directive and preserves tool English protocol', () => {
+    const prompt = new SystemPromptBuilder()
+      .withRolePersona()
+      .withChatLanguageDirective({
+        preference: 'ar',
+        resolvedLanguage: 'ar',
+        direction: 'rtl',
+        detectedInputScript: 'ar',
+        preserveEnglishMedicalTerms: true,
+      })
+      .withToolOrchestrationRules()
+      .build();
+
+    expect(prompt).toContain('اللغة العربية الفصحى الطبية السليمة');
+    expect(prompt).toContain('CANONICAL USMLE MEDICAL TERMS');
+    expect(prompt).toContain('STRICT TOOL CALLING PROTOCOL');
+    expect(prompt).toContain('simulate_hemodynamic_pv_loop');
+  });
 });
