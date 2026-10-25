@@ -5,12 +5,15 @@
  */
 import type { SafeAiContext } from './context.ts';
 import type { ActiveQuestionTelemetry } from './telemetry.ts';
+import type { ResolvedChatLanguageContext } from '../i18n/types.ts';
+import { ChatLanguagePolicy } from './languagePolicy.ts';
 
 export class SystemPromptBuilder {
   private rolePersona: string = '';
   private contextSection: string = '';
   private telemetrySection: string = '';
   private toolProtocolSection: string = '';
+  private languageDirectiveSection: string = '';
 
   withRolePersona(): this {
     this.rolePersona =
@@ -110,9 +113,15 @@ export class SystemPromptBuilder {
     return this;
   }
 
+  withChatLanguageDirective(context: ResolvedChatLanguageContext): this {
+    this.languageDirectiveSection = ChatLanguagePolicy.buildChatLanguageDirective(context);
+    return this;
+  }
+
   build(): string {
     const sections = [
       this.rolePersona,
+      this.languageDirectiveSection,
       this.contextSection,
       this.telemetrySection,
       this.toolProtocolSection,
