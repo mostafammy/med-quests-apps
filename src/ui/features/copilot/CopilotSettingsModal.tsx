@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAiSettingsStore } from '../../../application/stores/useAiSettingsStore.ts';
-import { X, Sparkles, Key, Check, Globe, Cpu, ExternalLink, Zap, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Sparkles, Key, Check, Globe, Cpu, ExternalLink, Zap, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import type { CloudProviderId } from '../../../domain/ai/settings.ts';
 import { PROVIDER_MODELS, type ModelOptionInfo } from '../../../domain/ai/modelCatalog.ts';
 
@@ -361,6 +361,22 @@ export const CopilotSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     className="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
+                {!openRouterKey.trim() && (
+                  <div className="p-3 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 flex items-start space-x-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <div className="font-bold">Free Account Key Required by OpenRouter:</div>
+                      <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
+                        Even for free models (like Llama 3.1 8B :free), OpenRouter requires an API key.
+                        Get your free key with 0 credit at{' '}
+                        <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="underline font-bold">
+                          openrouter.ai/keys
+                        </a>{' '}
+                        and paste it above. If you don't have an OpenRouter key, select <strong>Groq</strong> or <strong>Google Gemini</strong> (pre-configured with high limits).
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Simple Model Cards */}
