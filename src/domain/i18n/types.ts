@@ -313,6 +313,9 @@ export interface TranslationDictionary {
     readonly ingestBtn: string;
     readonly exportBtn: string;
     readonly clearBtn: string;
+    readonly resetToGlobalBtn: string;
+    readonly resetConfirmDialog: string;
+    readonly resetSuccessToast: string;
     readonly totalQuestions: string;
     readonly validationSuccess: string;
   };
