@@ -49,18 +49,18 @@ export const QuestionNavigatorStrip: React.FC<QuestionNavigatorStripProps> = ({
   return (
     <div className={`w-full border-b transition-colors select-none ${
       isExamMode 
-        ? 'bg-slate-900/80 border-slate-800/80 backdrop-blur-xl text-slate-200' 
-        : 'bg-white/80 border-slate-200/70 backdrop-blur-xl text-slate-800'
+        ? 'bg-slate-900/85 border-slate-800/80 backdrop-blur-xl text-slate-200' 
+        : 'bg-white/75 dark:bg-zinc-900/75 border-b border-white/60 dark:border-zinc-800/80 backdrop-blur-xl text-slate-800 dark:text-zinc-200 shadow-xs'
     }`}>
       <div className="max-w-6xl mx-auto px-2.5 sm:px-6 h-12 flex items-center justify-between gap-2 sm:gap-3">
         {/* Left: Interactive Grid Trigger Pill */}
         <button
           onClick={onOpenMatrix}
           title="Open Question Overview Grid (Press G)"
-          className={`shrink-0 flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-2.5 py-1 rounded-full text-xs font-semibold transition-all duration-150 cursor-pointer apple-tap ${
+          className={`shrink-0 flex items-center space-x-1 sm:space-x-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all duration-150 cursor-pointer apple-tap ${
             isExamMode
-              ? 'bg-slate-800/80 hover:bg-slate-750 text-slate-300 border border-slate-700/60 shadow-xs'
-              : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200/70 shadow-xs'
+              ? 'bg-slate-800/80 hover:bg-slate-750 text-slate-200 border border-slate-700/60 shadow-xs'
+              : 'glass-pill-luxury text-slate-700 dark:text-zinc-200 shadow-xs'
           }`}
         >
           <LayoutGrid className="w-3.5 h-3.5 text-blue-500" />
@@ -81,10 +81,18 @@ export const QuestionNavigatorStrip: React.FC<QuestionNavigatorStripProps> = ({
             const isAnswered = !!ans;
             const isFlagged = !!flags[q.id];
 
-            // Apple-style tactile pill styling
+            // Apple-style high-contrast tactile pill styling
             let pillStyle = '';
             if (isActive) {
-              pillStyle = 'bg-blue-600 text-white font-bold shadow-md shadow-blue-500/25 ring-2 ring-blue-500/40 ring-offset-1 scale-105 z-10';
+              if (!isExamMode && isAnswered) {
+                if (ans.isCorrect) {
+                  pillStyle = 'bg-emerald-600 text-white font-black shadow-md shadow-emerald-500/30 ring-2 ring-emerald-400 ring-offset-1 scale-105 z-10';
+                } else {
+                  pillStyle = 'bg-rose-600 text-white font-black shadow-md shadow-rose-500/30 ring-2 ring-rose-400 ring-offset-1 scale-105 z-10';
+                }
+              } else {
+                pillStyle = 'bg-blue-600 text-white font-bold shadow-md shadow-blue-500/25 ring-2 ring-blue-500/40 ring-offset-1 scale-105 z-10';
+              }
             } else if (isExamMode) {
               if (isAnswered) {
                 pillStyle = 'bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-750';
@@ -92,15 +100,15 @@ export const QuestionNavigatorStrip: React.FC<QuestionNavigatorStripProps> = ({
                 pillStyle = 'bg-slate-900/60 text-slate-400 hover:bg-slate-800 border border-slate-800/80';
               }
             } else {
-              // Practice mode: color-coded answer confirmation
+              // Practice mode: high-contrast color-coded answer confirmation
               if (isAnswered) {
                 if (ans.isCorrect) {
-                  pillStyle = 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-300/80 dark:border-emerald-700/80 hover:bg-emerald-100/70';
+                  pillStyle = 'bg-emerald-500/15 dark:bg-emerald-500/25 text-emerald-900 dark:text-emerald-200 border-2 border-emerald-600/70 dark:border-emerald-400/70 font-bold hover:bg-emerald-500/25 dark:hover:bg-emerald-500/35 shadow-2xs';
                 } else {
-                  pillStyle = 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-300/80 dark:border-rose-700/80 hover:bg-rose-100/70';
+                  pillStyle = 'bg-rose-500/15 dark:bg-rose-500/25 text-rose-900 dark:text-rose-200 border-2 border-rose-600/70 dark:border-rose-400/70 font-bold hover:bg-rose-500/25 dark:hover:bg-rose-500/35 shadow-2xs';
                 }
               } else {
-                pillStyle = 'bg-slate-100/80 hover:bg-slate-200/80 text-slate-600 border border-transparent hover:border-slate-300/60';
+                pillStyle = 'bg-slate-100/80 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 border border-slate-200/90 dark:border-zinc-700/80 hover:border-blue-400/70 hover:bg-white dark:hover:bg-zinc-700/80 shadow-2xs';
               }
             }
 
