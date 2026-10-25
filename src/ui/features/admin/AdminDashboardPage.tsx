@@ -10,6 +10,8 @@ import {
   Search,
   Ban,
   Loader2,
+  Trash2,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAuthStore, type GovernanceViewTab } from '../../../application/stores/useAuthStore.ts';
 import type { UserRole, FeatureFlagKey } from '../../../domain/auth/types.ts';
@@ -63,6 +65,7 @@ export const AdminDashboardPage: React.FC = () => {
     updateUserRole,
     setUserRestriction,
     signInWithGoogle,
+    purgeDemoData,
   } = useAuthStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -219,12 +222,22 @@ export const AdminDashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Global Edge Health Badge */}
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+        {/* Global Edge Health Badge & Production Clean Action */}
+        <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
           <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>Workers KV Latency: ~{analytics.globalAvgEdgeLatencyMs}ms</span>
           </div>
+
+          <button
+            type="button"
+            onClick={() => void purgeDemoData()}
+            title="Clean up all demo accounts and keep only verified platform accounts"
+            className="flex items-center gap-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700/80 px-3 py-1 text-xs font-semibold text-zinc-700 dark:text-zinc-300 shadow-xs cursor-pointer transition-colors apple-tap"
+          >
+            <Trash2 className="h-3.5 w-3.5 text-zinc-400 hover:text-red-500" />
+            <span>Clean Demo Data</span>
+          </button>
         </div>
       </div>
 
@@ -427,6 +440,15 @@ export const AdminDashboardPage: React.FC = () => {
                 <option value="anomalous">Anomalous</option>
               </select>
             </div>
+
+            {managedUsers.length <= 1 && (
+              <div className="p-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-900 dark:text-emerald-200 flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <p className="text-[11px] leading-relaxed">
+                  <strong>Pristine Production Mode:</strong> Demo data is cleaned up. As medical scholars sign in with Google OAuth, their cloud profiles and telemetry will populate here dynamically.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
               {filteredUsers.map((record) => {
