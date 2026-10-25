@@ -12,6 +12,7 @@ import {
   AlertCircle,
   CheckCircle2,
   RefreshCw,
+  RotateCcw,
   Globe,
   ShieldCheck,
   FileText,
@@ -32,6 +33,7 @@ export const QuestionStudio: React.FC = () => {
     loadMySubmissions,
     exportBankJson,
     clearBank,
+    resetLocalBankToGlobal,
   } = useQuestionStore();
 
   const { authState } = useAuthStore();
@@ -49,6 +51,7 @@ export const QuestionStudio: React.FC = () => {
   } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSubmissionsTracker, setShowSubmissionsTracker] = useState(false);
+  const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
 
   const activeSubject = CVS_TAXONOMY.subjects.find((s) => s.id === selectedSubjectId);
   const availableChapters = CVS_TAXONOMY.chapters.filter((c) => c.subjectId === selectedSubjectId);
@@ -60,7 +63,23 @@ export const QuestionStudio: React.FC = () => {
     loadMySubmissions(userId);
   }, [authState.user?.id, loadMySubmissions]);
 
-  // Generate Master System Prompt for Google AI Studio / Claude
+  const handleResetToGlobal = async () => {
+    if (!window.confirm(t.studio.resetConfirmDialog)) {
+      return;
+    }
+    try {
+      setIsProcessing(true);
+      const res = await resetLocalBankToGlobal('cvs');
+      setResetSuccessMessage(
+        `${t.studio.resetSuccessToast} (${res.resetCount} questions, Rev #${res.revision})`
+      );
+      setTimeout(() => setResetSuccessMessage(null), 5000);
+    } catch {
+      // Handled in store
+    } finally {
+      setIsProcessing(false);
+    }
+  };
   const generatePrompt = () => {
     return `You are a Senior Medical Professor and USMLE Board Item Writer creating high-yield, strictly grounded Multiple Choice Questions for 2nd-year medical students.
 
@@ -199,14 +218,24 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           <button
             onClick={() => syncWithGlobalBank('cvs')}
-            disabled={isSyncing}
+            disabled={isSyncing || isProcessing}
             className="py-2 px-3.5 rounded-xl bg-white/80 dark:bg-zinc-800/80 hover:bg-white dark:hover:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center space-x-2 shadow-xs transition-all disabled:opacity-50 cursor-pointer apple-tap"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-indigo-600' : ''}`} />
             <span>{isSyncing ? 'Syncing...' : 'Sync Global Bank'}</span>
+          </button>
+
+          <button
+            onClick={handleResetToGlobal}
+            disabled={isSyncing || isProcessing}
+            title={t.studio.resetToGlobalBtn}
+            className="py-2 px-3.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/15 border border-rose-400/30 text-xs font-bold text-rose-700 dark:text-rose-300 flex items-center space-x-1.5 shadow-xs transition-all disabled:opacity-50 cursor-pointer apple-tap"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 ${isProcessing ? 'animate-spin text-rose-600' : ''}`} />
+            <span>{t.studio.resetToGlobalBtn}</span>
           </button>
         </div>
       </div>
@@ -219,6 +248,16 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
             <span>
               Synchronized successfully: <strong>+{lastMergeReport.insertedCount} new canonical questions</strong>, {lastMergeReport.preservedLocalCustomCount} local custom questions preserved without modification.
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Bank Success Toast */}
+      {resetSuccessMessage && (
+        <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-400/30 text-indigo-800 dark:text-indigo-300 text-xs flex items-center justify-between animate-apple-entrance">
+          <div className="flex items-center space-x-2 font-medium">
+            <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+            <span>{resetSuccessMessage}</span>
           </div>
         </div>
       )}
