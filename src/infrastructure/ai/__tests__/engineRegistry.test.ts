@@ -1,13 +1,25 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   resolveAiProvider,
   resolveAiEngine,
+  getAvailableFallbackProvider,
 } from '../engineRegistry.ts';
 import type { AiSettings } from '../../../domain/ai/settings.ts';
 
 describe('Engine Registry & Cloud Provider Resolution (v2)', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_OPENROUTER_API_KEY', '');
+    vi.stubEnv('VITE_GROQ_API_KEY', '');
+    vi.stubEnv('VITE_GEMINI_API_KEY', '');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   const baseSettings: AiSettings = {
     engine: 'openrouter',
+    chatLanguage: 'auto',
     openRouterApiKey: '',
     openRouterModel: 'meta-llama/llama-3.1-8b-instruct:free',
     groqApiKey: '',
@@ -92,5 +104,24 @@ describe('Engine Registry & Cloud Provider Resolution (v2)', () => {
   it('resolves ai engine ID with graceful openrouter fallback when unconfigured', () => {
     const engine = resolveAiEngine(baseSettings);
     expect(engine.id).toBe('openrouter');
+  });
+
+  it('provides seamless automatic failover when a primary provider is rate-limited', () => {
+    const settings: AiSettings = {
+      ...baseSettings,
+      engine: 'groq',
+      groqApiKey: 'gsk_groq_key',
+      geminiApiKey: 'AIzaSy_gemini_key',
+    };
+
+    // When Groq is rate limited (429), failover goes to Gemini (1M TPM)
+    const fallbackFromGroq = getAvailableFallbackProvider(settings, 'groq');
+    expect(fallbackFromGroq).not.toBeNull();
+    expect(fallbackFromGroq?.providerId).toBe('gemini');
+
+    // When Gemini is rate limited, failover goes to Groq
+    const fallbackFromGemini = getAvailableFallbackProvider(settings, 'gemini');
+    expect(fallbackFromGemini).not.toBeNull();
+    expect(fallbackFromGemini?.providerId).toBe('groq');
   });
 });
