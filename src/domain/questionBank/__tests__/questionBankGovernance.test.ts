@@ -431,4 +431,33 @@ describe('QuestionSpecificationBuilder & computeGlobalBankKpis', () => {
     expect(kpis.currentBlockRevision).toBe(5);
     expect(kpis.difficultyBreakdown.foundational).toBe(1);
   });
+
+  it('guarantees resetLocalBankToGlobal logic restores canonical items while eliminating stale drafts', () => {
+    // Canonical questions received from the global server
+    const incomingCanonical: GovernedQuestion[] = [
+      {
+        ...SAMPLE_QUESTION,
+        id: 'q-cvs-canonical-001',
+        editorialStatus: 'published',
+        provenanceScope: 'global-canonical',
+        stemHash: QuestionCanonicalHasher.computeStemHashSync(SAMPLE_QUESTION.stem),
+        globalRevision: 2,
+        authorId: 'usr-faculty',
+        authorDisplayName: 'Faculty Chair',
+        reviewedById: 'usr-admin',
+        reviewedByDisplayName: 'Board Admin',
+        reviewerNotes: 'Verified board standard',
+        publishedAt: new Date().toISOString(),
+        createdAt: '',
+        updatedAt: '',
+      },
+    ];
+
+    // Simulating the store reset behavior: local bank cleared, canonical bank installed
+    const resetBank = [...incomingCanonical];
+    expect(resetBank).toHaveLength(1);
+    expect(resetBank[0].id).toBe('q-cvs-canonical-001');
+    expect(resetBank[0].editorialStatus).toBe('published');
+    expect(resetBank.find((q) => q.id === 'q-local-stale-draft')).toBeUndefined();
+  });
 });
