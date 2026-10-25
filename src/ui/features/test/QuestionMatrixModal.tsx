@@ -67,34 +67,34 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/50 backdrop-blur-md">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xl">
       <div 
-        className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-t-[28px] sm:rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[88vh] overflow-hidden animate-sheet-slide-up sm:animate-in sm:zoom-in-95 duration-200"
+        className="w-full max-w-2xl glass-surface rounded-t-[28px] sm:rounded-3xl shadow-2xl border border-white/80 dark:border-white/10 flex flex-col max-h-[90dvh] sm:max-h-[88vh] overflow-hidden animate-sheet-slide-up sm:animate-in sm:zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Apple Mobile Sheet Handle Bar */}
-        <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto my-2 sm:hidden shrink-0" />
+        <div className="w-12 h-1.5 bg-slate-300 dark:bg-zinc-700 rounded-full mx-auto my-2 sm:hidden shrink-0" />
 
         {/* Apple-style Sheet Header */}
-        <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="p-4 sm:p-6 border-b border-slate-200/60 dark:border-zinc-800/80 flex items-center justify-between">
           <div className="space-y-1">
             <div className="flex items-center space-x-2">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
                 Session Overview
               </span>
               <span className="text-xs text-slate-400">•</span>
-              <span className="text-xs font-semibold text-slate-500">
+              <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400">
                 {answeredCount} of {totalCount} Completed ({progressPercent}%)
               </span>
             </div>
-            <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight font-heading">
               Question Navigator
             </h2>
           </div>
 
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer apple-tap"
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer apple-tap"
             title="Close (Esc)"
           >
             <X className="w-4 h-4" />
@@ -102,22 +102,22 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
         </div>
 
         {/* Progress Bar Track */}
-        <div className="w-full h-1 bg-slate-100 dark:bg-slate-800">
+        <div className="w-full h-1 bg-slate-100 dark:bg-zinc-800">
           <div 
-            className="h-full bg-blue-600 dark:bg-blue-500 transition-all duration-300"
+            className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 transition-all duration-300"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
 
         {/* Apple Segmented Filter Control */}
-        <div className="p-3 sm:p-4 bg-slate-50/70 dark:bg-slate-950/40 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex p-1 bg-slate-200/70 dark:bg-slate-800/80 rounded-xl max-w-md mx-auto text-xs font-semibold overflow-x-auto scrollbar-none">
+        <div className="p-3 sm:p-4 bg-slate-50/50 dark:bg-zinc-900/40 border-b border-slate-200/60 dark:border-zinc-800/80">
+          <div className="flex p-1 bg-slate-200/60 dark:bg-zinc-800/60 rounded-xl max-w-md mx-auto text-xs font-semibold overflow-x-auto scrollbar-none">
             <button
               onClick={() => setFilter('all')}
               className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer ${
                 filter === 'all'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               All ({totalCount})
@@ -126,8 +126,8 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
               onClick={() => setFilter('answered')}
               className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer ${
                 filter === 'answered'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Answered ({answeredCount})
@@ -136,8 +136,8 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
               onClick={() => setFilter('unanswered')}
               className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer ${
                 filter === 'unanswered'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Unanswered ({unansweredCount})
@@ -146,8 +146,8 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
               onClick={() => setFilter('flagged')}
               className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center space-x-1 ${
                 filter === 'flagged'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs font-bold'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <Flag className="w-3 h-3 text-amber-500 fill-current" />
@@ -174,22 +174,30 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
 
                 let pillColor = '';
                 if (isActive) {
-                  pillColor = 'bg-blue-600 text-white font-bold ring-2 ring-blue-500 ring-offset-2 scale-105 shadow-md shadow-blue-500/30';
+                  if (!isExamMode && isAnswered) {
+                    if (ans.isCorrect) {
+                      pillColor = 'bg-emerald-600 text-white font-black ring-2 ring-emerald-400 ring-offset-2 scale-105 shadow-md shadow-emerald-500/30';
+                    } else {
+                      pillColor = 'bg-rose-600 text-white font-black ring-2 ring-rose-400 ring-offset-2 scale-105 shadow-md shadow-rose-500/30';
+                    }
+                  } else {
+                    pillColor = 'bg-blue-600 text-white font-bold ring-2 ring-blue-500 ring-offset-2 scale-105 shadow-md shadow-blue-500/30';
+                  }
                 } else if (isExamMode) {
                   if (isAnswered) {
-                    pillColor = 'bg-slate-800 text-white font-medium hover:bg-slate-700';
+                    pillColor = 'bg-slate-800 text-white font-medium hover:bg-slate-700 border border-slate-700';
                   } else {
-                    pillColor = 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-750';
+                    pillColor = 'bg-slate-100 dark:bg-zinc-800/80 text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-750 border border-slate-200/80 dark:border-zinc-700/80';
                   }
                 } else {
                   if (isAnswered) {
                     if (ans.isCorrect) {
-                      pillColor = 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100';
+                      pillColor = 'bg-emerald-500/20 dark:bg-emerald-500/30 text-emerald-800 dark:text-emerald-200 border-2 border-emerald-500 dark:border-emerald-400 font-bold hover:bg-emerald-500/35';
                     } else {
-                      pillColor = 'bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700 hover:bg-rose-100';
+                      pillColor = 'bg-rose-500/20 dark:bg-rose-500/30 text-rose-800 dark:text-rose-200 border-2 border-rose-500 dark:border-rose-400 font-bold hover:bg-rose-500/35';
                     }
                   } else {
-                    pillColor = 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-750';
+                    pillColor = 'glass-pill-luxury text-slate-700 dark:text-zinc-300 border border-slate-300/80 dark:border-zinc-700/80 hover:border-blue-400';
                   }
                 }
 
