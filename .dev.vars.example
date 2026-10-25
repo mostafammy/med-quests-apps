@@ -42,3 +42,4 @@ APPLE_PRIVATE_KEY=""
 # Note: Avoid aliases like gemini-flash-latest to avoid 503 high demand shedding.
 # GROQ_API_KEY=""
 # GEMINI_API_KEY=""
+# OPENROUTER_API_KEY=""
