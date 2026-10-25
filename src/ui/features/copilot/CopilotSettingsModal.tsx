@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAiSettingsStore } from '../../../application/stores/useAiSettingsStore.ts';
-import { X, Sparkles, Key, Check, Globe, Cpu, ExternalLink, Zap, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
-import type { CloudProviderId } from '../../../domain/ai/settings.ts';
+import { X, Sparkles, Key, Check, Globe, Cpu, ExternalLink, Zap, ChevronDown, ChevronUp, AlertCircle, Languages } from 'lucide-react';
+import type { CloudProviderId, AiChatLanguagePreference } from '../../../domain/ai/settings.ts';
 import { PROVIDER_MODELS, type ModelOptionInfo } from '../../../domain/ai/modelCatalog.ts';
 
 interface Props {
@@ -13,6 +13,7 @@ export const CopilotSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const { settings, updateSettings } = useAiSettingsStore();
 
   const [activeEngine, setActiveEngine] = useState<CloudProviderId>(settings.engine);
+  const [chatLanguage, setChatLanguage] = useState<AiChatLanguagePreference>(settings.chatLanguage || 'auto');
   const [openRouterKey, setOpenRouterKey] = useState(settings.openRouterApiKey);
   const [openRouterModel, setOpenRouterModel] = useState(settings.openRouterModel);
   const [groqKey, setGroqKey] = useState(settings.groqApiKey);
@@ -64,6 +65,7 @@ export const CopilotSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const handleSave = async () => {
     await updateSettings({
       engine: activeEngine,
+      chatLanguage,
       openRouterApiKey: openRouterKey,
       openRouterModel: openRouterModel,
       groqApiKey: groqKey,
@@ -170,6 +172,62 @@ export const CopilotSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Co-Pilot Chat Response Language (Bilingual Apple HIG Card) */}
+        <div className="p-3.5 rounded-2xl bg-slate-100/70 dark:bg-zinc-900/60 border border-slate-200/80 dark:border-zinc-800 space-y-2 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Languages className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <label className="text-xs font-black text-slate-800 dark:text-zinc-200 uppercase tracking-wide">
+                Chatbot Response Language
+              </label>
+            </div>
+            <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-medium">
+              USMLE Terms Preserved
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5">
+            <button
+              type="button"
+              onClick={() => setChatLanguage('auto')}
+              className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                chatLanguage === 'auto'
+                  ? 'border-indigo-500 bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-300 shadow-xs ring-1 ring-indigo-500/30'
+                  : 'border-slate-200/80 dark:border-zinc-800/80 text-slate-600 dark:text-zinc-400 hover:bg-white/60 dark:hover:bg-zinc-800/50'
+              }`}
+            >
+              <div className="text-xs font-bold">Auto-Detect</div>
+              <div className="text-[9px] text-slate-400 mt-0.5">Mirror input script</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setChatLanguage('en')}
+              className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                chatLanguage === 'en'
+                  ? 'border-indigo-500 bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-300 shadow-xs ring-1 ring-indigo-500/30'
+                  : 'border-slate-200/80 dark:border-zinc-800/80 text-slate-600 dark:text-zinc-400 hover:bg-white/60 dark:hover:bg-zinc-800/50'
+              }`}
+            >
+              <div className="text-xs font-bold">English</div>
+              <div className="text-[9px] text-slate-400 mt-0.5">USMLE Standard</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setChatLanguage('ar')}
+              className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                chatLanguage === 'ar'
+                  ? 'border-indigo-500 bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-300 shadow-xs ring-1 ring-indigo-500/30'
+                  : 'border-slate-200/80 dark:border-zinc-800/80 text-slate-600 dark:text-zinc-400 hover:bg-white/60 dark:hover:bg-zinc-800/50'
+              }`}
+            >
+              <div className="text-xs font-bold">العربية</div>
+              <div className="text-[9px] text-slate-400 mt-0.5">Medical Arabic</div>
+            </button>
+          </div>
         </div>
 
         {/* Provider Tabs */}
