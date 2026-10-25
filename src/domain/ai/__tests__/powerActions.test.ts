@@ -123,4 +123,24 @@ describe('Power Actions (High-Yield Medical Student Inquiries)', () => {
     expect(sealedActions.some((a) => a.key === 'sealed_pivot_clues')).toBe(true);
     expect(sealedActions.some((a) => a.key === 'sealed_torn_choice')).toBe(true);
   });
+
+  it('generates Arabic clinical prompts and provides Arabic labels when requested', () => {
+    const action = POWER_ACTIONS.find((a) => a.key === 'why_correct')!;
+    expect(action.labelAr).toBe('لماذا صحيحة');
+    expect(action.shortLabelAr).toBe('لماذا صحيحة');
+    expect(action.tooltipAr).toContain('الفيزيولوجيا المرضية');
+
+    const promptAr = action.generatePrompt(
+      {
+        questionStem: 'Patient with Aortic Stenosis...',
+        choices: mockChoices,
+        correctChoiceId: 'c',
+      },
+      'ar'
+    );
+
+    expect(promptAr).toContain('اشرح بالتفصيل لماذا يعتبر');
+    expect(promptAr).toContain('Option C (Ligamentum teres hepatis)');
+    expect(promptAr).toContain('الفيزيولوجيا المرضية');
+  });
 });
