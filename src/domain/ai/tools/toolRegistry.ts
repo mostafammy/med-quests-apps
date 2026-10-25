@@ -21,7 +21,6 @@ import {
   CalculateCvEquationTool,
 } from './clinicalModelingTools.ts';
 import {
-  CreateSrsAnchorTool,
   FormulateMnemonicTool,
   PrescribeMicroCurriculumTool,
 } from './memoryRemediationTools.ts';
@@ -60,7 +59,7 @@ export class AgentToolRegistry {
     this.register(new CalculateCvEquationTool());
 
     // 3. Active Memory & Adaptive Remediation Tools
-    this.register(new CreateSrsAnchorTool());
+    // CreateSrsAnchorTool is disabled per user request (excessive flashcard generation)
     this.register(new FormulateMnemonicTool());
     this.register(new PrescribeMicroCurriculumTool());
   }
