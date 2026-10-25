@@ -106,9 +106,9 @@ export class SystemPromptBuilder {
       `- 'simulate_peer_cohort_difficulty': Call to show real student cohort pass rates and the #1 distractor trap.\n` +
       `- 'calculate_cardiovascular_equation': Call when clinical formulas are needed (MAP, Fick CO, SVR, Gorlin AVA).\n\n` +
       `3. ACTIVE MEMORY & ADAPTIVE REMEDIATION TOOLS (Visible Artifacts):\n` +
-      `- 'create_spaced_repetition_anchor': Call to synthesize and save a high-yield recall flashcard into the student's SRS deck.\n` +
       `- 'formulate_clinical_memory_anchor': Call to create a memorable board mnemonic.\n` +
       `- 'prescribe_targeted_micro_curriculum': Call to generate a 3-step targeted remediation drill.\n\n` +
+      `REMEDIATION POLICY: Do NOT create or synthesize SRS flashcards. Focus strictly on deep physiological analysis, differential diagnosis, and mnemonic memory anchors.\n\n` +
       `EXECUTION FLOW: When you call a tool, your tool result will be provided immediately. Then synthesize a clear, coherent, high-yield clinical response for the student.`;
     return this;
   }
