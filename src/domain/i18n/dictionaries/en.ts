@@ -252,6 +252,10 @@ export const enDictionary: TranslationDictionary = {
     ingestBtn: 'Validate & Ingest Questions',
     exportBtn: 'Export Bank JSON',
     clearBtn: 'Clear Question Bank',
+    resetToGlobalBtn: 'Reset to Global Bank',
+    resetConfirmDialog:
+      'Reset local question bank to the canonical curriculum bank? Any unsubmitted local drafts will be overwritten.',
+    resetSuccessToast: 'Question bank restored to the canonical global curriculum bank.',
     totalQuestions: 'Total Questions in Bank',
     validationSuccess: 'Successfully validated and ingested {count} questions!',
   },
