@@ -133,6 +133,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
         parts: cachedRecord.responseParts,
         status: 'complete',
         engine: cachedRecord.engine ?? 'cached',
+        modelId: 'Instant Cache',
         createdAt: Date.now() + 1,
         latencyMs: 0,
       };
@@ -302,6 +303,14 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
     let accumulatedText = '';
     const partsBuffer: MessagePart[] = [];
     let resolvedEngineId: string | null = settings.engine;
+    let resolvedModelId: string | null =
+      settings.engine === 'groq'
+        ? settings.groqModel
+        : settings.engine === 'gemini'
+          ? settings.geminiModel
+          : settings.engine === 'openrouter'
+            ? settings.openRouterModel
+            : null;
     let rafId: number | null = null;
 
     const flushUpdatesToStore = () => {
@@ -318,6 +327,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
           return {
             ...m,
             engine: resolvedEngineId,
+            modelId: resolvedModelId,
             parts: currentParts,
             latencyMs: Math.round(performance.now() - startTime),
           };
@@ -360,6 +370,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
 
         if (event.type === 'engine-resolved') {
           resolvedEngineId = event.providerId;
+          resolvedModelId = event.modelId;
           set({ activeResolvedEngine: event.providerId });
         } else if (event.type === 'text-delta') {
           accumulatedText += event.delta;
@@ -387,7 +398,9 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
         isStreaming: false,
         activeDiagnosticTool: null,
         messages: state.messages.map((m) =>
-          m.id === assistantMsgId ? { ...m, status: 'complete' } : m
+          m.id === assistantMsgId
+            ? { ...m, status: 'complete', engine: resolvedEngineId, modelId: resolvedModelId }
+            : m
         ),
       }));
 

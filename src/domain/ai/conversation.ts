@@ -26,6 +26,7 @@ export interface ChatMessage {
   readonly parts: readonly MessagePart[];
   readonly status: MessageStatus;
   readonly engine: string | null;
+  readonly modelId?: string | null;
   readonly createdAt: number;
   readonly latencyMs: number | null;
 }

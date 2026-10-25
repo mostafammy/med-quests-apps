@@ -14,7 +14,11 @@ import {
   Activity,
   ArrowRight,
   Languages,
+  Copy,
+  Check,
+  Clock,
 } from 'lucide-react';
+import type { ChatMessage } from '../../../domain/ai/conversation.ts';
 import { useCopilotStore } from '../../../application/stores/useCopilotStore.ts';
 import { useAiSettingsStore } from '../../../application/stores/useAiSettingsStore.ts';
 import { CopilotSettingsModal } from './CopilotSettingsModal.tsx';
@@ -28,6 +32,53 @@ import {
   MicroCurriculumCard,
 } from './cards/MemoryRemediationCard.tsx';
 import { getModelDisplayName } from '../../../domain/ai/modelCatalog.ts';
+
+function formatMessageTime(timestamp: number): string {
+  if (!timestamp) return '';
+  try {
+    return new Date(timestamp).toLocaleTimeString([], {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}
+
+function formatMessageEngine(engine: string | null, modelId?: string | null): string {
+  if (!engine && !modelId) return 'AI Assistant';
+  if (engine === 'cached' || modelId === 'Instant Cache') return 'Instant Cache';
+
+  const provider = engine ? engine.toLowerCase() : '';
+  const providerLabel =
+    provider === 'groq'
+      ? 'Groq'
+      : provider === 'gemini'
+        ? 'Gemini'
+        : provider === 'openrouter'
+          ? 'OpenRouter'
+          : provider || 'AI';
+
+  if (modelId) {
+    if (provider === 'groq' || provider === 'gemini' || provider === 'openrouter') {
+      const displayName = getModelDisplayName(provider as any, modelId);
+      return `${providerLabel} • ${displayName}`;
+    }
+    return `${providerLabel} • ${modelId.split('/').pop() || modelId}`;
+  }
+
+  return providerLabel;
+}
+
+function getMessageCopyText(msg: ChatMessage): string {
+  const texts: string[] = [];
+  for (const part of msg.parts) {
+    if (part.kind === 'text' || part.kind === 'notice') {
+      texts.push(part.text);
+    }
+  }
+  return texts.join('\n\n');
+}
 
 export const AiCopilotDrawer: React.FC = () => {
   const {
@@ -48,8 +99,33 @@ export const AiCopilotDrawer: React.FC = () => {
   const { settings, loadSettings, updateSettings } = useAiSettingsStore();
   const [inputText, setInputText] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleCopyMessage = async (msg: ChatMessage) => {
+    const text = getMessageCopyText(msg);
+    if (!text) return;
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopiedMessageId(msg.id);
+      setTimeout(() => {
+        setCopiedMessageId((prev) => (prev === msg.id ? null : prev));
+      }, 2000);
+    } catch {
+      // Graceful fallback
+    }
+  };
 
   useEffect(() => {
     loadSettings();
@@ -294,7 +370,7 @@ export const AiCopilotDrawer: React.FC = () => {
               <div
                 key={msg.id}
                 dir="auto"
-                className={`flex flex-col space-y-1.5 transition-all duration-200 ${
+                className={`flex flex-col space-y-1 transition-all duration-200 ${
                   msg.role === 'user' ? 'items-end' : 'items-start'
                 }`}
               >
@@ -363,13 +439,84 @@ export const AiCopilotDrawer: React.FC = () => {
                       <span className="text-[10px] font-mono tracking-wider uppercase">Reasoning</span>
                     </div>
                   )}
+
+                  {/* Assistant Footer: Model Used, Message Time, Latency & Copy Button */}
+                  {msg.role === 'assistant' && msg.status !== 'streaming' && (
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-zinc-800/80 text-[10px] text-slate-400 dark:text-zinc-500">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Model Name & Provider Badge */}
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 font-medium text-slate-600 dark:text-zinc-300">
+                          <Cpu className="w-2.5 h-2.5 text-indigo-500" />
+                          <span>{formatMessageEngine(msg.engine, msg.modelId)}</span>
+                        </span>
+
+                        {/* Timestamp */}
+                        {msg.createdAt && (
+                          <span className="inline-flex items-center gap-1 font-mono text-[9px] text-slate-400 dark:text-zinc-500">
+                            <Clock className="w-2.5 h-2.5" />
+                            <span>{formatMessageTime(msg.createdAt)}</span>
+                          </span>
+                        )}
+
+                        {/* Latency */}
+                        {msg.latencyMs !== null && (
+                          <span className="font-mono text-[9px] text-slate-400 dark:text-zinc-500">
+                            {msg.latencyMs}ms
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Copy AI Message */}
+                      <button
+                        type="button"
+                        onClick={() => void handleCopyMessage(msg)}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                        title="Copy AI response"
+                      >
+                        {copiedMessageId === msg.id ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-500" />
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span className="text-[10px]">Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                {/* Latency footnote */}
-                {msg.latencyMs !== null && (
-                  <span className="text-[9px] font-mono text-slate-400 dark:text-zinc-500 px-2">
-                    {msg.latencyMs}ms
-                  </span>
+                {/* User Message Footer: Timestamp & Copy Button */}
+                {msg.role === 'user' && (
+                  <div className="flex items-center justify-end gap-2 text-[10px] text-slate-400 dark:text-zinc-500 px-1">
+                    {msg.createdAt && (
+                      <span className="inline-flex items-center gap-1 font-mono text-[9px]">
+                        <Clock className="w-2.5 h-2.5" />
+                        <span>{formatMessageTime(msg.createdAt)}</span>
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyMessage(msg)}
+                      className="inline-flex items-center gap-1 px-1 py-0.5 rounded hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                      title="Copy your message"
+                    >
+                      {copiedMessageId === msg.id ? (
+                        <>
+                          <Check className="w-2.5 h-2.5 text-emerald-500" />
+                          <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-2.5 h-2.5" />
+                          <span className="text-[9px]">Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 )}
               </div>
             ))
