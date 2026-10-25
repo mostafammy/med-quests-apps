@@ -51,6 +51,24 @@ export interface AiPowerActionCacheRecord {
   cachedAt: string; // ISO-8601
 }
 
+export interface BankSyncMetaRecord {
+  blockId: string;
+  serverRevision: number;
+  lastSyncedAt: string;
+  etag: string;
+  totalCanonicalCount: number;
+}
+
+export interface StudioSubmissionRecord {
+  ticketId: string;
+  questionId: string;
+  blockId: string;
+  editorialStatus: string;
+  submittedAt: string;
+  payloadJson: string;
+  reviewerNotes: string | null;
+}
+
 class MedQuestsDB extends Dexie {
   questions!: EntityTable<Question, 'id'>;
   attempts!: EntityTable<Attempt, 'id'>;
@@ -61,6 +79,8 @@ class MedQuestsDB extends Dexie {
   aiThreads!: EntityTable<AiThreadRecord, 'threadId'>;
   srsCards!: EntityTable<SrsFlashcardRecord, 'id'>;
   aiCache!: EntityTable<AiPowerActionCacheRecord, 'cacheKey'>;
+  bankSyncMeta!: EntityTable<BankSyncMetaRecord, 'blockId'>;
+  studioSubmissions!: EntityTable<StudioSubmissionRecord, 'ticketId'>;
 
   constructor() {
     super('MedQuestsDB');
@@ -83,6 +103,12 @@ class MedQuestsDB extends Dexie {
 
     this.version(4).stores({
       aiCache: 'cacheKey, questionId, actionKey, cachedAt',
+    });
+
+    this.version(5).stores({
+      questions: 'id, blockId, subjectId, chapterId, topicId, highYield, difficulty, provenanceScope, editorialStatus',
+      bankSyncMeta: 'blockId, serverRevision, lastSyncedAt',
+      studioSubmissions: 'ticketId, questionId, blockId, editorialStatus, submittedAt',
     });
   }
 }
