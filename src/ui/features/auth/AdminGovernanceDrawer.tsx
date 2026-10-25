@@ -21,6 +21,7 @@ import {
   Laptop,
   Smartphone,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import {
   useAuthStore,
@@ -83,6 +84,7 @@ export const AdminGovernanceDrawer: React.FC = () => {
     performanceOverride,
     setPerformanceOverride,
     signInWithGoogle,
+    purgeDemoData,
   } = useAuthStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -239,6 +241,16 @@ export const AdminGovernanceDrawer: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void purgeDemoData()}
+              title="Clean up legacy demo user accounts and restore pristine production directory"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700/80 text-zinc-600 dark:text-zinc-300 text-xs font-semibold transition-colors cursor-pointer"
+            >
+              <Trash2 className="h-3.5 w-3.5 text-zinc-400 hover:text-red-500" />
+              <span>Clean Demo</span>
+            </button>
+
             <a
               href="/admin"
               onClick={closeGovernanceDrawer}
