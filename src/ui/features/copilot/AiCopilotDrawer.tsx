@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Activity,
   ArrowRight,
+  Languages,
 } from 'lucide-react';
 import { useCopilotStore } from '../../../application/stores/useCopilotStore.ts';
 import { useAiSettingsStore } from '../../../application/stores/useAiSettingsStore.ts';
@@ -23,7 +24,6 @@ import { HemodynamicPvLoopCard } from './cards/HemodynamicPvLoopCard.tsx';
 import { CardiovascularEquationCard } from './cards/CardiovascularEquationCard.tsx';
 import { PeerCohortTrapCard } from './cards/PeerCohortTrapCard.tsx';
 import {
-  SrsFlashcardCard,
   MnemonicAnchorCard,
   MicroCurriculumCard,
 } from './cards/MemoryRemediationCard.tsx';
@@ -45,7 +45,7 @@ export const AiCopilotDrawer: React.FC = () => {
     clearMessages,
   } = useCopilotStore();
 
-  const { settings, loadSettings } = useAiSettingsStore();
+  const { settings, loadSettings, updateSettings } = useAiSettingsStore();
   const [inputText, setInputText] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -101,11 +101,18 @@ export const AiCopilotDrawer: React.FC = () => {
     sendUserMessage(txt);
   };
 
-  const starterSuggestions = [
-    'What is the primary hemodynamic shift in this vignette?',
-    'I am torn between choices B and C—what distinguishes them?',
-    'Simulate the Pressure-Volume loop for this patient lesion.',
-  ];
+  const isArabicChat = settings.chatLanguage === 'ar';
+  const starterSuggestions = isArabicChat
+    ? [
+        'ما هو التغير الديناميكي الدموي الأساسي في هذه الحالة؟',
+        'أنا محتار بين الخيارين B و C — ما الذي يفرق بينهما؟',
+        'قم بمحاكاة منحنى الضغط والحجم (P-V Loop) لهذه الآفة.',
+      ]
+    : [
+        'What is the primary hemodynamic shift in this vignette?',
+        'I am torn between choices B and C—what distinguishes them?',
+        'Simulate the Pressure-Volume loop for this patient lesion.',
+      ];
 
   return (
     <>
@@ -192,6 +199,27 @@ export const AiCopilotDrawer: React.FC = () => {
                     </button>
                   );
                 })()}
+
+                {/* Chat Response Language Quick-Toggle Pill */}
+                {(() => {
+                  const currentLangPref = settings.chatLanguage || 'auto';
+                  const nextLang =
+                    currentLangPref === 'auto' ? 'en' : currentLangPref === 'en' ? 'ar' : 'auto';
+                  const label =
+                    currentLangPref === 'auto' ? 'AUTO' : currentLangPref === 'en' ? 'EN' : 'عربي';
+
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => updateSettings({ chatLanguage: nextLang })}
+                      className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 font-extrabold border border-slate-300/60 dark:border-zinc-700/60 flex items-center space-x-1 cursor-pointer hover:bg-indigo-500/10 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
+                      title={`AI Chat Language: ${currentLangPref.toUpperCase()} (Click to toggle to ${nextLang.toUpperCase()})`}
+                    >
+                      <Languages className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
+                      <span>{label}</span>
+                    </button>
+                  );
+                })()}
               </div>
               <p className="text-[10px] font-medium text-slate-400 dark:text-zinc-500">
                 Autonomous Socratic Clinical Mentor
@@ -253,10 +281,10 @@ export const AiCopilotDrawer: React.FC = () => {
                   <button
                     key={i}
                     onClick={() => sendUserMessage(prompt)}
-                    className="w-full text-left p-3 rounded-2xl border border-slate-200/80 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/60 hover:border-indigo-400 text-xs text-slate-700 dark:text-zinc-300 transition-all duration-200 flex items-center justify-between group shadow-2xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                    className="w-full text-start p-3 rounded-2xl border border-slate-200/80 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/60 hover:border-indigo-400 text-xs text-slate-700 dark:text-zinc-300 transition-all duration-200 flex items-center justify-between group shadow-2xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
                   >
-                    <span className="font-medium pr-2">{prompt}</span>
-                    <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+                    <span className="font-medium pe-2">{prompt}</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-400 rtl:-scale-x-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5 transition-all shrink-0" />
                   </button>
                 ))}
               </div>
@@ -265,6 +293,7 @@ export const AiCopilotDrawer: React.FC = () => {
             messages.map((msg) => (
               <div
                 key={msg.id}
+                dir="auto"
                 className={`flex flex-col space-y-1.5 transition-all duration-200 ${
                   msg.role === 'user' ? 'items-end' : 'items-start'
                 }`}
@@ -302,7 +331,7 @@ export const AiCopilotDrawer: React.FC = () => {
                         return <PeerCohortTrapCard key={pIdx} result={artifactPayload} />;
                       }
                       if (artifactPayload.kind === 'srs_card') {
-                        return <SrsFlashcardCard key={pIdx} result={artifactPayload} />;
+                        return null;
                       }
                       if (artifactPayload.kind === 'mnemonic_anchor') {
                         return <MnemonicAnchorCard key={pIdx} result={artifactPayload} />;
@@ -382,17 +411,26 @@ export const AiCopilotDrawer: React.FC = () => {
               <input
                 ref={inputRef}
                 type="text"
+                dir="auto"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder={isStreaming ? 'Synthesizing clinical guidance...' : 'Ask question or discuss diagnostic reasoning...'}
+                placeholder={
+                  isStreaming
+                    ? isArabicChat
+                      ? 'جارٍ توليد التوجيه السريري...'
+                      : 'Synthesizing clinical guidance...'
+                    : isArabicChat
+                    ? 'اطرح سؤالاً أو ناقش التعليل التشخيصي...'
+                    : 'Ask question or discuss diagnostic reasoning...'
+                }
                 disabled={isStreaming}
-                className="w-full text-xs sm:text-sm pl-4 pr-12 py-3 rounded-2xl border border-slate-200 dark:border-zinc-700 bg-slate-50/80 dark:bg-zinc-900/80 text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:focus:border-indigo-400 shadow-inner transition-all duration-300"
+                className="w-full text-xs sm:text-sm ps-4 pe-12 py-3 rounded-2xl border border-slate-200 dark:border-zinc-700 bg-slate-50/80 dark:bg-zinc-900/80 text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:focus:border-indigo-400 shadow-inner transition-all duration-300"
               />
               {messages.length > 0 && !isStreaming && (
                 <button
                   type="button"
                   onClick={clearMessages}
-                  className="absolute right-3 top-3 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors p-0.5 cursor-pointer"
+                  className="absolute end-3 top-3 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors p-0.5 cursor-pointer"
                   title="Clear conversation"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -400,7 +438,7 @@ export const AiCopilotDrawer: React.FC = () => {
               )}
             </div>
 
-            <div className="ml-2">
+            <div className="ms-2">
               {isStreaming ? (
                 <button
                   type="button"
