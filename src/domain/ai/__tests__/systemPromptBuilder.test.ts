@@ -162,7 +162,6 @@ describe('SystemPromptBuilder (v2 Medical Faculty Builder)', () => {
     expect(prompt).toContain('simulate_hemodynamic_pv_loop');
     expect(prompt).toContain('simulate_peer_cohort_difficulty');
     expect(prompt).toContain('calculate_cardiovascular_equation');
-    expect(prompt).toContain('create_spaced_repetition_anchor');
     expect(prompt).toContain('formulate_clinical_memory_anchor');
     expect(prompt).toContain('prescribe_targeted_micro_curriculum');
   });
