@@ -12,12 +12,14 @@ import {
   X
 } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
+import { LocaleToggle } from './LocaleToggle.tsx';
 import { CopilotTriggerButton } from '../features/copilot/CopilotTriggerButton.tsx';
 import { AiCopilotDrawer } from '../features/copilot/AiCopilotDrawer.tsx';
 import { IdentityStatusPill } from '../features/auth/IdentityStatusPill.tsx';
 import { AccountRestrictedBanner } from '../features/auth/AccountRestrictedBanner.tsx';
 import { useCopilotStore } from '../../application/stores/useCopilotStore.ts';
 import { useAuthStore } from '../../application/stores/useAuthStore.ts';
+import { useLocaleStore } from '../../application/stores/useLocaleStore.ts';
 
 const AuthSecurityModal = lazy(() =>
   import('../features/auth/AuthSecurityModal.tsx').then((m) => ({ default: m.AuthSecurityModal }))
@@ -30,7 +32,12 @@ export const Shell: React.FC = () => {
   const location = useLocation();
   const { setSurface } = useCopilotStore();
   const { authState, notificationToast, clearToast } = useAuthStore();
+  const { t, initLocale } = useLocaleStore();
   const isAdmin = authState.status === 'authenticated-active' && authState.user.role === 'admin';
+
+  useEffect(() => {
+    return initLocale();
+  }, [initLocale]);
 
   useEffect(() => {
     const path = location.pathname;
@@ -67,19 +74,19 @@ export const Shell: React.FC = () => {
               <span className="font-extrabold text-slate-900 dark:text-zinc-50 tracking-tight text-base sm:text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                 Med Quests
               </span>
-              <span className="hidden sm:inline-block ml-2 text-[10px] uppercase tracking-wider font-extrabold bg-blue-500/10 dark:bg-blue-400/10 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-full border border-blue-400/20 backdrop-blur-md">
-                Exam Prep
+              <span className="hidden sm:inline-block ml-2 rtl:ml-0 rtl:mr-2 text-[10px] uppercase tracking-wider font-extrabold bg-blue-500/10 dark:bg-blue-400/10 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-full border border-blue-400/20 backdrop-blur-md">
+                {t.common.examPrepBadge}
               </span>
             </div>
           </NavLink>
 
           {/* Center Navigation Links with Smooth Liquid Pill Highlights */}
-          <nav className="hidden md:flex items-center space-x-1.5 p-1 rounded-2xl bg-slate-200/40 dark:bg-zinc-800/40 backdrop-blur-lg border border-white/40 dark:border-zinc-700/40">
+          <nav className="hidden md:flex items-center space-x-1.5 rtl:space-x-reverse p-1 rounded-2xl bg-slate-200/40 dark:bg-zinc-800/40 backdrop-blur-lg border border-white/40 dark:border-zinc-700/40">
             <NavLink
               to="/"
               end
               className={({ isActive }) =>
-                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all duration-200 ${
+                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse transition-all duration-200 ${
                   isActive
                     ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 scale-[1.02]'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-zinc-800/60'
@@ -87,13 +94,13 @@ export const Shell: React.FC = () => {
               }
             >
               <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>Dashboard</span>
+              <span>{t.nav.dashboard}</span>
             </NavLink>
 
             <NavLink
               to="/test"
               className={({ isActive }) =>
-                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all duration-200 ${
+                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse transition-all duration-200 ${
                   isActive
                     ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 scale-[1.02]'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-zinc-800/60'
@@ -101,13 +108,13 @@ export const Shell: React.FC = () => {
               }
             >
               <PenTool className="w-3.5 h-3.5" />
-              <span>Test</span>
+              <span>{t.nav.test}</span>
             </NavLink>
 
             <NavLink
               to="/review"
               className={({ isActive }) =>
-                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all duration-200 ${
+                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse transition-all duration-200 ${
                   isActive
                     ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 scale-[1.02]'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-zinc-800/60'
@@ -115,13 +122,13 @@ export const Shell: React.FC = () => {
               }
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Review</span>
+              <span>{t.nav.review}</span>
             </NavLink>
 
             <NavLink
               to="/curriculum"
               className={({ isActive }) =>
-                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all duration-200 ${
+                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse transition-all duration-200 ${
                   isActive
                     ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 scale-[1.02]'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-zinc-800/60'
@@ -129,13 +136,13 @@ export const Shell: React.FC = () => {
               }
             >
               <BookOpen className="w-3.5 h-3.5" />
-              <span>Curriculum</span>
+              <span>{t.nav.curriculum}</span>
             </NavLink>
 
             <NavLink
               to="/studio"
               className={({ isActive }) =>
-                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all duration-200 ${
+                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse transition-all duration-200 ${
                   isActive
                     ? 'bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 scale-[1.02]'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-indigo-900 dark:hover:text-indigo-300 hover:bg-white/50 dark:hover:bg-zinc-800/60'
@@ -143,31 +150,34 @@ export const Shell: React.FC = () => {
               }
             >
               <Sparkles className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
-              <span>Studio</span>
+              <span>{t.nav.studio}</span>
             </NavLink>
 
-            {/* Admin Governance & Cohort Analytics */}
-            <NavLink
-              to="/admin"
-              className={({ isActive }) =>
-                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all duration-200 ${
-                  isActive
-                    ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40 shadow-xs scale-[1.02]'
-                    : 'text-slate-600 dark:text-zinc-400 hover:text-amber-800 dark:hover:text-amber-300 hover:bg-amber-500/10'
-                }`
-              }
-              title="Platform Owner & Admin Governance Dashboard"
-            >
-              <Shield className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-              <span>Admin</span>
-              {isAdmin && (
+            {/* Admin Governance & Cohort Analytics - Strictly visible only when authenticated as Admin */}
+            {isAdmin && (
+              <NavLink
+                to="/admin"
+                className={({ isActive }) =>
+                  `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse transition-all duration-200 ${
+                    isActive
+                      ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40 shadow-xs scale-[1.02]'
+                      : 'text-slate-600 dark:text-zinc-400 hover:text-amber-800 dark:hover:text-amber-300 hover:bg-amber-500/10'
+                  }`
+                }
+                title="Platform Owner & Admin Governance Dashboard"
+              >
+                <Shield className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span>{t.nav.admin}</span>
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-              )}
-            </NavLink>
+              </NavLink>
+            )}
           </nav>
 
           {/* Right Header: Identity & Edge Pill, AI Co-Pilot, Theme Switcher & Block Switcher */}
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            {/* Bilingual Language Switcher */}
+            <LocaleToggle />
+
             {/* Identity, Cloudflare Edge & Hardware Tier Pill */}
             <IdentityStatusPill />
 
@@ -189,13 +199,16 @@ export const Shell: React.FC = () => {
             {/* Apple Dynamic Appearance Switcher */}
             <ThemeToggle />
 
+            {/* Platform Language Switcher */}
+            <LocaleToggle />
+
             {/* Active Block Glass Pill */}
             <div className="hidden sm:flex items-center space-x-2 bg-white/60 dark:bg-zinc-800/60 hover:bg-white/80 dark:hover:bg-zinc-800/80 backdrop-blur-md border border-white/80 dark:border-zinc-700/70 px-3 py-1.5 rounded-2xl text-xs font-bold text-slate-800 dark:text-zinc-200 cursor-pointer shadow-xs transition-all duration-200 hover:-translate-y-0.5">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span>CVS: 206</span>
+              <span>{t.nav.activeBlockPrefix}: 206</span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500" />
             </div>
           </div>
@@ -249,7 +262,7 @@ export const Shell: React.FC = () => {
                     <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400 shadow-xs shadow-blue-500" />
                   )}
                 </div>
-                <span className="text-[10px] tracking-tight mt-0.5">Dashboard</span>
+                <span className="text-[10px] tracking-tight mt-0.5">{t.nav.dashboard}</span>
               </>
             )}
           </NavLink>
@@ -272,7 +285,7 @@ export const Shell: React.FC = () => {
                     <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400 shadow-xs shadow-blue-500" />
                   )}
                 </div>
-                <span className="text-[10px] tracking-tight mt-0.5">Test</span>
+                <span className="text-[10px] tracking-tight mt-0.5">{t.nav.test}</span>
               </>
             )}
           </NavLink>
@@ -295,7 +308,7 @@ export const Shell: React.FC = () => {
                     <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400 shadow-xs shadow-blue-500" />
                   )}
                 </div>
-                <span className="text-[10px] tracking-tight mt-0.5">Review</span>
+                <span className="text-[10px] tracking-tight mt-0.5">{t.nav.review}</span>
               </>
             )}
           </NavLink>
@@ -318,7 +331,7 @@ export const Shell: React.FC = () => {
                     <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400 shadow-xs shadow-blue-500" />
                   )}
                 </div>
-                <span className="text-[10px] tracking-tight mt-0.5">Curriculum</span>
+                <span className="text-[10px] tracking-tight mt-0.5">{t.nav.curriculum}</span>
               </>
             )}
           </NavLink>
@@ -341,7 +354,7 @@ export const Shell: React.FC = () => {
                     <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 shadow-xs shadow-indigo-500" />
                   )}
                 </div>
-                <span className="text-[10px] tracking-tight mt-0.5">Studio</span>
+                <span className="text-[10px] tracking-tight mt-0.5">{t.nav.studio}</span>
               </>
             )}
           </NavLink>
@@ -365,7 +378,7 @@ export const Shell: React.FC = () => {
                       <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-amber-500 shadow-xs shadow-amber-500" />
                     )}
                   </div>
-                  <span className="text-[10px] tracking-tight mt-0.5">Admin</span>
+                  <span className="text-[10px] tracking-tight mt-0.5">{t.nav.admin}</span>
                 </>
               )}
             </NavLink>
