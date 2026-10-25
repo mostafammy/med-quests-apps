@@ -27,7 +27,7 @@ describe('SystemPromptBuilder (v2 Medical Faculty Builder)', () => {
     expect(prompt).toContain('first-principles pathophysiology');
   });
 
-  it('enforces Sealed Exam Integrity: NEVER reveals answer or diagnosis before commitment', () => {
+  it('enforces Socratic guidance by default, but mandates immediate revelation upon explicit user request without refusal', () => {
     const sealedContext: TutorContext = {
       kind: 'tutor',
       mode: 'practice',
@@ -51,13 +51,14 @@ describe('SystemPromptBuilder (v2 Medical Faculty Builder)', () => {
       .withSafeContext(sealedContext)
       .build();
 
-    expect(prompt).toContain('CRITICAL EXAM INTEGRITY DIRECTIVE');
-    expect(prompt).toContain('NEVER reveal the correct letter or direct diagnosis');
-    expect(prompt).toContain('Guide them Socratically');
-    expect(prompt).not.toContain('POST-COMMIT REVIEW');
+    expect(prompt).toContain('PEDAGOGICAL & DISCLOSURE POLICY');
+    expect(prompt).toContain('DEFAULT TEACHING MODE (HINTS & SOCRATIC REASONING)');
+    expect(prompt).toContain('EXPLICIT ANSWER REQUESTS — MANDATORY IMMEDIATE REVELATION');
+    expect(prompt).toContain('NEVER REFUSE to reveal the correct choice when asked explicitly');
+    expect(prompt).toContain('ZERO REFUSAL POLICY');
   });
 
-  it('includes official rationale, board tips, and mnemonic when revealed', () => {
+  it('includes official rationale, board tips, and mnemonic when revealed or activeQuestion provided', () => {
     const revealedContext: TutorContext = {
       kind: 'tutor',
       mode: 'practice',
@@ -96,14 +97,14 @@ describe('SystemPromptBuilder (v2 Medical Faculty Builder)', () => {
       .withSafeContext(revealedContext)
       .build();
 
-    expect(prompt).toContain('DISCLOSURE STATUS: POST-COMMIT REVIEW (ANSWER REVEALED)');
-    expect(prompt).toContain('Correct Answer: Option A');
-    expect(prompt).toContain('Student Selected: Option B');
+    expect(prompt).toContain('GROUND TRUTH FACULTY SOLUTION');
+    expect(prompt).toContain('Correct Option: Option A');
+    expect(prompt).toContain('Student Selected on Screen: Option B');
     expect(prompt).toContain('parvus et tardus');
     expect(prompt).toContain('SAD: Syncope, Angina, Dyspnea');
   });
 
-  it('enforces strict Proctor constraints during timed mock exams', () => {
+  it('embeds active question details and pacing guidance during timed mock exams without blanket refusal', () => {
     const proctorContext: ProctorContext = {
       kind: 'proctor',
       mode: 'mock',
@@ -126,9 +127,9 @@ describe('SystemPromptBuilder (v2 Medical Faculty Builder)', () => {
       .withSafeContext(proctorContext)
       .build();
 
-    expect(prompt).toContain('EXAM PROCTOR CONSTRAINTS (MOCK EXAM IN PROGRESS)');
-    expect(prompt).toContain('MUST NOT confirm or deny answers, provide hints, or explain medical concepts');
-    expect(prompt).toContain('Question 5 of 20');
+    expect(prompt).toContain('Timed Mock Exam (Question 5 of 20)');
+    expect(prompt).toContain(dummyQuestion.stem);
+    expect(prompt).toContain('ACTIVE QUESTION ENGAGEMENT: NEVER refuse to discuss or explain the active clinical question');
   });
 
   it('embeds real-time behavioral telemetry with hesitation detection', () => {
@@ -183,5 +184,36 @@ describe('SystemPromptBuilder (v2 Medical Faculty Builder)', () => {
     expect(prompt).toContain('CANONICAL USMLE MEDICAL TERMS');
     expect(prompt).toContain('STRICT TOOL CALLING PROTOCOL');
     expect(prompt).toContain('simulate_hemodynamic_pv_loop');
+  });
+
+  it('grounds prompt with activeQuestion and enables explicit answer revelation', () => {
+    const rawQuestion = {
+      id: 'q-cvs-99',
+      stem: 'A 45-year-old female presents with fever, new murmur, and splinter hemorrhages.',
+      concept: 'Infective Endocarditis',
+      topicId: 'valvular-heart-disease',
+      chapterId: 'cardiovascular',
+      highYield: true,
+      choices: [
+        { id: 'a', text: 'Infective Endocarditis', isCorrect: true, rationale: 'Duke criteria positive.' },
+        { id: 'b', text: 'Rheumatic Heart Disease', isCorrect: false, rationale: 'Jones criteria.' },
+      ],
+      explanation: 'Splinter hemorrhages and new murmur indicate infective endocarditis.',
+      examTip: 'Check blood cultures x3 before empiric antibiotics.',
+      mnemonic: 'FROM JANE with love',
+    };
+
+    const prompt = new SystemPromptBuilder()
+      .withRolePersona()
+      .withSafeContext({ kind: 'workspace', route: 'review', overview: {} as any }, rawQuestion)
+      .build();
+
+    expect(prompt).toContain('CURRENT ACTIVE CLINICAL QUESTION ON SCREEN:');
+    expect(prompt).toContain('Infective Endocarditis');
+    expect(prompt).toContain('GROUND TRUTH FACULTY SOLUTION');
+    expect(prompt).toContain('Correct Option: Option A: Infective Endocarditis');
+    expect(prompt).toContain('Splinter hemorrhages and new murmur indicate infective endocarditis.');
+    expect(prompt).toContain('FROM JANE with love');
+    expect(prompt).toContain('EXPLICIT ANSWER REQUESTS — MANDATORY IMMEDIATE REVELATION');
   });
 });

@@ -200,13 +200,20 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
   },
 
   sendUserMessage: async (userText: string, cacheActionKey?: string) => {
-    const { surface, messages, isStreaming } = get();
-    if (!surface || isStreaming || !userText.trim()) return;
+    const { surface, messages, isStreaming, activeQuestionId } = get();
+    if (isStreaming || !userText.trim()) return;
+
+    const effectiveSurface: CopilotSurface = surface || { kind: 'workspace', route: 'dashboard' };
 
     // 1. Gather trusted question state
     const { questions } = useQuestionStore.getState();
     const { topicStats, overallAccuracy, mistakeQuestionIds } = useStatsStore.getState();
-    const activeQuestion = surface.kind === 'session' ? surface.question : null;
+    const activeQuestion =
+      effectiveSurface.kind === 'session'
+        ? effectiveSurface.question
+        : (activeQuestionId
+            ? questions.find((q) => q.id === activeQuestionId) || null
+            : null);
 
     let attemptsOnQ: any[] = [];
     let existingNote: string | null = null;
@@ -255,7 +262,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
     };
 
     // 2. Build SafeAiContext through Domain Policy Gate
-    const safeContext: SafeAiContext = buildSafeAiContext({ surface, signals, overview });
+    const safeContext: SafeAiContext = buildSafeAiContext({ surface: effectiveSurface, signals, overview });
 
     // 3. Append User Message
     const userMsg: ChatMessage = {

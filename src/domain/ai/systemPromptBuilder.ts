@@ -23,54 +23,121 @@ export class SystemPromptBuilder {
     return this;
   }
 
-  withSafeContext(context: SafeAiContext): this {
-    if (context.kind === 'proctor') {
-      this.contextSection =
-        `EXAM PROCTOR CONSTRAINTS (MOCK EXAM IN PROGRESS):\n` +
-        `Academic integrity is strictly enforced. The student is under timed exam conditions.\n` +
-        `You MUST NOT confirm or deny answers, provide hints, or explain medical concepts.\n` +
-        `You may only provide exam time management or pacing guidance.\n` +
-        `Exam Status: Question ${context.questionIndex + 1} of ${context.totalQuestions}.`;
-      return this;
-    }
+  withSafeContext(context: SafeAiContext, activeQuestion?: any): this {
+    // 1. Resolve question attributes from activeQuestion or context
+    const qStem =
+      activeQuestion?.stem ||
+      (context.kind === 'tutor' || context.kind === 'proctor'
+        ? context.question?.stem
+        : null);
 
-    if (context.kind === 'tutor') {
-      const q = context.question;
-      let s =
-        `ACTIVE CLINICAL QUESTION:\n` +
-        `- Concept: ${q.concept}\n` +
-        `- Topic ID: ${q.topicId} (${q.chapterId})\n` +
-        `- High-Yield Objective: ${q.highYield ? 'YES' : 'Standard'}\n` +
-        `- Vignette Stem: "${q.stem}"\n` +
-        `- Available Choices:\n` +
-        q.choices.map((c) => `  * Option ${c.id.toUpperCase()}: ${c.text}`).join('\n') +
-        `\n\n`;
+    const qChoices: ReadonlyArray<{ id: string; text: string }> =
+      activeQuestion?.choices ||
+      (context.kind === 'tutor' || context.kind === 'proctor'
+        ? context.question?.choices
+        : []);
 
-      if (context.disclosure.state === 'revealed') {
-        s +=
-          `DISCLOSURE STATUS: POST-COMMIT REVIEW (ANSWER REVEALED)\n` +
-          `- Correct Answer: Option ${context.disclosure.correctChoiceId.toUpperCase()}\n` +
-          `- Student Selected: ${context.disclosure.selectedChoiceId ? `Option ${context.disclosure.selectedChoiceId.toUpperCase()}` : 'None'}\n` +
-          `- Official Faculty Rationale: ${context.disclosure.explanation}\n`;
-        if (context.disclosure.examTip) {
-          s += `- Board Exam Tip: ${context.disclosure.examTip}\n`;
-        }
-        if (context.disclosure.mnemonic) {
-          s += `- Canonical Mnemonic: ${context.disclosure.mnemonic}\n`;
-        }
-      } else {
-        s +=
-          `DISCLOSURE STATUS: PRE-COMMIT SOLVING MODE (ANSWER CONCEALED)\n` +
-          `CRITICAL EXAM INTEGRITY DIRECTIVE: The student has NOT committed an answer yet.\n` +
-          `NEVER reveal the correct letter or direct diagnosis!\n` +
-          `Guide them Socratically: emphasize the clinical pivot findings (vital signs, heart sounds, murmur radiation, chronicity) and prompt them to think through the hemodynamic consequences.\n`;
+    const qConcept =
+      activeQuestion?.concept ||
+      (context.kind === 'tutor' ? context.question?.concept : null);
+
+    const qTopicId =
+      activeQuestion?.topicId ||
+      (context.kind === 'tutor' ? context.question?.topicId : null);
+
+    const qChapterId =
+      activeQuestion?.chapterId ||
+      (context.kind === 'tutor' ? context.question?.chapterId : null);
+
+    const qHighYield =
+      activeQuestion?.highYield ??
+      (context.kind === 'tutor' ? context.question?.highYield : false);
+
+    // 2. Ground Truth Solution Resolution
+    const correctChoiceObj = activeQuestion?.choices?.find((c: any) => c.isCorrect);
+    const correctChoiceId: string | null =
+      correctChoiceObj?.id ||
+      (context.kind === 'tutor' && context.disclosure.state === 'revealed'
+        ? context.disclosure.correctChoiceId
+        : null);
+
+    const facultyExplanation: string | null =
+      activeQuestion?.explanation ||
+      (context.kind === 'tutor' && context.disclosure.state === 'revealed'
+        ? context.disclosure.explanation
+        : null);
+
+    const examTip: string | null =
+      activeQuestion?.examTip ||
+      (context.kind === 'tutor' && context.disclosure.state === 'revealed'
+        ? context.disclosure.examTip
+        : null);
+
+    const mnemonic: string | null =
+      activeQuestion?.mnemonic ||
+      (context.kind === 'tutor' && context.disclosure.state === 'revealed'
+        ? context.disclosure.mnemonic
+        : null);
+
+    const selectedChoiceId: string | null =
+      context.kind === 'tutor' && context.disclosure.state === 'revealed'
+        ? context.disclosure.selectedChoiceId
+        : context.kind === 'proctor'
+          ? context.selectedChoiceId
+          : null;
+
+    if (qStem) {
+      let s = `CURRENT ACTIVE CLINICAL QUESTION ON SCREEN:\n`;
+      if (qConcept) s += `- Core Concept: ${qConcept}\n`;
+      if (qTopicId) s += `- Topic ID: ${qTopicId} (${qChapterId || 'Cardiovascular'})\n`;
+      s += `- High-Yield Status: ${qHighYield ? 'YES (High-Yield Board Objective)' : 'Standard'}\n`;
+      if (context.kind === 'proctor') {
+        s += `- Exam Mode: Timed Mock Exam (Question ${context.questionIndex + 1} of ${context.totalQuestions})\n`;
       }
+      s += `- Vignette Stem: "${qStem}"\n`;
+      s += `- Available Choices:\n`;
+      s += qChoices.map((c) => `  * Option ${c.id.toUpperCase()}: ${c.text}`).join('\n');
+      s += `\n\n`;
+
+      if (correctChoiceId) {
+        s += `GROUND TRUTH FACULTY SOLUTION (AUTHORITATIVE REFERENCE):\n`;
+        s += `- Correct Option: Option ${correctChoiceId.toUpperCase()}${correctChoiceObj?.text ? `: ${correctChoiceObj.text}` : ''}\n`;
+        if (selectedChoiceId) {
+          s += `- Student Selected on Screen: Option ${selectedChoiceId.toUpperCase()}\n`;
+        }
+        if (facultyExplanation) {
+          s += `- Official Faculty Rationale: ${facultyExplanation}\n`;
+        }
+        if (examTip) {
+          s += `- Board Exam Tip: ${examTip}\n`;
+        }
+        if (mnemonic) {
+          s += `- Canonical Memory Mnemonic: ${mnemonic}\n`;
+        }
+        s += `\n`;
+      }
+
+      s += `PEDAGOGICAL & DISCLOSURE POLICY (CRITICAL DIRECTIVE):\n`;
+      s += `1. ACTIVE QUESTION ENGAGEMENT: NEVER refuse to discuss or explain the active clinical question, its symptoms, vital signs, physical exam findings, or pathophysiological mechanisms. Always treat the student with academic respect and clarity.\n`;
+      s += `2. DEFAULT TEACHING MODE (HINTS & SOCRATIC REASONING): When the student asks for a hint, says "I'm stuck", asks for guidance, or is working through the case, guide them Socratically: emphasize the clinical pivot findings (vital signs, heart sounds, murmur radiation, chronicity) and prompt them to think through the hemodynamic consequences.\n`;
+      s += `3. EXPLICIT ANSWER REQUESTS — MANDATORY IMMEDIATE REVELATION: IF THE STUDENT EXPLICITLY ASKS FOR THE CORRECT CHOICE, ASKS "WHAT IS THE ANSWER?", "TELL ME THE ANSWER", "WHICH OPTION IS CORRECT?", ASKS WHY A SPECIFIC OPTION IS RIGHT OR WRONG, OR USES AN EXPLANATION POWER ACTION:\n`;
+      s += `   - YOU MUST IMMEDIATELY AND DIRECTLY STATE THE CORRECT CHOICE (e.g. "**The correct choice is Option ${correctChoiceId ? correctChoiceId.toUpperCase() : '...'}**").\n`;
+      s += `   - Provide a complete, rigorous first-principles pathophysiological explanation of why this answer is correct.\n`;
+      s += `   - Explain why each alternative choice (distractor) is incorrect.\n`;
+      s += `   - ZERO REFUSAL POLICY: NEVER REFUSE to reveal the correct choice when asked explicitly.\n`;
+      s += `   - NEVER lecture the student about exam rules, academic integrity, or withholding answers.\n`;
+      s += `   - NEVER say "I cannot reveal the answer" or "You must guess first".`;
 
       this.contextSection = s;
       return this;
     }
 
-    this.contextSection = `STUDIO / WORKSPACE MODE: Assisting with question authoring and curriculum analysis.`;
+    if (context.kind === 'studio') {
+      this.contextSection = `STUDIO MODE: Assisting with question authoring, clinical vignette editing, and curriculum analysis.`;
+      return this;
+    }
+
+    this.contextSection = `WORKSPACE MODE: Navigating curriculum library and review hub.`;
     return this;
   }
 

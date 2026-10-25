@@ -74,14 +74,9 @@ export class AgentToolRegistry {
 
   /**
    * Compiles JSON Schema tool declarations for the LLM API.
-   * Enforces Exam Integrity: If under timed proctored exam conditions,
-   * clinical tools are excluded.
+   * Supplies clinical and telemetry tools for the model.
    */
-  getToolDeclarations(context: SafeAiContext): ToolDefinition[] {
-    if (context.kind === 'proctor') {
-      return []; // No clinical tools during timed mock exams
-    }
-
+  getToolDeclarations(_context?: SafeAiContext): ToolDefinition[] {
     const declarations: ToolDefinition[] = [];
     for (const tool of this.tools.values()) {
       declarations.push({

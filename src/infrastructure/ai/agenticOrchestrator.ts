@@ -78,7 +78,7 @@ export class AgenticOrchestrator {
     const systemPrompt = new SystemPromptBuilder()
       .withRolePersona()
       .withChatLanguageDirective(langContext)
-      .withSafeContext(safeContext)
+      .withSafeContext(safeContext, activeQuestion)
       .withTelemetrySnapshot(telemetrySnapshot, timeSpentSeconds)
       .withToolOrchestrationRules()
       .build();
