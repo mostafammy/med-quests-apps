@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { db } from '../../infrastructure/storage/db.ts';
 import { Question, Attempt } from '../../domain/model/types.ts';
 import { CVS_TAXONOMY } from '../../domain/taxonomy/cvsTaxonomy.ts';
+import defaultCvsBank from '../../../content/cvs/dist/bank.v1.json';
 
 export interface TopicStat {
   topicId: string;
@@ -156,7 +157,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
         qAtts.some((a) => a.isCorrect === true)
       ).length;
 
-      const totalQuestionsCount = questions.length > 0 ? questions.length : 106;
+      const totalQuestionsCount = questions.length > 0 ? questions.length : defaultCvsBank.length;
       const masteryPercentage = Math.round((masteredQuestions / totalQuestionsCount) * 100);
 
       set({

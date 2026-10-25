@@ -3,6 +3,7 @@ import { RotateCcw, AlertTriangle, X, Loader2, Database, ShieldCheck } from 'luc
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 import { useAuthStore } from '../../../application/stores/useAuthStore.ts';
+import defaultCvsBank from '../../../../content/cvs/dist/bank.v1.json';
 
 export interface ResetBankConfirmationModalProps {
   isOpen: boolean;
@@ -126,7 +127,7 @@ export const ResetBankConfirmationModal: React.FC<ResetBankConfirmationModalProp
               Cloudflare Edge / D1
             </span>
             <div className="text-sm font-extrabold text-emerald-700 dark:text-emerald-300">
-              106 <span className="text-xs font-normal text-slate-500">canonical</span>
+              {defaultCvsBank.length} <span className="text-xs font-normal text-slate-500">canonical</span>
             </div>
             <p className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80">{t.bank.edgeVerified}</p>
           </div>

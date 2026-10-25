@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, RotateCcw, RefreshCw, ShieldCheck, Database, Layers } from 'lucide-react';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
+import defaultCvsBank from '../../../../content/cvs/dist/bank.v1.json';
 import { ResetBankConfirmationModal } from './ResetBankConfirmationModal.tsx';
 
 export const QuestionBankStatusPill: React.FC = () => {
@@ -148,7 +149,7 @@ export const QuestionBankStatusPill: React.FC = () => {
                 <span>{t.bank.resetToGlobalBtn}</span>
               </div>
               <span className="text-[10px] uppercase font-mono tracking-wider opacity-70">
-                106 Canonical
+                {defaultCvsBank.length} Canonical
               </span>
             </button>
           </div>
