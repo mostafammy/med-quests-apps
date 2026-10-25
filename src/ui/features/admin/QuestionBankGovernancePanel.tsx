@@ -13,7 +13,9 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useBankGovernanceStore } from '../../../application/stores/useBankGovernanceStore.ts';
+import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 import { useAuthStore } from '../../../application/stores/useAuthStore.ts';
+import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 import { CVS_TAXONOMY } from '../../../domain/taxonomy/cvsTaxonomy.ts';
 import { AiPromptStudioModal } from './AiPromptStudioModal.tsx';
 import type {
@@ -43,12 +45,16 @@ export const QuestionBankGovernancePanel: React.FC = () => {
   } = useBankGovernanceStore();
 
   const { authState } = useAuthStore();
+  const { resetLocalBankToGlobal } = useQuestionStore();
+  const { t } = useLocaleStore();
 
   // Local state for reviewer actions
   const [reviewerNotes, setReviewerNotes] = useState('');
   const [isInlineEditing, setIsInlineEditing] = useState(false);
   const [inlineStem, setInlineStem] = useState('');
   const [inlineExplanation, setInlineExplanation] = useState('');
+  const [isResettingCache, setIsResettingCache] = useState(false);
+  const [resetFeedback, setResetFeedback] = useState<string | null>(null);
 
   // Modal state for creating canonical items
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -75,6 +81,23 @@ export const QuestionBankGovernancePanel: React.FC = () => {
       setReviewerNotes('');
     }
   }, [activeTicket]);
+
+  const handleResetLocalCache = async () => {
+    if (!window.confirm(t.studio.resetConfirmDialog)) {
+      return;
+    }
+    try {
+      setIsResettingCache(true);
+      const res = await resetLocalBankToGlobal('cvs');
+      await loadGovernanceData('cvs');
+      setResetFeedback(`Local cache reset: ${res.resetCount} items restored (Rev #${res.revision})`);
+      setTimeout(() => setResetFeedback(null), 5000);
+    } catch {
+      // Ignored
+    } finally {
+      setIsResettingCache(false);
+    }
+  };
 
   const currentActor = {
     id: authState.user?.id || 'usr_faculty_admin',
@@ -154,7 +177,7 @@ export const QuestionBankGovernancePanel: React.FC = () => {
           </button>
         </div>
 
-        <div className="flex items-center space-x-2 self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           <button
             onClick={() => setIsPromptStudioOpen(true)}
             className="py-2 px-3.5 rounded-xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/10 hover:from-indigo-500/20 hover:to-purple-500/20 border border-indigo-200/80 dark:border-indigo-800 text-xs font-bold text-indigo-700 dark:text-indigo-300 flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer apple-tap"
@@ -162,6 +185,16 @@ export const QuestionBankGovernancePanel: React.FC = () => {
           >
             <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>AI Prompt Studio</span>
+          </button>
+
+          <button
+            onClick={handleResetLocalCache}
+            disabled={isResettingCache}
+            title={t.studio.resetToGlobalBtn}
+            className="py-2 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/15 border border-rose-300 dark:border-rose-800 text-xs font-semibold text-rose-700 dark:text-rose-300 flex items-center space-x-1.5 transition-all cursor-pointer apple-tap"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 ${isResettingCache ? 'animate-spin text-rose-600' : ''}`} />
+            <span>{isResettingCache ? 'Resetting...' : 'Reset Local Bank'}</span>
           </button>
 
           <button
@@ -174,6 +207,15 @@ export const QuestionBankGovernancePanel: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {resetFeedback && (
+        <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-400/30 text-indigo-800 dark:text-indigo-300 text-xs flex items-center justify-between animate-apple-entrance">
+          <div className="flex items-center space-x-2 font-medium">
+            <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+            <span>{resetFeedback}</span>
+          </div>
+        </div>
+      )}
 
       {/* 2. TAB 1: CURRICULUM REVIEW QUEUE */}
       {activeWorkspaceTab === 'review-queue' && (
