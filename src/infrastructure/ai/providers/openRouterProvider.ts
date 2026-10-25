@@ -19,4 +19,10 @@ export class OpenRouterProvider extends OpenAiCompatibleProvider {
       'X-Title': 'Med Quests Medical AI Co-Pilot',
     };
   }
+
+  protected override getCustomBodyFields(): Record<string, unknown> {
+    return {
+      include_reasoning: true,
+    };
+  }
 }

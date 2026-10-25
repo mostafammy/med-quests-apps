@@ -74,6 +74,9 @@ export class GeminiProvider {
       contents: geminiContents,
       generationConfig: {
         temperature: 0.2,
+        thinkingConfig: {
+          thinkingBudget: -1,
+        },
       },
     };
 
@@ -156,8 +159,10 @@ export class GeminiProvider {
           if (!Array.isArray(parts)) continue;
 
           for (const part of parts) {
-            // Text chunk
-            if (typeof part.text === 'string') {
+            // Model thought / reasoning process
+            if (part.thought === true && typeof part.text === 'string') {
+              yield { type: 'thinking', delta: part.text };
+            } else if (typeof part.text === 'string') {
               yield { type: 'text', delta: part.text };
             }
 

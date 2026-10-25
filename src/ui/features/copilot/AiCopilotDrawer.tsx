@@ -31,6 +31,7 @@ import {
   MnemonicAnchorCard,
   MicroCurriculumCard,
 } from './cards/MemoryRemediationCard.tsx';
+import { ThinkingAccordion } from './ThinkingAccordion.tsx';
 import { getModelDisplayName } from '../../../domain/ai/modelCatalog.ts';
 
 function formatMessageTime(timestamp: number): string {
@@ -382,6 +383,14 @@ export const AiCopilotDrawer: React.FC = () => {
                       : 'bg-white/90 dark:bg-zinc-900/90 text-slate-900 dark:text-zinc-100 border border-slate-200/80 dark:border-zinc-800/80 shadow-sm rounded-bl-sm space-y-2.5 backdrop-blur-md'
                   }`}
                 >
+                  {/* Model Thinking Accordion (if supported and emitted by model) */}
+                  {msg.role === 'assistant' && msg.thinking && (
+                    <ThinkingAccordion
+                      thinking={msg.thinking}
+                      isStreaming={msg.status === 'streaming'}
+                    />
+                  )}
+
                   {msg.parts.map((part, pIdx) => {
                     if (part.kind === 'text') {
                       return msg.role === 'user' ? (

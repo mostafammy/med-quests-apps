@@ -27,6 +27,7 @@ export interface ChatMessage {
   readonly status: MessageStatus;
   readonly engine: string | null;
   readonly modelId?: string | null;
+  readonly thinking?: string | null;
   readonly createdAt: number;
   readonly latencyMs: number | null;
 }

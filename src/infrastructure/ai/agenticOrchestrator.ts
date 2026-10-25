@@ -40,6 +40,7 @@ export type OrchestratorEvent =
   | { type: 'silent-diagnostic-done'; toolName: string }
   | { type: 'artifact'; envelope: AgentToolExecutionEnvelope }
   | { type: 'text-delta'; delta: string }
+  | { type: 'thinking-delta'; delta: string }
   | { type: 'engine-resolved'; providerId: string; modelId: string };
 
 const MAX_REACT_TURNS = 3;
@@ -119,6 +120,9 @@ export class AgenticOrchestrator {
             streamedAnyChunks = true;
             turnText += chunk.delta;
             yield { type: 'text-delta', delta: chunk.delta };
+          } else if (chunk.type === 'thinking') {
+            streamedAnyChunks = true;
+            yield { type: 'thinking-delta', delta: chunk.delta };
           } else if (chunk.type === 'tool-call') {
             streamedAnyChunks = true;
             turnToolCalls.push(chunk);

@@ -21,7 +21,76 @@ export interface LlmMessage {
 
 export type LlmStreamEvent =
   | { type: 'text'; delta: string }
+  | { type: 'thinking'; delta: string }
   | { type: 'tool-call'; callId: string; name: string; argsJson: string };
+
+/**
+ * Robust streaming parser that detects and splits <think>...</think> tags
+ * into dedicated 'thinking' events without polluting final answer text.
+ */
+export class ThinkTagStreamFilter {
+  private inThinkTag = false;
+  private pendingBuffer = '';
+
+  processChunk(chunk: string): Array<{ type: 'text' | 'thinking'; delta: string }> {
+    const events: Array<{ type: 'text' | 'thinking'; delta: string }> = [];
+    let text = this.pendingBuffer + chunk;
+    this.pendingBuffer = '';
+
+    while (text.length > 0) {
+      if (!this.inThinkTag) {
+        const startIdx = text.indexOf('<think>');
+        if (startIdx === -1) {
+          const partialMatch = text.match(/<t(h(i(n(k)?)?)?)?$/i);
+          if (partialMatch) {
+            const safeText = text.slice(0, partialMatch.index);
+            if (safeText) events.push({ type: 'text', delta: safeText });
+            this.pendingBuffer = partialMatch[0];
+            break;
+          } else {
+            events.push({ type: 'text', delta: text });
+            break;
+          }
+        } else {
+          if (startIdx > 0) {
+            events.push({ type: 'text', delta: text.slice(0, startIdx) });
+          }
+          this.inThinkTag = true;
+          text = text.slice(startIdx + 7);
+        }
+      } else {
+        const endIdx = text.indexOf('</think>');
+        if (endIdx === -1) {
+          const partialMatch = text.match(/<\/t(h(i(n(k)?)?)?)?$/i);
+          if (partialMatch) {
+            const safeText = text.slice(0, partialMatch.index);
+            if (safeText) events.push({ type: 'thinking', delta: safeText });
+            this.pendingBuffer = partialMatch[0];
+            break;
+          } else {
+            events.push({ type: 'thinking', delta: text });
+            break;
+          }
+        } else {
+          if (endIdx > 0) {
+            events.push({ type: 'thinking', delta: text.slice(0, endIdx) });
+          }
+          this.inThinkTag = false;
+          text = text.slice(endIdx + 8).replace(/^\n+/, '');
+        }
+      }
+    }
+
+    return events;
+  }
+
+  flush(): Array<{ type: 'text' | 'thinking'; delta: string }> {
+    if (!this.pendingBuffer) return [];
+    const chunk = this.pendingBuffer;
+    this.pendingBuffer = '';
+    return [{ type: this.inThinkTag ? 'thinking' : 'text', delta: chunk }];
+  }
+}
 
 export abstract class OpenAiCompatibleProvider {
   abstract readonly providerId: 'openrouter' | 'groq';
@@ -34,6 +103,10 @@ export abstract class OpenAiCompatibleProvider {
   ) {}
 
   protected getCustomHeaders(): Record<string, string> {
+    return {};
+  }
+
+  protected getCustomBodyFields(): Record<string, unknown> {
     return {};
   }
 
@@ -62,6 +135,7 @@ export abstract class OpenAiCompatibleProvider {
       messages,
       stream: true,
       temperature: 0.2,
+      ...this.getCustomBodyFields(),
     };
 
     if (tools.length > 0) {
@@ -176,6 +250,7 @@ export abstract class OpenAiCompatibleProvider {
     let buffer = '';
 
     const toolCallAccumulators = new Map<number, { id: string; name: string; argsJson: string }>();
+    const thinkFilter = new ThinkTagStreamFilter();
 
     try {
       while (true) {
@@ -202,9 +277,18 @@ export abstract class OpenAiCompatibleProvider {
           const choice = payload.choices?.[0];
           if (!choice) continue;
 
-          // Stream Text deltas
-          if (choice.delta?.content) {
-            yield { type: 'text', delta: choice.delta.content };
+          // 1. Stream dedicated reasoning/thinking deltas (DeepSeek, OpenRouter, Groq reasoning models)
+          const reasoningDelta = choice.delta?.reasoning_content ?? choice.delta?.reasoning;
+          if (typeof reasoningDelta === 'string' && reasoningDelta) {
+            yield { type: 'thinking', delta: reasoningDelta };
+          }
+
+          // 2. Stream content deltas (filtering embedded <think>...</think> tags)
+          if (typeof choice.delta?.content === 'string' && choice.delta.content) {
+            const filteredEvents = thinkFilter.processChunk(choice.delta.content);
+            for (const ev of filteredEvents) {
+              yield ev;
+            }
           }
 
           // Accumulate tool call chunks
@@ -225,6 +309,11 @@ export abstract class OpenAiCompatibleProvider {
             }
           }
         }
+      }
+
+      // Flush any pending trailing tokens from thinkFilter
+      for (const ev of thinkFilter.flush()) {
+        yield ev;
       }
 
       // Yield all assembled tool calls

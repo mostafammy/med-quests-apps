@@ -301,6 +301,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
     const startTime = performance.now();
 
     let accumulatedText = '';
+    let accumulatedThinking = '';
     const partsBuffer: MessagePart[] = [];
     let resolvedEngineId: string | null = settings.engine;
     let resolvedModelId: string | null =
@@ -328,6 +329,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
             ...m,
             engine: resolvedEngineId,
             modelId: resolvedModelId,
+            thinking: accumulatedThinking || null,
             parts: currentParts,
             latencyMs: Math.round(performance.now() - startTime),
           };
@@ -372,6 +374,9 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
           resolvedEngineId = event.providerId;
           resolvedModelId = event.modelId;
           set({ activeResolvedEngine: event.providerId });
+        } else if (event.type === 'thinking-delta') {
+          accumulatedThinking += event.delta;
+          scheduleFlush();
         } else if (event.type === 'text-delta') {
           accumulatedText += event.delta;
           scheduleFlush();
@@ -399,7 +404,13 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
         activeDiagnosticTool: null,
         messages: state.messages.map((m) =>
           m.id === assistantMsgId
-            ? { ...m, status: 'complete', engine: resolvedEngineId, modelId: resolvedModelId }
+            ? {
+                ...m,
+                status: 'complete',
+                engine: resolvedEngineId,
+                modelId: resolvedModelId,
+                thinking: accumulatedThinking || null,
+              }
             : m
         ),
       }));
