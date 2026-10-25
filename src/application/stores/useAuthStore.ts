@@ -74,6 +74,7 @@ export interface AuthStoreState {
     blockedUntil?: string | null
   ) => Promise<void>;
   quarantineAnomalousAccounts: () => Promise<void>;
+  purgeDemoData: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthStoreState>((set, get) => ({
@@ -581,6 +582,25 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
           count > 0
             ? `Quarantined ${count} account(s) flagged with security anomalies.`
             : 'No active unquarantined security anomalies detected.',
+      },
+    });
+  },
+
+  purgeDemoData: async () => {
+    const { purgedUsersCount } = edgeAuthGateway.purgeDemoData();
+    const managedUsers = [...edgeAuthGateway.getManagedUsers()];
+    const auditLogs = [...edgeAuthGateway.getAuditLogs()];
+
+    set({
+      managedUsers,
+      auditLogs,
+      selectedManagedUserId: managedUsers[0]?.profile.id ?? null,
+      notificationToast: {
+        type: 'success',
+        message:
+          purgedUsersCount > 0
+            ? `Purged ${purgedUsersCount} demo account(s). Directory clean for production.`
+            : 'Directory is already clean for production.',
       },
     });
   },
