@@ -1,0 +1,68 @@
+import type { TranslationDictionary } from '../types.ts';
+
+export const enDictionary: TranslationDictionary = {
+  common: {
+    appName: 'Med Quests',
+    examPrepBadge: 'Exam Prep',
+    saveAndApply: 'Save & Apply',
+    saved: 'Saved!',
+    cancel: 'Cancel',
+    close: 'Close',
+    loading: 'Loading...',
+    languageLabel: 'Language',
+    languageToggleAria: 'Switch platform interface language (English / العربية)',
+  },
+  nav: {
+    dashboard: 'Dashboard',
+    test: 'Test',
+    review: 'Review',
+    curriculum: 'Curriculum',
+    studio: 'Studio',
+    admin: 'Admin',
+    activeBlockPrefix: 'CVS',
+  },
+  copilot: {
+    title: 'AI Co-Pilot',
+    subtitle: 'Autonomous Socratic Clinical Mentor',
+    emptyTitle: 'Clinical Socratic Co-Pilot',
+    emptyDescription:
+      'Real-time cognitive guidance synchronized with your active question and performance telemetry.',
+    inputPlaceholder: 'Ask question or discuss diagnostic reasoning...',
+    inputStreamingPlaceholder: 'Synthesizing clinical guidance...',
+    reasoningBadge: 'Reasoning',
+    clearConversation: 'Clear conversation',
+    stopGeneration: 'Stop generation',
+    sendMessage: 'Send message (Enter)',
+    expandWidth: 'Expand width',
+    collapseWidth: 'Collapse width',
+    closeCopilot: 'Close Co-Pilot (Esc)',
+    chatLanguagePillTooltip: 'Co-Pilot Chat Language: Click to toggle (Auto / English / العربية)',
+    starterPrompts: [
+      'What is the primary hemodynamic shift in this vignette?',
+      'I am torn between choices B and C—what distinguishes them?',
+      'Simulate the Pressure-Volume loop for this patient lesion.',
+    ],
+    diagnostics: {
+      analyzingVignette: 'Analyzing vignette presentation & trap map...',
+      readingTelemetry: 'Reading live hesitation telemetry...',
+      evaluatingBias: 'Evaluating cognitive bias & anchoring patterns...',
+      runningGeneric: 'Running clinical background diagnostic...',
+    },
+    settings: {
+      modalTitle: 'AI Co-Pilot Cloud Engines',
+      modalSubtitle: 'Choose your medical reasoning engine and language preference',
+      chatLanguageLabel: 'Co-Pilot Chat Response Language',
+      chatLanguageSubtext:
+        'Controls the language the AI Mentor uses in the chat. Canonical USMLE terms are preserved.',
+      langAuto: 'Auto-Detect',
+      langAutoDesc: 'Matches the language of each prompt you type automatically.',
+      langEnglish: 'English',
+      langEnglishDesc: 'Always responds in USMLE Clinical English.',
+      langArabic: 'العربية (Arabic)',
+      langArabicDesc: 'Responds in Medical Arabic with English terms in parentheses.',
+      chooseModelLabel: 'Choose Clinical Model:',
+      advancedCustomModel: 'Advanced: Custom Model ID',
+      persistedNotice: 'Persisted locally in encrypted IndexedDB',
+    },
+  },
+};
