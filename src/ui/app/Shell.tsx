@@ -63,10 +63,10 @@ export const Shell: React.FC = () => {
 
       {/* Top Navigation Bar with Frosted Glassmorphism (Apple Material Blur) */}
       <header className="sticky top-0 z-40 bg-white/75 dark:bg-zinc-900/75 backdrop-blur-2xl border-b border-white/60 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.4)] transition-all duration-300 pt-[env(safe-area-inset-top,0px)]">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2">
-          {/* Logo & Platform Name */}
-          <NavLink to="/" className="flex items-center space-x-2 sm:space-x-3 group cursor-pointer shrink-0 apple-tap">
-            <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-indigo-700 dark:from-blue-500 dark:to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+        <div className="w-full px-3 sm:px-5 lg:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
+          {/* Left: Logo & Platform Name (Aligned to Far-Left) */}
+          <NavLink to="/" className="flex items-center space-x-2 sm:space-x-2.5 rtl:space-x-reverse group cursor-pointer shrink-0 apple-tap">
+            <div className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-indigo-700 dark:from-blue-500 dark:to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
               <Heart className="w-4 h-4 sm:w-5 sm:h-5 fill-current animate-heartbeat" />
               <span className="absolute -inset-0.5 rounded-xl sm:rounded-2xl bg-blue-400/30 blur-xs -z-10 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
@@ -74,7 +74,7 @@ export const Shell: React.FC = () => {
               <span className="font-extrabold text-slate-900 dark:text-zinc-50 tracking-tight text-base sm:text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                 Med Quests
               </span>
-              <span className="hidden sm:inline-block ml-2 rtl:ml-0 rtl:mr-2 text-[10px] uppercase tracking-wider font-extrabold bg-blue-500/10 dark:bg-blue-400/10 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-full border border-blue-400/20 backdrop-blur-md">
+              <span className="hidden xl:inline-block ml-2 rtl:ml-0 rtl:mr-2 text-[10px] uppercase tracking-wider font-extrabold bg-blue-500/10 dark:bg-blue-400/10 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-full border border-blue-400/20 backdrop-blur-md">
                 {t.common.examPrepBadge}
               </span>
             </div>
@@ -198,9 +198,6 @@ export const Shell: React.FC = () => {
 
             {/* Apple Dynamic Appearance Switcher */}
             <ThemeToggle />
-
-            {/* Platform Language Switcher */}
-            <LocaleToggle />
 
             {/* Active Block Glass Pill */}
             <div className="hidden sm:flex items-center space-x-2 bg-white/60 dark:bg-zinc-800/60 hover:bg-white/80 dark:hover:bg-zinc-800/80 backdrop-blur-md border border-white/80 dark:border-zinc-700/70 px-3 py-1.5 rounded-2xl text-xs font-bold text-slate-800 dark:text-zinc-200 cursor-pointer shadow-xs transition-all duration-200 hover:-translate-y-0.5">
