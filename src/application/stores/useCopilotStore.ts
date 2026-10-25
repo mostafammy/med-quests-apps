@@ -15,6 +15,7 @@ import { useStatsStore } from './useStatsStore.ts';
 import { db } from '../../infrastructure/storage/db.ts';
 import { powerActionCacheService } from '../../domain/ai/powerActionCacheService.ts';
 import { POWER_ACTIONS, type PowerActionKey } from '../../domain/ai/powerActions.ts';
+import { ChatLanguagePolicy } from '../../domain/ai/languagePolicy.ts';
 
 interface CopilotState {
   // Drawer visibility & size
