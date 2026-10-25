@@ -1,22 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CVS_TAXONOMY } from '../../../domain/taxonomy/cvsTaxonomy.ts';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
-import { Copy, Check, Upload, Download, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useAuthStore } from '../../../application/stores/useAuthStore.ts';
+import {
+  Copy,
+  Check,
+  Upload,
+  Download,
+  Sparkles,
+  AlertCircle,
+  CheckCircle2,
+  RefreshCw,
+  Globe,
+  ShieldCheck,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 
 export const QuestionStudio: React.FC = () => {
-  const { questions, ingestQuestions, exportBankJson, clearBank } = useQuestionStore();
+  const {
+    questions,
+    syncCursor,
+    isSyncing,
+    lastMergeReport,
+    mySubmissions,
+    ingestQuestions,
+    submitQuestionsForGlobalReview,
+    syncWithGlobalBank,
+    loadMySubmissions,
+    exportBankJson,
+    clearBank,
+  } = useQuestionStore();
+
+  const { authState } = useAuthStore();
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('anatomy');
   const [selectedChapterId, setSelectedChapterId] = useState<string>('cvs-ana-heart-dev');
   const [copied, setCopied] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
-  const [ingestStatus, setIngestStatus] = useState<{ count: number; errors: string[] } | null>(null);
+  const [ingestStatus, setIngestStatus] = useState<{
+    count: number;
+    errors: string[];
+    ticketCount?: number;
+    mode?: 'local' | 'global_review';
+  } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showSubmissionsTracker, setShowSubmissionsTracker] = useState(false);
 
   const activeSubject = CVS_TAXONOMY.subjects.find((s) => s.id === selectedSubjectId);
   const availableChapters = CVS_TAXONOMY.chapters.filter((c) => c.subjectId === selectedSubjectId);
   const activeChapter = CVS_TAXONOMY.chapters.find((c) => c.id === selectedChapterId);
   const chapterTopics = CVS_TAXONOMY.topics.filter((t) => t.chapterId === selectedChapterId);
+
+  useEffect(() => {
+    const userId = authState.user?.id || 'usr_local_author';
+    loadMySubmissions(userId);
+  }, [authState.user?.id, loadMySubmissions]);
 
   // Generate Master System Prompt for Google AI Studio / Claude
   const generatePrompt = () => {
@@ -82,18 +122,42 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleIngest = async () => {
+  // Action 1: Save Locally to Device (Private Sandbox, 0ms)
+  const handleIngestLocalOnly = async () => {
     if (!jsonInput.trim()) return;
     setIsProcessing(true);
     try {
-      const parsed = JSON.parse(jsonInput);
-      const res = await ingestQuestions(Array.isArray(parsed) ? parsed : [parsed]);
-      setIngestStatus(res);
+      const res = await ingestQuestions(jsonInput);
+      setIngestStatus({ ...res, mode: 'local' });
       if (res.errors.length === 0) {
         setJsonInput('');
       }
-    } catch {
-      setIngestStatus({ count: 0, errors: ['Invalid JSON syntax. Ensure valid JSON array.'] });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Action 2: Save Locally AND Submit for Global Curriculum Review
+  const handleSubmitGlobalReview = async () => {
+    if (!jsonInput.trim()) return;
+    setIsProcessing(true);
+    try {
+      const user = authState.user;
+      const res = await submitQuestionsForGlobalReview(jsonInput, {
+        authorId: user?.id || 'usr_local_author',
+        authorDisplayName: user?.displayName || 'Medical Scholar',
+        authorRole: user?.role || 'student-pro',
+      });
+      setIngestStatus({
+        count: res.count,
+        errors: res.errors,
+        ticketCount: res.ticketCount,
+        mode: 'global_review',
+      });
+      if (res.errors.length === 0) {
+        setJsonInput('');
+        setShowSubmissionsTracker(true);
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -112,7 +176,52 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] py-6 sm:py-8 px-3 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 animate-apple-entrance">
-      {/* Header */}
+      {/* 1. Global Bank Synchronizer Ribbon */}
+      <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border border-indigo-400/20 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+        <div className="flex items-center space-x-3">
+          <div className="p-2.5 rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-500/20">
+            <Globe className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                Global Question Bank (CVS)
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30">
+                Rev #{syncCursor?.serverRevision || 1}
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+              {questions.length} total questions in local database. Read-only delta sync automatically pulls verified additions from peers.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2 self-start sm:self-auto">
+          <button
+            onClick={() => syncWithGlobalBank('cvs')}
+            disabled={isSyncing}
+            className="py-2 px-3.5 rounded-xl bg-white/80 dark:bg-zinc-800/80 hover:bg-white dark:hover:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center space-x-2 shadow-xs transition-all disabled:opacity-50 cursor-pointer apple-tap"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-indigo-600' : ''}`} />
+            <span>{isSyncing ? 'Syncing...' : 'Sync Global Bank'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Delta Sync Report Toast */}
+      {lastMergeReport && (
+        <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-400/30 text-emerald-800 dark:text-emerald-300 text-xs flex items-center justify-between animate-apple-entrance">
+          <div className="flex items-center space-x-2 font-medium">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>
+              Synchronized successfully: <strong>+{lastMergeReport.insertedCount} new canonical questions</strong>, {lastMergeReport.preservedLocalCustomCount} local custom questions preserved without modification.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Main Studio Header */}
       <div className="p-5 sm:p-7 md:p-8 rounded-3xl bg-white/65 dark:bg-zinc-900/65 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.06)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all">
         <div className="space-y-1.5">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-700 dark:text-indigo-300 text-xs font-semibold backdrop-blur-md">
@@ -123,7 +232,7 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
             Question Authoring Studio
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl leading-relaxed">
-            Generate grounded prompt templates for LLMs, validate against curriculum taxonomy schemas, and ingest into the local IndexedDB bank.
+            Generate grounded prompt templates, validate against taxonomy schemas, save privately to your device, or submit for peer & faculty curriculum review.
           </p>
         </div>
 
@@ -138,17 +247,94 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
-        {/* Step 1: Prompt Generator Glass Card */}
-        <div className="p-5 sm:p-7 md:p-8 rounded-3xl bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.3)] space-y-5">
-          <div className="flex items-center space-x-2 text-indigo-600 dark:text-indigo-400 font-extrabold text-xs uppercase tracking-wider">
-            <span>Step 1: Grounded Prompt Architect</span>
+      {/* 3. Author's Submitted Questions Tracker (Collapsible) */}
+      <div className="p-4 sm:p-6 rounded-3xl bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-xs space-y-4">
+        <button
+          onClick={() => setShowSubmissionsTracker(!showSubmissionsTracker)}
+          className="w-full flex items-center justify-between text-left cursor-pointer"
+        >
+          <div className="flex items-center space-x-2.5">
+            <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
+              My Submissions to Global Curriculum ({mySubmissions.length})
+            </span>
+          </div>
+          {showSubmissionsTracker ? (
+            <ChevronUp className="w-4 h-4 text-zinc-500" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-zinc-500" />
+          )}
+        </button>
+
+        {showSubmissionsTracker && (
+          <div className="space-y-3 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
+            {mySubmissions.length === 0 ? (
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                You have not submitted any questions for global review yet. Use "Add Locally & Submit for Global Review" below to propose questions.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
+                {mySubmissions.map((sub) => {
+                  let badge = 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-400/30';
+                  let statusLabel = 'Pending Review';
+                  if (sub.editorialStatus === 'published') {
+                    badge = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-400/30';
+                    statusLabel = 'Published Globally';
+                  } else if (sub.editorialStatus === 'changes_requested') {
+                    badge = 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-400/30';
+                    statusLabel = 'Changes Requested';
+                  } else if (sub.editorialStatus === 'rejected') {
+                    badge = 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-400/30';
+                    statusLabel = 'Rejected';
+                  }
+
+                  return (
+                    <div
+                      key={sub.ticketId}
+                      className="p-3.5 rounded-2xl bg-white/70 dark:bg-zinc-800/70 border border-zinc-200/80 dark:border-zinc-700/80 space-y-1.5 text-xs"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-[10px] text-zinc-500 font-semibold">{sub.question.id}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${badge}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <p className="font-medium text-zinc-800 dark:text-zinc-200 line-clamp-1">{sub.question.stem}</p>
+                      {sub.reviewerNotes && (
+                        <div className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-900 text-[11px] text-zinc-600 dark:text-zinc-400 border border-zinc-200/60 dark:border-zinc-800">
+                          <strong>Faculty Feedback:</strong> {sub.reviewerNotes}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 4. Generation & Ingestion Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+        {/* Step 1: LLM Prompt Generator Glass Card */}
+        <div className="p-6 md:p-8 rounded-3xl bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.3)] space-y-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 text-indigo-600 dark:text-indigo-400 font-extrabold text-xs uppercase tracking-wider">
+              <span>Step 1: Curriculum Targeting</span>
+            </div>
+            <button
+              onClick={handleCopyPrompt}
+              className="py-1.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center space-x-1.5 shadow-sm shadow-indigo-500/20 transition-all cursor-pointer apple-tap"
+            >
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copied ? 'Copied System Prompt' : 'Copy AI Studio Prompt'}</span>
+            </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 mb-1.5 uppercase">
-                Subject
+              <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                Select Academic Subject
               </label>
               <select
                 value={selectedSubjectId}
@@ -157,76 +343,94 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
                   const firstChap = CVS_TAXONOMY.chapters.find((c) => c.subjectId === e.target.value);
                   if (firstChap) setSelectedChapterId(firstChap.id);
                 }}
-                className="w-full text-xs font-semibold rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/70 dark:bg-zinc-800/70 backdrop-blur-md py-2.5 px-3 text-slate-800 dark:text-zinc-200"
+                className="w-full text-xs font-semibold rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 backdrop-blur-md p-3 text-slate-800 dark:text-zinc-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
               >
-                {CVS_TAXONOMY.subjects.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                {CVS_TAXONOMY.subjects.map((sub) => (
+                  <option key={sub.id} value={sub.id}>
+                    {sub.name}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 mb-1.5 uppercase">
-                Chapter
+              <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                Select Target Chapter
               </label>
               <select
                 value={selectedChapterId}
                 onChange={(e) => setSelectedChapterId(e.target.value)}
-                className="w-full text-xs font-semibold rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/70 dark:bg-zinc-800/70 backdrop-blur-md py-2.5 px-3 text-slate-800 dark:text-zinc-200"
+                className="w-full text-xs font-semibold rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 backdrop-blur-md p-3 text-slate-800 dark:text-zinc-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
               >
-                {availableChapters.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                {availableChapters.map((chap) => (
+                  <option key={chap.id} value={chap.id}>
+                    {chap.name}
+                  </option>
                 ))}
               </select>
             </div>
-          </div>
 
-          {/* Generated Prompt Preview Box */}
-          <div className="relative">
-            <textarea
-              readOnly
-              rows={12}
-              value={generatePrompt()}
-              className="w-full text-xs font-mono rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-slate-900/90 text-slate-300 p-4 focus:outline-hidden backdrop-blur-md"
-            />
-            <button
-              onClick={handleCopyPrompt}
-              className="absolute top-3 right-3 py-1.5 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-md cursor-pointer transition-all"
-            >
-              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Copied to Clipboard!' : 'Copy Prompt'}</span>
-            </button>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                Target Topics in this Chapter ({chapterTopics.length})
+              </label>
+              <div className="max-h-36 overflow-y-auto space-y-1.5 p-3 rounded-2xl bg-slate-50/50 dark:bg-zinc-950/30 border border-slate-100 dark:border-zinc-800">
+                {chapterTopics.map((t) => (
+                  <div key={t.id} className="text-xs flex items-center space-x-2 text-slate-600 dark:text-zinc-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                    <span>{t.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Step 2: JSON Ingestion Glass Card */}
+        {/* Step 2: JSON Ingestion Glass Card with Dual Actions */}
         <div className="p-6 md:p-8 rounded-3xl bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_4px_24px_0_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_0_rgba(0,0,0,0.3)] space-y-5">
           <div className="flex items-center space-x-2 text-indigo-600 dark:text-indigo-400 font-extrabold text-xs uppercase tracking-wider">
-            <span>Step 2: Ingest & Validate Items</span>
+            <span>Step 2: Ingest & Dual-Route Commit</span>
           </div>
 
           <p className="text-xs text-slate-600 dark:text-zinc-400">
-            Paste the raw JSON output from your model below. The ingestion validator guarantees 100% schema compliance before committing to IndexedDB.
+            Paste the raw JSON array from your model below. You can save it privately to your device to practice right away, or propose it for global curriculum inclusion.
           </p>
 
           <textarea
-            rows={10}
+            rows={8}
             value={jsonInput}
             onChange={(e) => setJsonInput(e.target.value)}
             placeholder='[ { "id": "q-cvs-ana-001", "stem": "...", "choices": [...] } ]'
             className="w-full text-base sm:text-xs font-mono rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/70 dark:bg-zinc-800/70 backdrop-blur-md p-3.5 sm:p-4 text-slate-800 dark:text-zinc-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all"
           />
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Dual Action Controls */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Action A: Save to My Device Only */}
             <button
-              onClick={handleIngest}
+              onClick={handleIngestLocalOnly}
               disabled={isProcessing || !jsonInput.trim()}
-              className="w-full sm:w-auto py-3 px-6 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-40 text-white rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center space-x-2 shadow-md shadow-indigo-500/20 transition-all cursor-pointer apple-tap"
+              className="py-3 px-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl text-xs font-bold flex items-center justify-center space-x-2 shadow-sm disabled:opacity-40 transition-all cursor-pointer apple-tap"
             >
-              <Upload className="w-4 h-4" />
-              <span>{isProcessing ? 'Validating...' : 'Ingest & Store in IndexedDB'}</span>
+              <Upload className="w-3.5 h-3.5" />
+              <span>{isProcessing ? 'Processing...' : 'Save to My Device (Private)'}</span>
             </button>
 
+            {/* Action B: Add Locally & Submit for Global Review */}
+            <button
+              onClick={handleSubmitGlobalReview}
+              disabled={isProcessing || !jsonInput.trim()}
+              className="py-3 px-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-2xl text-xs font-bold flex items-center justify-center space-x-2 shadow-md shadow-indigo-500/20 disabled:opacity-40 transition-all cursor-pointer apple-tap"
+            >
+              <ShieldCheck className="w-4 h-4 text-indigo-200" />
+              <span>{isProcessing ? 'Submitting...' : 'Add Locally & Submit for Review'}</span>
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
+              * "Submit for Review" saves to your local device immediately and sends a copy to the faculty triage queue.
+            </span>
             <button
               onClick={() => {
                 if (confirm('Clear the local question bank in IndexedDB?')) {
@@ -240,21 +444,34 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
           </div>
 
           {ingestStatus && (
-            <div className={`p-4 rounded-2xl text-xs ${
-              ingestStatus.errors.length === 0
-                ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-400/20'
-                : 'bg-rose-500/10 text-rose-800 dark:text-rose-300 border border-rose-400/20'
-            }`}>
+            <div
+              className={`p-4 rounded-2xl text-xs ${
+                ingestStatus.errors.length === 0
+                  ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-400/20'
+                  : 'bg-rose-500/10 text-rose-800 dark:text-rose-300 border border-rose-400/20'
+              }`}
+            >
               {ingestStatus.errors.length === 0 ? (
-                <div className="flex items-center space-x-2 font-bold">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Successfully ingested and indexed {ingestStatus.count} questions!</span>
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2 font-bold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>
+                      {ingestStatus.mode === 'global_review'
+                        ? `Saved ${ingestStatus.count} questions locally and queued for Faculty Review!`
+                        : `Successfully saved ${ingestStatus.count} questions to your local device!`}
+                    </span>
+                  </div>
+                  {ingestStatus.ticketCount !== undefined && ingestStatus.ticketCount > 0 && (
+                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 pl-6">
+                      Assigned {ingestStatus.ticketCount} curriculum review ticket(s). Once verified by faculty, your questions will be published to all scholars.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-1">
                   <div className="font-bold flex items-center space-x-1">
                     <AlertCircle className="w-4 h-4 text-rose-600" />
-                    <span>Failed with {ingestStatus.errors.length} validation errors:</span>
+                    <span>Failed with {ingestStatus.errors.length} validation error(s):</span>
                   </div>
                   <ul className="list-disc list-inside space-y-0.5 text-[11px]">
                     {ingestStatus.errors.map((err, i) => (
