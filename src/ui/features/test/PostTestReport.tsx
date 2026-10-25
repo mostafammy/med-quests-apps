@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Question, ChoiceId } from '../../../domain/model/types.ts';
+import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 import { 
   Trophy, 
   RotateCcw, 
@@ -24,6 +25,7 @@ export const PostTestReport: React.FC<{
   onRetestMistakes?: (mistakeQuestions: Question[]) => void;
 }> = ({ result, onRetestMistakes }) => {
   const navigate = useNavigate();
+  const { t } = useLocaleStore();
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
 
   const { sessionQuestions, answers, timeSpentSeconds, mode } = result;
@@ -78,13 +80,13 @@ export const PostTestReport: React.FC<{
             <div>
               <div className="flex items-center space-x-2">
                 <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-                  {mode.toUpperCase()} SESSION COMPLETE
+                  {mode.toUpperCase()} • {t.postTest.title}
                 </span>
                 <span className="text-xs text-slate-400">•</span>
-                <span className="text-[11px] sm:text-xs font-semibold text-emerald-600 dark:text-emerald-400">Calibration Recorded</span>
+                <span className="text-[11px] sm:text-xs font-semibold text-emerald-600 dark:text-emerald-400">{t.postTest.subtitle}</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-zinc-50 tracking-tight mt-0.5">
-                {scorePercent}% Overall Score
+                {scorePercent}% {t.postTest.scorePercent}
               </h1>
             </div>
           </div>
@@ -96,7 +98,7 @@ export const PostTestReport: React.FC<{
                 className="flex-1 sm:flex-none py-2.5 sm:py-3 px-4 sm:px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center space-x-1.5 shadow-sm shadow-blue-500/25 transition-all cursor-pointer apple-tap"
               >
                 <RotateCcw className="w-4 h-4" />
-                <span>Retest Mistakes ({incorrectQuestions.length})</span>
+                <span>{t.postTest.retestMistakesBtn} ({incorrectQuestions.length})</span>
               </button>
             )}
             <button
@@ -104,7 +106,7 @@ export const PostTestReport: React.FC<{
               className="py-2.5 sm:py-3 px-3.5 sm:px-4 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center justify-center space-x-1.5 apple-tap"
             >
               <LayoutDashboard className="w-4 h-4" />
-              <span>Dashboard</span>
+              <span>{t.nav.dashboard}</span>
             </button>
           </div>
         </div>
@@ -112,34 +114,34 @@ export const PostTestReport: React.FC<{
         {/* 4 Metric Counters */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 pt-4 border-t border-slate-100 dark:border-zinc-800 text-center">
           <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/40 rounded-2xl">
-            <div className="text-[11px] sm:text-xs font-semibold text-emerald-700 dark:text-emerald-400">Correct</div>
+            <div className="text-[11px] sm:text-xs font-semibold text-emerald-700 dark:text-emerald-400">{t.postTest.correctCount}</div>
             <div className="text-xl sm:text-2xl font-black text-emerald-900 dark:text-emerald-200 mt-0.5">{correctCount}</div>
-            <div className="text-[10px] sm:text-[11px] text-emerald-600 dark:text-emerald-400">of {totalQuestions} Questions</div>
+            <div className="text-[10px] sm:text-[11px] text-emerald-600 dark:text-emerald-400">{t.postTest.totalAnswered} ({totalQuestions})</div>
           </div>
 
           <div className="p-3 bg-rose-50/70 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-800/40 rounded-2xl">
-            <div className="text-[11px] sm:text-xs font-semibold text-rose-700 dark:text-rose-400">Incorrect</div>
+            <div className="text-[11px] sm:text-xs font-semibold text-rose-700 dark:text-rose-400">{t.postTest.incorrectCount}</div>
             <div className="text-xl sm:text-2xl font-black text-rose-900 dark:text-rose-200 mt-0.5">{incorrectQuestions.length}</div>
-            <div className="text-[10px] sm:text-[11px] text-rose-600 dark:text-rose-400">Needs Revision</div>
+            <div className="text-[10px] sm:text-[11px] text-rose-600 dark:text-rose-400">{t.review.badge}</div>
           </div>
 
           <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 border border-slate-100 dark:border-zinc-800 rounded-2xl">
-            <div className="text-[11px] sm:text-xs font-semibold text-slate-600 dark:text-zinc-400">Unanswered</div>
+            <div className="text-[11px] sm:text-xs font-semibold text-slate-600 dark:text-zinc-400">{t.postTest.unansweredCount}</div>
             <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-zinc-100 mt-0.5">{unansweredCount}</div>
-            <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-zinc-400">Skipped</div>
+            <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-zinc-400">{t.common.all}</div>
           </div>
 
           <div className="p-3 bg-slate-50 dark:bg-zinc-800/50 border border-slate-100 dark:border-zinc-800 rounded-2xl">
-            <div className="text-[11px] sm:text-xs font-semibold text-slate-600 dark:text-zinc-400">Pacing</div>
+            <div className="text-[11px] sm:text-xs font-semibold text-slate-600 dark:text-zinc-400">{t.postTest.avgPacing}</div>
             <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-zinc-100 mt-0.5">{avgTimePerQuestion}s</div>
-            <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-zinc-400">Avg Time / Question</div>
+            <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-zinc-400">{t.postTest.secondsPerQ}</div>
           </div>
         </div>
       </div>
 
       {/* Chapter Breakdown */}
       <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl rounded-3xl border border-slate-200/80 dark:border-zinc-800/80 p-5 sm:p-6 shadow-sm space-y-4">
-        <h3 className="font-bold text-slate-900 dark:text-zinc-100 text-base">Performance by Curriculum Chapter</h3>
+        <h3 className="font-bold text-slate-900 dark:text-zinc-100 text-base">{t.postTest.breakdownTitle}</h3>
         <div className="space-y-3">
           {Object.entries(chapterStats).map(([chapId, stat]) => {
             const pct = Math.round((stat.correct / stat.total) * 100);
