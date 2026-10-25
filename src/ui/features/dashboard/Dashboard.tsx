@@ -17,6 +17,7 @@ import {
   Flame,
   CheckCircle2
 } from 'lucide-react';
+import { ResetBankConfirmationModal } from '../questionBank/ResetBankConfirmationModal.tsx';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ export const Dashboard: React.FC = () => {
   } = useStatsStore();
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showResetBankModal, setShowResetBankModal] = useState(false);
   const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
@@ -79,14 +81,25 @@ export const Dashboard: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
             <div className="flex items-center gap-2">
               <button
+                type="button"
+                onClick={() => setShowResetBankModal(true)}
+                className="py-2.5 px-3 glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-rose-600 dark:hover:text-rose-400 rounded-2xl text-xs font-bold flex items-center justify-center space-x-1.5 cursor-pointer apple-tap flex-1 sm:flex-none border hover:border-rose-300 dark:hover:border-rose-800 transition-all"
+                title={t.bank.resetToGlobalBtn}
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-rose-500" />
+                <span className="hidden sm:inline">{t.bank.resetToGlobalBtn}</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowResetConfirm(true)}
-                className="py-2.5 px-3 glass-pill-luxury text-slate-600 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-2xl text-xs font-bold flex items-center justify-center space-x-1.5 cursor-pointer apple-tap flex-1 sm:flex-none"
+                className="py-2.5 px-3 glass-pill-luxury text-slate-600 dark:text-zinc-400 hover:text-amber-600 dark:hover:text-amber-400 rounded-2xl text-xs font-bold flex items-center justify-center space-x-1.5 cursor-pointer apple-tap flex-1 sm:flex-none"
                 title={t.dashboard.resetModalDesc}
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>{t.dashboard.resetBtn}</span>
               </button>
               <button
+                type="button"
                 onClick={() => navigate('/test/mock')}
                 className="py-2.5 px-4 bg-gradient-to-r from-slate-900 to-indigo-950 dark:from-zinc-800 dark:to-zinc-900 hover:from-slate-800 hover:to-indigo-900 text-white rounded-2xl text-xs sm:text-sm font-bold border border-indigo-500/30 dark:border-indigo-500/20 backdrop-blur-md shadow-md shadow-indigo-950/20 transition-all cursor-pointer flex items-center justify-center space-x-1.5 apple-tap flex-1 sm:flex-none"
               >
@@ -129,10 +142,19 @@ export const Dashboard: React.FC = () => {
             <div className="text-xl sm:text-2xl font-black text-blue-950 dark:text-blue-100 mt-1">
               {questions.length} <span className="text-xs font-normal text-slate-400 dark:text-zinc-500">{t.common.questions}</span>
             </div>
-            <div className="text-[10px] sm:text-[11px] text-blue-600 dark:text-blue-400 font-semibold mt-1">
-              <span onClick={() => navigate('/studio')} className="cursor-pointer hover:underline">
+            <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-semibold mt-1">
+              <span onClick={() => navigate('/studio')} className="cursor-pointer text-blue-600 dark:text-blue-400 hover:underline">
                 {t.nav.studio} →
               </span>
+              <button
+                type="button"
+                onClick={() => setShowResetBankModal(true)}
+                className="cursor-pointer text-slate-500 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 flex items-center space-x-1 rtl:space-x-reverse transition-colors"
+                title={t.bank.resetToGlobalBtn}
+              >
+                <RotateCcw className="w-2.5 h-2.5 text-rose-500" />
+                <span>{t.bank.resetToGlobalBtn}</span>
+              </button>
             </div>
           </div>
 
@@ -421,6 +443,12 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Global Question Bank Recovery Modal */}
+      <ResetBankConfirmationModal
+        isOpen={showResetBankModal}
+        onClose={() => setShowResetBankModal(false)}
+      />
     </div>
   );
 };

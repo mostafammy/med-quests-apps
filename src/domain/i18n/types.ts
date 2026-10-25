@@ -90,6 +90,9 @@ export interface TranslationDictionary {
     readonly enter: string;
     readonly seconds: string;
     readonly minutes: string;
+    readonly exit: string;
+    readonly exitSession: string;
+    readonly highYield: string;
   };
   readonly nav: {
     readonly dashboard: string;
@@ -110,6 +113,7 @@ export interface TranslationDictionary {
   readonly copilot: {
     readonly title: string;
     readonly subtitle: string;
+    readonly toggleAria: string;
     readonly emptyTitle: string;
     readonly emptyDescription: string;
     readonly inputPlaceholder: string;
@@ -134,6 +138,7 @@ export interface TranslationDictionary {
       readonly modalSubtitle: string;
       readonly chatLanguageLabel: string;
       readonly chatLanguageSubtext: string;
+      readonly usmleTermsPreserved: string;
       readonly langAuto: string;
       readonly langAutoDesc: string;
       readonly langEnglish: string;
@@ -195,6 +200,9 @@ export interface TranslationDictionary {
     readonly mockModeDesc: string;
     readonly rapidMode: string;
     readonly rapidModeDesc: string;
+    readonly highYieldScope: string;
+    readonly curriculumScope: string;
+    readonly scopeSubtitle: string;
     readonly filterSubject: string;
     readonly filterChapter: string;
     readonly allSubjects: string;
@@ -255,6 +263,10 @@ export interface TranslationDictionary {
       readonly bookmarkQuestion: string;
       readonly bookmarked: string;
       readonly questionMatrixShortcut: string;
+      readonly keyShortcut: string;
+      readonly yourAnswerCorrect: string;
+      readonly yourChoiceIncorrect: string;
+      readonly correctAnswerKey: string;
     };
     readonly matrix: {
       readonly title: string;
@@ -263,6 +275,9 @@ export interface TranslationDictionary {
       readonly tabUnanswered: string;
       readonly tabAnswered: string;
       readonly tabFlagged: string;
+      readonly legendCurrent: string;
+      readonly legendCorrect: string;
+      readonly legendIncorrect: string;
       readonly progress: string;
       readonly close: string;
     };
@@ -318,6 +333,19 @@ export interface TranslationDictionary {
     readonly resetSuccessToast: string;
     readonly totalQuestions: string;
     readonly validationSuccess: string;
+  };
+  readonly bank: {
+    readonly title: string;
+    readonly resetToGlobalBtn: string;
+    readonly resetConfirmTitle: string;
+    readonly resetConfirmDialog: string;
+    readonly resetSuccessToast: string;
+    readonly resetDescription: string;
+    readonly syncNowBtn: string;
+    readonly syncing: string;
+    readonly syncedBadge: string;
+    readonly edgeVerified: string;
+    readonly activeCanonicalCount: string;
   };
   readonly postTest: {
     readonly title: string;

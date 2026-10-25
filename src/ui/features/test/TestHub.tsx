@@ -16,8 +16,10 @@ import {
   ChevronRight,
   ShieldCheck,
   Compass,
-  ArrowUpRight
+  ArrowUpRight,
+  RotateCcw
 } from 'lucide-react';
+import { ResetBankConfirmationModal } from '../questionBank/ResetBankConfirmationModal.tsx';
 
 type TestMode = 'practice' | 'mock' | 'rapid';
 
@@ -32,6 +34,7 @@ export const TestHub: React.FC = () => {
   const [questionCount, setQuestionCount] = useState<number>(20);
   const [highYieldOnly, setHighYieldOnly] = useState<boolean>(false);
   const [timedSprint, setTimedSprint] = useState<boolean>(false);
+  const [showResetBankModal, setShowResetBankModal] = useState<boolean>(false);
 
   // Filter available chapters by selected subject
   const availableChapters = useMemo(() => {
@@ -298,13 +301,24 @@ export const TestHub: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/60 dark:border-zinc-800 pb-5">
             <div>
               <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                {selectedMode === 'rapid' ? 'High-Yield Scope' : '2. Scope & Target Curriculum'}
+                {selectedMode === 'rapid' ? t.test.highYieldScope : t.test.curriculumScope}
               </h2>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">Filter questions by medical discipline or specific chapter</p>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">{t.test.scopeSubtitle}</p>
             </div>
-            <div className="glass-pill-luxury px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 text-blue-700 dark:text-blue-300 self-start sm:self-auto">
-              <Filter className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              <span>Matching Questions: <strong className="text-slate-900 dark:text-white font-black">{matchingQuestionCount}</strong></span>
+            <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+              <div className="glass-pill-luxury px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 rtl:space-x-reverse text-blue-700 dark:text-blue-300">
+                <Filter className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span>{t.test.matchingQuestions}: <strong className="text-slate-900 dark:text-white font-black">{matchingQuestionCount}</strong></span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowResetBankModal(true)}
+                className="glass-pill-luxury px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse text-slate-600 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 border hover:border-rose-400/40 cursor-pointer apple-tap transition-all"
+                title={t.bank.resetToGlobalBtn}
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-rose-500" />
+                <span className="hidden sm:inline">{t.bank.resetToGlobalBtn}</span>
+              </button>
             </div>
           </div>
 
@@ -478,6 +492,12 @@ export const TestHub: React.FC = () => {
           <ChevronRight className={`w-4 h-4 ${isRtl ? 'rotate-180' : ''}`} />
         </button>
       </div>
+
+      {/* Global Question Bank Recovery Modal */}
+      <ResetBankConfirmationModal
+        isOpen={showResetBankModal}
+        onClose={() => setShowResetBankModal(false)}
+      />
     </div>
   );
 };

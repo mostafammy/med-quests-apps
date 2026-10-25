@@ -22,6 +22,9 @@ export const enDictionary: TranslationDictionary = {
     enter: 'Enter',
     seconds: 'seconds',
     minutes: 'minutes',
+    exit: 'Exit',
+    exitSession: 'Exit Session',
+    highYield: 'High-Yield',
   },
   nav: {
     dashboard: 'Dashboard',
@@ -42,6 +45,7 @@ export const enDictionary: TranslationDictionary = {
   copilot: {
     title: 'AI Co-Pilot',
     subtitle: 'Autonomous Socratic Clinical Mentor',
+    toggleAria: 'Toggle AI Cognitive Co-Pilot (? or Cmd+K)',
     emptyTitle: 'Clinical Socratic Co-Pilot',
     emptyDescription:
       'Real-time cognitive guidance synchronized with your active question and performance telemetry.',
@@ -72,6 +76,7 @@ export const enDictionary: TranslationDictionary = {
       chatLanguageLabel: 'Co-Pilot Chat Response Language',
       chatLanguageSubtext:
         'Controls the language the AI Mentor uses in the chat. Canonical USMLE terms are preserved.',
+      usmleTermsPreserved: 'Canonical USMLE terms are preserved.',
       langAuto: 'Auto-Detect',
       langAutoDesc: 'Matches the language of each prompt you type automatically.',
       langEnglish: 'English',
@@ -134,6 +139,9 @@ export const enDictionary: TranslationDictionary = {
     mockModeDesc: 'Timed exam conditions, no feedback until completion, realistic grading.',
     rapidMode: 'Rapid Fire High-Yield',
     rapidModeDesc: 'Fast-paced testing focusing exclusively on highest-probability exam concepts.',
+    highYieldScope: 'High-Yield Scope',
+    curriculumScope: '2. Scope & Target Curriculum',
+    scopeSubtitle: 'Filter questions by medical discipline or specific chapter',
     filterSubject: 'Subject Filter',
     filterChapter: 'Chapter / Topic Filter',
     allSubjects: 'All Subjects (Cardiovascular)',
@@ -194,6 +202,10 @@ export const enDictionary: TranslationDictionary = {
       bookmarkQuestion: 'Bookmark Question',
       bookmarked: 'Bookmarked',
       questionMatrixShortcut: 'Question Overview Grid (Press G)',
+      keyShortcut: 'Key {num}',
+      yourAnswerCorrect: 'Your Answer • Correct',
+      yourChoiceIncorrect: 'Your Choice • Incorrect',
+      correctAnswerKey: 'Correct Answer Key',
     },
     matrix: {
       title: 'Question Navigator Matrix',
@@ -202,6 +214,9 @@ export const enDictionary: TranslationDictionary = {
       tabUnanswered: 'Unanswered',
       tabAnswered: 'Answered',
       tabFlagged: 'Flagged',
+      legendCurrent: 'Current',
+      legendCorrect: 'Correct',
+      legendIncorrect: 'Incorrect',
       progress: 'Exam Progress',
       close: 'Close Matrix (Esc)',
     },
@@ -258,6 +273,21 @@ export const enDictionary: TranslationDictionary = {
     resetSuccessToast: 'Question bank restored to the canonical global curriculum bank.',
     totalQuestions: 'Total Questions in Bank',
     validationSuccess: 'Successfully validated and ingested {count} questions!',
+  },
+  bank: {
+    title: 'Question Bank & Synchronisation',
+    resetToGlobalBtn: 'Reset to Global Bank',
+    resetConfirmTitle: 'Reset Question Bank to Global Canonical Edition?',
+    resetConfirmDialog:
+      'Are you sure you want to reset your local question bank to the canonical faculty-approved global bank? Any unsent local drafts will be replaced.',
+    resetSuccessToast: 'Question bank restored to authoritative global canonical edition.',
+    resetDescription:
+      'Purges unapproved local drafts and restores the authoritative canonical questions directly from Cloudflare Edge / D1.',
+    syncNowBtn: 'Sync with Global Bank',
+    syncing: 'Syncing...',
+    syncedBadge: 'Canonical Up-to-Date',
+    edgeVerified: 'Edge Verified ~1.8ms',
+    activeCanonicalCount: 'Canonical Questions Active',
   },
   postTest: {
     title: 'Test Session Complete',

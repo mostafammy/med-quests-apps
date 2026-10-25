@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAiSettingsStore } from '../../../application/stores/useAiSettingsStore.ts';
+import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 import { X, Sparkles, Key, Check, Globe, Cpu, ExternalLink, ChevronDown, ChevronUp, AlertCircle, Languages, Gauge } from 'lucide-react';
 import type { CloudProviderId, AiChatLanguagePreference } from '../../../domain/ai/settings.ts';
 import { PROVIDER_MODELS, type ModelOptionInfo } from '../../../domain/ai/modelCatalog.ts';
@@ -12,6 +13,7 @@ interface Props {
 
 export const CopilotSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const { settings, updateSettings } = useAiSettingsStore();
+  const { t } = useLocaleStore();
 
   const [activeEngine, setActiveEngine] = useState<CloudProviderId>(settings.engine);
   const [chatLanguage, setChatLanguage] = useState<AiChatLanguagePreference>(settings.chatLanguage || 'auto');
@@ -155,16 +157,16 @@ export const CopilotSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-zinc-800 shrink-0">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 rtl:space-x-reverse">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/25">
               <Sparkles className="w-5 h-5 animate-pulse" />
             </div>
             <div>
               <h3 className="text-base font-black text-slate-900 dark:text-zinc-50 uppercase tracking-wide">
-                AI Co-Pilot Cloud Engines
+                {t.copilot.settings.modalTitle}
               </h3>
               <p className="text-xs text-slate-500 dark:text-zinc-400">
-                Choose your medical reasoning engine and speed preference
+                {t.copilot.settings.modalSubtitle}
               </p>
             </div>
           </div>
@@ -179,14 +181,14 @@ export const CopilotSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
         {/* Co-Pilot Chat Response Language (Bilingual Apple HIG Card) */}
         <div className="p-3.5 rounded-2xl bg-slate-100/70 dark:bg-zinc-900/60 border border-slate-200/80 dark:border-zinc-800 space-y-2 shrink-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 rtl:space-x-reverse">
               <Languages className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               <label className="text-xs font-black text-slate-800 dark:text-zinc-200 uppercase tracking-wide">
-                Chatbot Response Language
+                {t.copilot.settings.chatLanguageLabel}
               </label>
             </div>
             <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-medium">
-              USMLE Terms Preserved
+              {t.copilot.settings.usmleTermsPreserved}
             </span>
           </div>
 
@@ -200,8 +202,8 @@ export const CopilotSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   : 'border-slate-200/80 dark:border-zinc-800/80 text-slate-600 dark:text-zinc-400 hover:bg-white/60 dark:hover:bg-zinc-800/50'
               }`}
             >
-              <div className="text-xs font-bold">Auto-Detect</div>
-              <div className="text-[9px] text-slate-400 mt-0.5">Mirror input script</div>
+              <div className="text-xs font-bold">{t.copilot.settings.langAuto}</div>
+              <div className="text-[9px] text-slate-400 mt-0.5">{t.copilot.settings.langAutoDesc}</div>
             </button>
 
             <button
@@ -213,8 +215,8 @@ export const CopilotSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   : 'border-slate-200/80 dark:border-zinc-800/80 text-slate-600 dark:text-zinc-400 hover:bg-white/60 dark:hover:bg-zinc-800/50'
               }`}
             >
-              <div className="text-xs font-bold">English</div>
-              <div className="text-[9px] text-slate-400 mt-0.5">USMLE Standard</div>
+              <div className="text-xs font-bold">{t.copilot.settings.langEnglish}</div>
+              <div className="text-[9px] text-slate-400 mt-0.5">{t.copilot.settings.langEnglishDesc}</div>
             </button>
 
             <button
@@ -226,8 +228,8 @@ export const CopilotSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   : 'border-slate-200/80 dark:border-zinc-800/80 text-slate-600 dark:text-zinc-400 hover:bg-white/60 dark:hover:bg-zinc-800/50'
               }`}
             >
-              <div className="text-xs font-bold">العربية</div>
-              <div className="text-[9px] text-slate-400 mt-0.5">Medical Arabic</div>
+              <div className="text-xs font-bold">{t.copilot.settings.langArabic}</div>
+              <div className="text-[9px] text-slate-400 mt-0.5">{t.copilot.settings.langArabicDesc}</div>
             </button>
           </div>
         </div>
@@ -491,7 +493,7 @@ export const CopilotSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
           </button>
           <button
             onClick={handleSave}
-            className={`px-5 py-2.5 rounded-2xl font-bold text-xs flex items-center space-x-1.5 transition-all cursor-pointer shadow-md ${
+            className={`px-5 py-2.5 rounded-2xl font-bold text-xs flex items-center space-x-1.5 rtl:space-x-reverse transition-all cursor-pointer shadow-md ${
               savedSuccess
                 ? 'bg-emerald-600 text-white'
                 : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-500/25 active:scale-95'
@@ -500,10 +502,10 @@ export const CopilotSettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
             {savedSuccess ? (
               <>
                 <Check className="w-4 h-4" />
-                <span>Saved!</span>
+                <span>{t.common.saved}</span>
               </>
             ) : (
-              <span>Save & Apply</span>
+              <span>{t.common.saveAndApply}</span>
             )}
           </button>
         </div>

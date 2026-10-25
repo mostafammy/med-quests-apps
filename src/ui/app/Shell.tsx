@@ -2,7 +2,6 @@ import React, { useEffect, Suspense, lazy } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { 
   Heart, 
-  ChevronDown,
   X
 } from 'lucide-react';
 import { DesktopNavBar } from './navigation/DesktopNavBar.tsx';
@@ -13,6 +12,7 @@ import { CopilotTriggerButton } from '../features/copilot/CopilotTriggerButton.t
 import { AiCopilotDrawer } from '../features/copilot/AiCopilotDrawer.tsx';
 import { IdentityStatusPill } from '../features/auth/IdentityStatusPill.tsx';
 import { AccountRestrictedBanner } from '../features/auth/AccountRestrictedBanner.tsx';
+import { QuestionBankStatusPill } from '../features/questionBank/QuestionBankStatusPill.tsx';
 import { useCopilotStore } from '../../application/stores/useCopilotStore.ts';
 import { useAuthStore } from '../../application/stores/useAuthStore.ts';
 import { useLocaleStore } from '../../application/stores/useLocaleStore.ts';
@@ -93,14 +93,9 @@ export const Shell: React.FC = () => {
             {/* Apple Dynamic Appearance Switcher */}
             <ThemeToggle />
 
-            {/* Active Block Glass Pill - Fluidly hidden when space is constrained, shown on wide viewports */}
-            <div className="hidden xl:flex items-center space-x-2 bg-white/60 dark:bg-zinc-800/60 hover:bg-white/80 dark:hover:bg-zinc-800/80 backdrop-blur-md border border-white/80 dark:border-zinc-700/70 px-3 py-1.5 rounded-2xl text-xs font-bold text-slate-800 dark:text-zinc-200 cursor-pointer shadow-xs transition-all duration-200 hover:-translate-y-0.5">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span>{t.nav.activeBlockPrefix}: 206</span>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500" />
+            {/* Question Bank Status & Actions Capsule - Available to all users across every screen */}
+            <div className="hidden sm:inline-block">
+              <QuestionBankStatusPill />
             </div>
           </div>
         </div>

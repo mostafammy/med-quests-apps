@@ -52,6 +52,7 @@ export interface AuthStoreState {
   selectManagedUser: (userId: string) => void;
   setPerformanceOverride: (mode: PerformanceOverrideMode) => void;
   clearToast: () => void;
+  showToast: (type: 'success' | 'error' | 'info', message: string) => void;
 
   // Auth Operations
   signIn: (email: string, password?: string) => Promise<boolean>;
@@ -194,6 +195,10 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
 
   clearToast: () => {
     set({ notificationToast: null });
+  },
+
+  showToast: (type: 'success' | 'error' | 'info', message: string) => {
+    set({ notificationToast: { type, message } });
   },
 
   signIn: async (email: string, password?: string) => {

@@ -1,21 +1,23 @@
 import React from 'react';
 import { Sparkles } from 'lucide-react';
 import { useCopilotStore } from '../../../application/stores/useCopilotStore.ts';
+import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 
 export const CopilotTriggerButton: React.FC = () => {
   const { isOpen, toggleDrawer } = useCopilotStore();
+  const { t } = useLocaleStore();
 
   return (
     <button
       type="button"
       onClick={toggleDrawer}
-      className={`relative group flex items-center justify-center space-x-1.5 sm:space-x-2 w-9 h-9 sm:w-auto sm:h-9 p-0 sm:px-3.5 sm:py-1.5 rounded-xl sm:rounded-2xl text-xs font-bold transition-all duration-300 border cursor-pointer select-none overflow-hidden shrink-0 apple-tap ${
+      className={`relative group flex items-center justify-center space-x-1.5 sm:space-x-2 rtl:space-x-reverse w-9 h-9 sm:w-auto sm:h-9 p-0 sm:px-3.5 sm:py-1.5 rounded-xl sm:rounded-2xl text-xs font-bold transition-all duration-300 border cursor-pointer select-none overflow-hidden shrink-0 apple-tap ${
         isOpen
           ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-400/50 shadow-md shadow-indigo-500/25 ring-2 ring-indigo-400/40'
           : 'bg-white/80 dark:bg-zinc-800/80 hover:bg-white dark:hover:bg-zinc-800 text-slate-800 dark:text-zinc-200 border-slate-200/80 dark:border-zinc-700/80 hover:border-indigo-400/60 dark:hover:border-indigo-500/60 shadow-xs hover:shadow-indigo-500/15'
       }`}
-      title="Toggle AI Cognitive Co-Pilot (? or Cmd+K)"
-      aria-label="Toggle AI Cognitive Co-Pilot"
+      title={t.copilot.toggleAria}
+      aria-label={t.copilot.title}
       aria-expanded={isOpen}
     >
       {/* Background kinetic sweep on hover */}
@@ -31,7 +33,7 @@ export const CopilotTriggerButton: React.FC = () => {
         <span className="absolute -inset-1 rounded-full bg-indigo-400/30 blur-xs -z-10 animate-pulse opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
 
-      <span className="tracking-tight font-extrabold hidden sm:inline">Co-Pilot</span>
+      <span className="tracking-tight font-extrabold hidden sm:inline">{t.copilot.title}</span>
 
       <span
         className={`hidden sm:inline-block font-mono text-[10px] font-black px-1.5 py-0.2 rounded-md ${

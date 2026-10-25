@@ -23,6 +23,7 @@ import {
 import type { ChatMessage } from '../../../domain/ai/conversation.ts';
 import { useCopilotStore } from '../../../application/stores/useCopilotStore.ts';
 import { useAiSettingsStore } from '../../../application/stores/useAiSettingsStore.ts';
+import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 import { CopilotSettingsModal } from './CopilotSettingsModal.tsx';
 import { ModelPerformanceInsightsModal } from './ModelPerformanceInsightsModal.tsx';
 import { CopilotMarkdownView } from './CopilotMarkdownView.tsx';
@@ -102,6 +103,7 @@ export const AiCopilotDrawer: React.FC = () => {
   } = useCopilotStore();
 
   const { settings, loadSettings, updateSettings } = useAiSettingsStore();
+  const { t } = useLocaleStore();
   const [inputText, setInputText] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
@@ -183,18 +185,7 @@ export const AiCopilotDrawer: React.FC = () => {
     sendUserMessage(txt);
   };
 
-  const isArabicChat = settings.chatLanguage === 'ar';
-  const starterSuggestions = isArabicChat
-    ? [
-        'ما هو التغير الديناميكي الدموي الأساسي في هذه الحالة؟',
-        'أنا محتار بين الخيارين B و C — ما الذي يفرق بينهما؟',
-        'قم بمحاكاة منحنى الضغط والحجم (P-V Loop) لهذه الآفة.',
-      ]
-    : [
-        'What is the primary hemodynamic shift in this vignette?',
-        'I am torn between choices B and C—what distinguishes them?',
-        'Simulate the Pressure-Volume loop for this patient lesion.',
-      ];
+  const starterSuggestions = t.copilot.starterPrompts;
 
   return (
     <>
@@ -216,7 +207,7 @@ export const AiCopilotDrawer: React.FC = () => {
             ? 'translate-x-0 opacity-100 shadow-2xl pointer-events-auto'
             : 'translate-x-full opacity-0 pointer-events-none'
         }`}
-        aria-label="AI Cognitive Co-Pilot"
+        aria-label={t.copilot.title}
         aria-hidden={!isOpen}
       >
         {/* Animated Laser Edge Seam along the left border */}
@@ -227,7 +218,7 @@ export const AiCopilotDrawer: React.FC = () => {
 
         {/* Clean Header */}
         <div className="px-4 py-3 border-b border-slate-200/60 dark:border-zinc-800/60 flex items-center justify-between bg-slate-50/70 dark:bg-zinc-900/60 relative z-10">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 rtl:space-x-reverse">
             {/* Holographic AI Core Orb */}
             <div className="relative flex items-center justify-center w-8 h-8">
               <div className="absolute inset-0 rounded-xl bg-gradient-to-tr from-indigo-500 via-cyan-400 to-fuchsia-500 p-[1.5px] animate-spin-slow">
@@ -239,9 +230,9 @@ export const AiCopilotDrawer: React.FC = () => {
             </div>
 
             <div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 rtl:space-x-reverse">
                 <span className="text-xs font-black tracking-wide uppercase bg-gradient-to-r from-slate-900 to-indigo-950 dark:from-white dark:to-indigo-200 bg-clip-text text-transparent">
-                  AI Co-Pilot
+                  {t.copilot.title}
                 </span>
 
                 {/* Model Engine Pill */}
@@ -304,13 +295,13 @@ export const AiCopilotDrawer: React.FC = () => {
                 })()}
               </div>
               <p className="text-[10px] font-medium text-slate-400 dark:text-zinc-500">
-                Autonomous Socratic Clinical Mentor
+                {t.copilot.subtitle}
               </p>
             </div>
           </div>
 
           {/* Action Icons */}
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center space-x-1 rtl:space-x-reverse">
             <button
               onClick={() => setIsInsightsOpen(true)}
               className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-all cursor-pointer"
@@ -330,7 +321,7 @@ export const AiCopilotDrawer: React.FC = () => {
             <button
               onClick={toggleExpanded}
               className="hidden sm:inline-flex p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-all cursor-pointer"
-              title={isExpanded ? 'Collapse width' : 'Expand width'}
+              title={isExpanded ? t.copilot.collapseWidth : t.copilot.expandWidth}
             >
               {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </button>
@@ -338,7 +329,7 @@ export const AiCopilotDrawer: React.FC = () => {
             <button
               onClick={closeDrawer}
               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-all cursor-pointer"
-              title="Close Co-Pilot (Esc)"
+              title={t.copilot.closeCopilot}
             >
               <X className="w-4 h-4" />
             </button>
@@ -358,10 +349,10 @@ export const AiCopilotDrawer: React.FC = () => {
 
               <div className="space-y-1 max-w-xs">
                 <h4 className="text-sm font-extrabold text-slate-900 dark:text-zinc-100 tracking-tight">
-                  Clinical Socratic Co-Pilot
+                  {t.copilot.emptyTitle}
                 </h4>
                 <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-                  Real-time cognitive guidance synchronized with your active question and performance telemetry.
+                  {t.copilot.emptyDescription}
                 </p>
               </div>
 
@@ -456,9 +447,9 @@ export const AiCopilotDrawer: React.FC = () => {
 
                   {/* Streaming indicator */}
                   {msg.status === 'streaming' && !activeDiagnosticTool && (
-                    <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-semibold">
+                    <div className="inline-flex items-center space-x-1.5 rtl:space-x-reverse px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-semibold">
                       <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping" />
-                      <span className="text-[10px] font-mono tracking-wider uppercase">Reasoning</span>
+                      <span className="text-[10px] font-mono tracking-wider uppercase">{t.copilot.reasoningBadge}</span>
                     </div>
                   )}
 
@@ -550,22 +541,22 @@ export const AiCopilotDrawer: React.FC = () => {
 
           {/* Subtle Silent Background Tool Indicator */}
           {activeDiagnosticTool && (
-            <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-700 dark:text-indigo-300 text-xs font-semibold animate-pulse">
+            <div className="inline-flex items-center space-x-2 rtl:space-x-reverse px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-700 dark:text-indigo-300 text-xs font-semibold animate-pulse">
               <Activity className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 animate-spin-slow" />
               <span className="text-[11px]">
                 {activeDiagnosticTool === 'analyze_active_question_vignette'
-                  ? 'Analyzing vignette presentation & trap map...'
+                  ? t.copilot.diagnostics.analyzingVignette
                   : activeDiagnosticTool === 'inspect_student_cognitive_telemetry'
-                  ? 'Reading live hesitation telemetry...'
+                  ? t.copilot.diagnostics.readingTelemetry
                   : activeDiagnosticTool === 'detect_cognitive_bias_trap'
-                  ? 'Evaluating cognitive bias & anchoring patterns...'
-                  : 'Running clinical background diagnostic...'}
+                  ? t.copilot.diagnostics.evaluatingBias
+                  : t.copilot.diagnostics.runningGeneric}
               </span>
             </div>
           )}
 
           {error && (
-            <div className="p-3.5 rounded-2xl bg-rose-50/90 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-900/60 text-xs text-rose-900 dark:text-rose-200 flex items-start space-x-2 shadow-sm">
+            <div className="p-3.5 rounded-2xl bg-rose-50/90 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-900/60 text-xs text-rose-900 dark:text-rose-200 flex items-start space-x-2 rtl:space-x-reverse shadow-sm">
               <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
               <div className="leading-relaxed font-medium">{error}</div>
             </div>
@@ -587,15 +578,7 @@ export const AiCopilotDrawer: React.FC = () => {
                 dir="auto"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder={
-                  isStreaming
-                    ? isArabicChat
-                      ? 'جارٍ توليد التوجيه السريري...'
-                      : 'Synthesizing clinical guidance...'
-                    : isArabicChat
-                    ? 'اطرح سؤالاً أو ناقش التعليل التشخيصي...'
-                    : 'Ask question or discuss diagnostic reasoning...'
-                }
+                placeholder={isStreaming ? t.copilot.inputStreamingPlaceholder : t.copilot.inputPlaceholder}
                 disabled={isStreaming}
                 className="w-full text-xs sm:text-sm ps-4 pe-12 py-3 rounded-2xl border border-slate-200 dark:border-zinc-700 bg-slate-50/80 dark:bg-zinc-900/80 text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:focus:border-indigo-400 shadow-inner transition-all duration-300"
               />
@@ -604,7 +587,7 @@ export const AiCopilotDrawer: React.FC = () => {
                   type="button"
                   onClick={clearMessages}
                   className="absolute end-3 top-3 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 transition-colors p-0.5 cursor-pointer"
-                  title="Clear conversation"
+                  title={t.copilot.clearConversation}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -617,7 +600,7 @@ export const AiCopilotDrawer: React.FC = () => {
                   type="button"
                   onClick={abortStreaming}
                   className="p-3 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white transition-all shadow-md shadow-rose-600/30 hover:scale-105 active:scale-95 cursor-pointer"
-                  title="Stop generation"
+                  title={t.copilot.stopGeneration}
                 >
                   <Square className="w-4 h-4 fill-current" />
                 </button>
@@ -626,7 +609,7 @@ export const AiCopilotDrawer: React.FC = () => {
                   type="submit"
                   disabled={!inputText.trim()}
                   className="p-3 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 disabled:opacity-40 disabled:hover:scale-100 text-white transition-all shadow-md shadow-indigo-600/25 hover:shadow-indigo-600/40 hover:scale-105 active:scale-95 cursor-pointer"
-                  title="Send message (Enter)"
+                  title={t.copilot.sendMessage}
                 >
                   <Send className="w-4 h-4" />
                 </button>

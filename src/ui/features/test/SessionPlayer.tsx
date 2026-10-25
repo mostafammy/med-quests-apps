@@ -352,30 +352,30 @@ export const SessionPlayer: React.FC = () => {
           ? 'bg-slate-900/85 border-slate-800/80 text-slate-100 shadow-md' 
           : 'bg-white/75 dark:bg-zinc-900/75 border-white/60 dark:border-zinc-800/80 text-slate-900 dark:text-zinc-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)]'
       }`}>
-        <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+        <div className="flex items-center space-x-2 sm:space-x-3 rtl:space-x-reverse shrink-0">
           <button
             onClick={() => navigate('/')}
-            className={`p-2 rounded-xl text-xs font-semibold flex items-center space-x-1.5 apple-tap cursor-pointer transition-all ${
+            className={`p-2 rounded-xl text-xs font-semibold flex items-center space-x-1.5 rtl:space-x-reverse apple-tap cursor-pointer transition-all ${
               isExamMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
             }`}
-            title="Exit Session"
+            title={t.common.exitSession}
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline font-bold">Exit</span>
+            <ArrowLeft className="w-4 h-4 rtl:rotate-180" />
+            <span className="hidden sm:inline font-bold">{t.common.exit}</span>
           </button>
           <div className="h-4 w-px bg-slate-300 dark:bg-zinc-700" />
           
           {/* Apple Dynamic Capsule Pill */}
           <button
             onClick={() => setShowMatrixModal(true)}
-            className={`group flex items-center space-x-1.5 sm:space-x-2.5 px-3 py-1.5 rounded-full transition-all border shadow-xs cursor-pointer apple-tap ${
+            className={`group flex items-center space-x-1.5 sm:space-x-2.5 rtl:space-x-reverse px-3 py-1.5 rounded-full transition-all border shadow-xs cursor-pointer apple-tap ${
               isExamMode
                 ? 'bg-slate-800/90 hover:bg-slate-750 border-slate-700 text-slate-100 hover:border-slate-600'
                 : 'glass-pill-luxury text-slate-900 dark:text-zinc-100'
             }`}
-            title="Open Question Grid Overview (G)"
+            title={t.test.matrix.title}
           >
-            <div className="flex items-center space-x-1 text-xs font-bold tracking-tight">
+            <div className="flex items-center space-x-1 rtl:space-x-reverse text-xs font-bold tracking-tight">
               <span className="text-blue-600 dark:text-blue-400 font-mono font-extrabold text-xs sm:text-sm">
                 {String(currentIndex + 1).padStart(2, '0')}
               </span>
@@ -397,16 +397,16 @@ export const SessionPlayer: React.FC = () => {
           </button>
 
           {currentQ.highYield && (
-            <span className="hidden md:inline-flex items-center space-x-1 text-[10px] font-black px-2.5 py-0.5 bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-400/40 rounded-full shadow-xs">
-              <span>⚡ HIGH YIELD</span>
+            <span className="hidden md:inline-flex items-center space-x-1 rtl:space-x-reverse text-[10px] font-black px-2.5 py-0.5 bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-400/40 rounded-full shadow-xs">
+              <span>⚡ {t.common.highYield}</span>
             </span>
           )}
         </div>
 
         {/* Center / Right: Timer, Theme Toggle & Controls */}
-        <div className="flex items-center space-x-1.5 sm:space-x-2.5 shrink-0">
+        <div className="flex items-center space-x-1.5 sm:space-x-2.5 rtl:space-x-reverse shrink-0">
           {isExamMode && (
-            <div className="flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1 bg-slate-800 border border-slate-700 rounded-xl text-xs font-mono font-bold text-amber-400 shadow-xs">
+            <div className="flex items-center space-x-1 sm:space-x-1.5 rtl:space-x-reverse px-2.5 sm:px-3 py-1 bg-slate-800 border border-slate-700 rounded-xl text-xs font-mono font-bold text-amber-400 shadow-xs">
               <Clock className="w-3.5 h-3.5" />
               <span>{formatTime(timeLeftSeconds)}</span>
             </div>
@@ -414,25 +414,25 @@ export const SessionPlayer: React.FC = () => {
 
           <button
             onClick={handleToggleFlag}
-            className={`p-2 rounded-xl text-xs font-semibold flex items-center space-x-1 transition-all apple-tap cursor-pointer ${
+            className={`p-2 rounded-xl text-xs font-semibold flex items-center space-x-1 rtl:space-x-reverse transition-all apple-tap cursor-pointer ${
               flags[currentQ.id]
                 ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/40'
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100/70 dark:hover:bg-zinc-800/70'
             }`}
-            title="Flag question (F)"
+            title={flags[currentQ.id] ? t.test.player.flagged : t.test.player.flagQuestion}
           >
             <Flag className={`w-4 h-4 ${flags[currentQ.id] ? 'fill-current text-amber-500' : ''}`} />
-            <span className="hidden md:inline font-bold">Flag</span>
+            <span className="hidden md:inline font-bold">{flags[currentQ.id] ? t.test.player.flagged : t.test.player.flagQuestion}</span>
           </button>
 
           <button
             onClick={handleToggleBookmark}
-            className={`p-2 rounded-xl text-xs font-semibold flex items-center space-x-1 transition-all apple-tap cursor-pointer ${
+            className={`p-2 rounded-xl text-xs font-semibold flex items-center space-x-1 rtl:space-x-reverse transition-all apple-tap cursor-pointer ${
               bookmarks[currentQ.id]
                 ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/40'
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100/70 dark:hover:bg-zinc-800/70'
             }`}
-            title="Bookmark (B)"
+            title={bookmarks[currentQ.id] ? t.test.player.bookmarked : t.test.player.bookmarkQuestion}
           >
             <Bookmark className={`w-4 h-4 ${bookmarks[currentQ.id] ? 'fill-current text-blue-500' : ''}`} />
           </button>
@@ -552,7 +552,7 @@ export const SessionPlayer: React.FC = () => {
                   'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200/80 dark:border-zinc-700/80 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-colors shadow-2xs font-bold';
                 statusPill = (
                   <span className="opacity-0 group-hover:opacity-100 transition-opacity font-mono text-[11px] text-blue-600 dark:text-blue-400 font-bold px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 shrink-0 hidden sm:inline-block">
-                    Key {idx + 1}
+                    {t.test.player.keyShortcut.replace('{num}', String(idx + 1))}
                   </span>
                 );
               } else {
@@ -566,7 +566,7 @@ export const SessionPlayer: React.FC = () => {
                   statusPill = (
                     <div className="shrink-0 flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-600 text-white font-bold text-xs shadow-sm shadow-emerald-600/30 animate-apple-entrance">
                       <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                      <span>Your Answer • Correct</span>
+                      <span>{t.test.player.yourAnswerCorrect}</span>
                     </div>
                   );
                 } else if (isSelected && !isCorrect) {
@@ -578,7 +578,7 @@ export const SessionPlayer: React.FC = () => {
                   statusPill = (
                     <div className="shrink-0 flex items-center space-x-1.5 px-3 py-1 rounded-full bg-rose-600 text-white font-bold text-xs shadow-sm shadow-rose-600/30 animate-apple-entrance">
                       <XCircle className="w-3.5 h-3.5 stroke-[2.5]" />
-                      <span>Your Choice • Incorrect</span>
+                      <span>{t.test.player.yourChoiceIncorrect}</span>
                     </div>
                   );
                 } else if (!isSelected && isCorrect) {
@@ -590,7 +590,7 @@ export const SessionPlayer: React.FC = () => {
                   statusPill = (
                     <div className="shrink-0 flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/15 dark:bg-emerald-500/25 text-emerald-800 dark:text-emerald-200 border border-emerald-600/30 dark:border-emerald-400/40 font-bold text-xs backdrop-blur-md animate-apple-entrance">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
-                      <span>Correct Answer Key</span>
+                      <span>{t.test.player.correctAnswerKey}</span>
                     </div>
                   );
                 } else {
@@ -703,28 +703,28 @@ export const SessionPlayer: React.FC = () => {
           <button
             onClick={handlePrev}
             disabled={currentIndex === 0}
-            className="py-2.5 px-4 rounded-xl border border-slate-200/90 dark:border-zinc-700/80 bg-white/70 dark:bg-zinc-800/70 hover:bg-white dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 disabled:opacity-30 font-bold flex items-center space-x-1.5 cursor-pointer apple-tap transition-all shadow-xs"
+            className="py-2.5 px-4 rounded-xl border border-slate-200/90 dark:border-zinc-700/80 bg-white/70 dark:bg-zinc-800/70 hover:bg-white dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 disabled:opacity-30 font-bold flex items-center space-x-1.5 rtl:space-x-reverse cursor-pointer apple-tap transition-all shadow-xs"
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden xs:inline sm:inline">Previous</span>
+            <ArrowLeft className="w-4 h-4 rtl:rotate-180" />
+            <span className="hidden xs:inline sm:inline">{t.common.back}</span>
           </button>
 
           {/* Apple Dynamic Island Keyboard Dock */}
-          <div className="hidden sm:flex items-center space-x-3 px-4 sm:px-5 py-2 rounded-full bg-slate-900/90 dark:bg-black/90 text-white border border-white/15 dark:border-white/10 shadow-[0_8px_25px_rgba(0,0,0,0.25)] backdrop-blur-2xl transition-all duration-300">
+          <div className="hidden sm:flex items-center space-x-3 rtl:space-x-reverse px-4 sm:px-5 py-2 rounded-full bg-slate-900/90 dark:bg-black/90 text-white border border-white/15 dark:border-white/10 shadow-[0_8px_25px_rgba(0,0,0,0.25)] backdrop-blur-2xl transition-all duration-300">
             {!isExamMode && isAnswered ? (
-              <div className="flex items-center space-x-2 animate-apple-entrance">
+              <div className="flex items-center space-x-2 rtl:space-x-reverse animate-apple-entrance">
                 <kbd className="px-2 py-0.5 rounded-md bg-blue-600 text-white font-mono text-[10px] font-black shadow-xs border border-blue-400">
                   Enter ⏎
                 </kbd>
                 <span className="text-xs font-bold text-white tracking-tight">
-                  {isLastQuestion ? 'Finish Test' : 'Next Question'}
+                  {isLastQuestion ? t.test.player.finishResults : t.test.player.next}
                 </span>
                 <span className="w-1 h-1 rounded-full bg-slate-600" />
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center space-x-1 rtl:space-x-reverse">
                   <kbd className="px-1.5 py-0.5 rounded bg-white/15 text-slate-300 font-mono text-[10px] font-semibold border border-white/15">
                     ←
                   </kbd>
-                  <span className="text-[11px] text-slate-400 font-medium">Review</span>
+                  <span className="text-[11px] text-slate-400 font-medium">{t.nav.review}</span>
                 </div>
               </div>
             ) : (

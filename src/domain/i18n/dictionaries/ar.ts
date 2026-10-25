@@ -22,6 +22,9 @@ export const arDictionary: TranslationDictionary = {
     enter: 'Enter',
     seconds: 'ثوانٍ',
     minutes: 'دقائق',
+    exit: 'خروج',
+    exitSession: 'إنهاء الجلسة',
+    highYield: 'عالي الأهمية',
   },
   nav: {
     dashboard: 'لوحة التحكم',
@@ -42,6 +45,7 @@ export const arDictionary: TranslationDictionary = {
   copilot: {
     title: 'المساعد الذكي',
     subtitle: 'المرشد السقراطي الإكلينيكي المستقل',
+    toggleAria: 'تبديل درج المساعد الذكي المعرفي (? أو Cmd+K)',
     emptyTitle: 'المرشد السقراطي الإكلينيكي',
     emptyDescription:
       'إرشاد معرفي فوري متزامن مع السؤال الحالي وبيانات الأداء والتسجيل الإكلينيكي الخاص بك.',
@@ -72,6 +76,7 @@ export const arDictionary: TranslationDictionary = {
       chatLanguageLabel: 'لغة رد المساعد الذكي في المحادثة',
       chatLanguageSubtext:
         'تحدد اللغة التي يستخدمها المرشد السقراطي أثناء المحادثة. يتم الحفاظ على المصطلحات الطبية بالإنجليزية.',
+      usmleTermsPreserved: 'الحفاظ على مصطلحات USMLE بالإنجليزية',
       langAuto: 'اكتشاف تلقائي',
       langAutoDesc: 'يطابق لغة كل سؤال تكتبه في الدردشة تلقائياً.',
       langEnglish: 'English (الإنجليزية)',
@@ -134,6 +139,9 @@ export const arDictionary: TranslationDictionary = {
     mockModeDesc: 'شروط امتحان حقيقية موقوتة، حجب النتائج حتى التسليم، وتصنيف واقعي.',
     rapidMode: 'تدريب سريع عالي الأهمية',
     rapidModeDesc: 'جلسة سريعة تركز حصرياً على المفاهيم الأكثر تكراراً في امتحانات البورد.',
+    highYieldScope: 'نطاق عالي الأهمية',
+    curriculumScope: '2. نطاق المنهج المستهدف',
+    scopeSubtitle: 'تصفية الأسئلة حسب التخصص الطبي أو الفصل المحدد',
     filterSubject: 'تصفية حسب المادة',
     filterChapter: 'تصفية حسب الفصل / الموضوع',
     allSubjects: 'جميع المواد (جهاز الدوران)',
@@ -194,6 +202,10 @@ export const arDictionary: TranslationDictionary = {
       bookmarkQuestion: 'حفظ في الإشارات',
       bookmarked: 'محفوظ',
       questionMatrixShortcut: 'شبكة استعراض الأسئلة (اضغط G)',
+      keyShortcut: 'مفتاح {num}',
+      yourAnswerCorrect: 'إجابتك • صحيحة',
+      yourChoiceIncorrect: 'اختيارك • غير صحيح',
+      correctAnswerKey: 'مفتاح الإجابة الصحيحة',
     },
     matrix: {
       title: 'شبكة التصفح السريع للأسئلة',
@@ -202,6 +214,9 @@ export const arDictionary: TranslationDictionary = {
       tabUnanswered: 'لم تتم الإجابة',
       tabAnswered: 'تمت الإجابة',
       tabFlagged: 'مميّزة بعلامة',
+      legendCurrent: 'الحالي',
+      legendCorrect: 'صحيح',
+      legendIncorrect: 'غير صحيح',
       progress: 'تقدم الاختبار',
       close: 'إغلاق الشبكة (Esc)',
     },
@@ -258,6 +273,21 @@ export const arDictionary: TranslationDictionary = {
     resetSuccessToast: 'تمت استعادة بنك الأسئلة بنجاح إلى النسخة العامة المعتمدة.',
     totalQuestions: 'إجمالي الأسئلة في البنك',
     validationSuccess: 'تم تدقيق واستيراد {count} أسئلة بنجاح!',
+  },
+  bank: {
+    title: 'بنك الأسئلة والمزامنة العالمية',
+    resetToGlobalBtn: 'إعادة ضبط لبنك الأسئلة العام',
+    resetConfirmTitle: 'إعادة ضبط بنك الأسئلة للنسخة العامة المعتمدة؟',
+    resetConfirmDialog:
+      'هل أنت متأكد من إعادة ضبط بنك الأسئلة المحلي للنسخة الأكاديمية الرسمية المعتمدة؟ سيتم استبدال أي مسودات محلية غير مرسلة.',
+    resetSuccessToast: 'تمت استعادة بنك الأسئلة بنجاح إلى النسخة العامة المعتمدة.',
+    resetDescription:
+      'يحذف المسودات المحلية غير المعتمدة ويستعيد بنك الأسئلة الأكاديمي الرسمي المعتمد مباشرة من خوادم Cloudflare Edge و D1.',
+    syncNowBtn: 'مزامنة مع البنك العام',
+    syncing: 'جارٍ المزامنة...',
+    syncedBadge: 'النسخة المعتمدة محدثة',
+    edgeVerified: 'متحقق عبر Edge في ~1.8 مللي ثانية',
+    activeCanonicalCount: 'أسئلة أكاديمية معتمدة نشطة',
   },
   postTest: {
     title: 'اكتملت جلسة الاختبار بنجاح',

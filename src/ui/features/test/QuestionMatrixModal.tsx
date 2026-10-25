@@ -238,34 +238,34 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
         {/* Apple Sheet Footer: Legend & Close */}
         <div className="p-4 bg-slate-50 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-1 rtl:space-x-reverse">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-              <span>Current</span>
+              <span>{t.test.matrix.legendCurrent}</span>
             </div>
             {!isExamMode ? (
               <>
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center space-x-1 rtl:space-x-reverse">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                  <span>Correct</span>
+                  <span>{t.test.matrix.legendCorrect}</span>
                 </div>
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center space-x-1 rtl:space-x-reverse">
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                  <span>Incorrect</span>
+                  <span>{t.test.matrix.legendIncorrect}</span>
                 </div>
               </>
             ) : (
-              <div className="flex items-center space-x-1">
+              <div className="flex items-center space-x-1 rtl:space-x-reverse">
                 <span className="w-2.5 h-2.5 rounded-full bg-slate-800 dark:bg-slate-600" />
-                <span>Answered</span>
+                <span>{t.test.matrix.tabAnswered}</span>
               </div>
             )}
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-1 rtl:space-x-reverse">
               <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-700" />
-              <span>Unanswered</span>
+              <span>{t.test.matrix.tabUnanswered}</span>
             </div>
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-1 rtl:space-x-reverse">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-              <span>Flagged</span>
+              <span>{t.test.matrix.tabFlagged}</span>
             </div>
           </div>
 
@@ -273,7 +273,7 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
             onClick={onClose}
             className="py-1.5 px-4 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 rounded-xl font-bold transition-all cursor-pointer"
           >
-            Done
+            {t.common.close}
           </button>
         </div>
       </div>

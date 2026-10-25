@@ -120,13 +120,13 @@ export const QuestionNavigatorStrip: React.FC<QuestionNavigatorStripProps> = ({
                 ref={isActive ? activePillRef : null}
                 onClick={() => handleSelect(idx)}
                 className={`relative shrink-0 w-8 h-8 rounded-xl text-xs font-bold tabular-nums flex items-center justify-center transition-all duration-150 cursor-pointer apple-tap ${pillStyle}`}
-                title={`Question ${idx + 1}${isFlagged ? ' (Flagged)' : ''}${isAnswered ? ' (Answered)' : ''}`}
+                title={`${t.common.questions} ${idx + 1}${isFlagged ? ` (${t.test.strip.flagged})` : ''}${isAnswered ? ` (${t.test.strip.answered})` : ''}`}
               >
                 <span>{idx + 1}</span>
 
                 {/* Flagged micro-indicator (Apple vibrancy amber dot) */}
                 {isFlagged && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-white dark:ring-slate-900 shadow-xs flex items-center justify-center">
+                  <span className="absolute -top-1 -end-1 w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-white dark:ring-slate-900 shadow-xs flex items-center justify-center">
                     <span className="w-1 h-1 rounded-full bg-amber-700" />
                   </span>
                 )}
@@ -139,14 +139,14 @@ export const QuestionNavigatorStrip: React.FC<QuestionNavigatorStripProps> = ({
         {flaggedCount > 0 && (
           <div 
             onClick={onOpenMatrix}
-            className={`shrink-0 hidden md:flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-medium cursor-pointer ${
+            className={`shrink-0 hidden md:flex items-center space-x-1 rtl:space-x-reverse px-2 py-0.5 rounded-md text-[11px] font-medium cursor-pointer ${
               isExamMode 
                 ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20' 
                 : 'bg-amber-50 text-amber-700 border border-amber-200'
             }`}
           >
             <Flag className="w-3 h-3 fill-current" />
-            <span>{flaggedCount} Flagged</span>
+            <span>{flaggedCount} {t.test.strip.flagged}</span>
           </div>
         )}
       </div>
