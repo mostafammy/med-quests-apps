@@ -16,6 +16,18 @@ import type {
   Evidence,
   IsoDateTime,
 } from '../../../src/domain/model/types.ts';
+
+export type {
+  BlockId,
+  SubjectId,
+  ChapterId,
+  TopicId,
+  QuestionId,
+  Question,
+  Choice,
+  Evidence,
+  IsoDateTime,
+};
 import type { UserId, UserRole } from '../../../src/domain/auth/types.ts';
 
 // ==========================================
@@ -232,14 +244,14 @@ export interface QuestionMutationPatch {
   readonly topicId?: TopicId;
   readonly concept?: string;
   readonly stem?: string;
-  readonly choices?: readonly [Choice, Choice, Choice, Choice];
+  readonly choices?: Choice[];
   readonly explanation?: string;
   readonly examTip?: string | null;
   readonly mnemonic?: string | null;
   readonly difficulty?: 1 | 2 | 3;
   readonly cognitiveLevel?: 'recall' | 'understanding' | 'application';
   readonly highYield?: boolean;
-  readonly evidence?: readonly Evidence[];
+  readonly evidence?: Evidence[];
 }
 
 /**
