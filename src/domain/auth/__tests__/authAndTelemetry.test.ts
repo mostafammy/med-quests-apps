@@ -316,6 +316,7 @@ describe('Enterprise Governance, Per-User AI Activation/Exclusion & Cohort Analy
   it('enforces AI Entitlement Guard in resolveAiEngine when user is excluded or blocked', () => {
     const cloudSettings = {
       engine: 'groq' as const,
+      chatLanguage: 'auto' as const,
       openRouterApiKey: '',
       openRouterModel: '',
       groqApiKey: 'gsk_test_live_key_12345',
@@ -347,44 +348,146 @@ describe('Enterprise Governance, Per-User AI Activation/Exclusion & Cohort Analy
   });
 
   it('aggregates platform-wide cohort analytics and filters the user directory accurately', () => {
-    const cohort = edgeAuthGateway.getManagedUsers();
-    expect(cohort.length).toBeGreaterThanOrEqual(5);
+    // Verify production directory contains pristine platform owner
+    const liveCohort = edgeAuthGateway.getManagedUsers();
+    expect(liveCohort.length).toBeGreaterThanOrEqual(1);
+    expect(liveCohort[0].profile.email).toBe('mostafa.yaser.developer@gmail.com');
 
-    const analytics = computePlatformAnalytics(cohort);
-    expect(analytics.totalUsers).toBe(cohort.length);
-    expect(analytics.globalTotalAttempts).toBeGreaterThan(1000);
-    expect(analytics.aiCloudEnabledUsersCount).toBeGreaterThan(0);
-    expect(analytics.aiCloudExcludedUsersCount).toBeGreaterThan(0);
-    expect(analytics.universityCohorts.length).toBeGreaterThanOrEqual(3);
+    // Test analytics computation and filtering algorithms with a synthetic test cohort
+    const testCohort = [
+      liveCohort[0],
+      buildManagedUserRecord({
+        profile: {
+          id: 'test_u_excluded',
+          email: 'test.excluded@med.edu',
+          displayName: 'Test Excluded Scholar',
+          avatarUrl: null,
+          universityName: 'Cairo University',
+          academicYear: 3,
+          role: 'student-free',
+          customFeatureOverrides: { ai_cloud_streaming_quota: false },
+          restriction: {
+            status: 'active',
+            blockedReason: null,
+            blockedUntil: null,
+            blockedByUserId: null,
+            updatedAt: '2026-10-24T00:00:00Z',
+          },
+          emailVerified: true,
+          createdAt: '2026-10-24T00:00:00Z',
+          lastActiveAt: '2026-10-24T00:00:00Z',
+        },
+        studyTelemetry: {
+          totalAttempts: 150,
+          overallAccuracy: 85,
+          masteryPercentage: 80,
+          weakTopicsCount: 1,
+          dueReviewsCount: 5,
+          dailyAiRequestsUsed: 0,
+          favoriteSubspecialty: 'Cardiology',
+        },
+        activeSessions: [
+          {
+            sessionId: 'ses_test_1',
+            userId: 'test_u_excluded',
+            isCurrentDevice: false,
+            device: {
+              deviceCategory: 'mobile',
+              osName: 'Android',
+              osVersion: '14',
+              browserName: 'Chrome',
+              browserVersion: '131.0',
+              browserEngine: 'Blink',
+              cpuArchitecture: 'arm64',
+              isMobileHint: true,
+              preferredLanguage: 'en-US',
+              rawUserAgent: 'Mozilla/5.0',
+            },
+            edgeNetwork: {
+              ipAddress: '1.2.3.4',
+              countryCode: 'EG',
+              countryName: 'Egypt',
+              city: 'Cairo',
+              region: 'Cairo',
+              continent: 'AF',
+              latitude: 30.0,
+              longitude: 31.0,
+              postalCode: '11511',
+              edgeTimezone: 'Africa/Cairo',
+              asn: 8452,
+              ispOrganization: 'ISP',
+              colo: 'CAI',
+              httpProtocol: 'HTTP/3',
+              tlsVersion: 'TLSv1.3',
+              ja4Fingerprint: 'test',
+              threatScore: 0,
+              capturedAt: '2026-10-24T00:00:00Z',
+            },
+            clientTimezone: 'Africa/Cairo',
+            clientTier: 'low-spec',
+            anomalyFlags: ['impossible_travel_geo_shift'],
+            createdAt: '2026-10-24T00:00:00Z',
+            lastVerifiedAt: '2026-10-24T00:00:00Z',
+            expiresAt: '2026-11-24T00:00:00Z',
+            kvCacheStatus: 'hit',
+            edgeVerificationLatencyMs: 1.5,
+            hardwareProfile: {
+              clientTimezone: 'Africa/Cairo',
+              clientLocale: 'en-US',
+              logicalCpuCores: 4,
+              deviceMemoryGb: 4,
+              devicePixelRatio: 2,
+              screenResolution: { width: 393, height: 852, colorDepth: 24 },
+              effectiveNetworkType: '4g',
+              downlinkMbps: 10,
+              rttMs: 50,
+              saveDataEnabled: false,
+              prefersReducedMotion: false,
+              isTouchPrimary: true,
+              computedTier: 'low-spec',
+              activeTier: 'low-spec',
+              probedAt: '2026-10-24T00:00:00Z',
+            },
+          },
+        ],
+      }),
+    ];
+
+    const analytics = computePlatformAnalytics(testCohort);
+    expect(analytics.totalUsers).toBe(2);
+    expect(analytics.aiCloudEnabledUsersCount).toBe(1);
+    expect(analytics.aiCloudExcludedUsersCount).toBe(1);
     expect(analytics.coloDistribution.some((c) => c.colo === 'CAI')).toBe(true);
 
     // Filter by AI-excluded users
-    const excludedUsers = filterManagedUsers(cohort, {
+    const excludedUsers = filterManagedUsers(testCohort, {
       searchQuery: '',
       roleFilter: 'all',
       restrictionFilter: 'all',
       aiFeatureFilter: 'ai-excluded',
     });
-    expect(excludedUsers.every((u) => !u.entitlements.ai_cloud_streaming_quota)).toBe(true);
+    expect(excludedUsers.length).toBe(1);
+    expect(excludedUsers[0].profile.id).toBe('test_u_excluded');
 
     // Filter by anomalous sessions
-    const anomalousUsers = filterManagedUsers(cohort, {
+    const anomalousUsers = filterManagedUsers(testCohort, {
       searchQuery: '',
       roleFilter: 'all',
       restrictionFilter: 'anomalous',
       aiFeatureFilter: 'all',
     });
-    expect(anomalousUsers.length).toBeGreaterThan(0);
+    expect(anomalousUsers.length).toBe(1);
+    expect(anomalousUsers[0].profile.id).toBe('test_u_excluded');
 
     // Build custom record and verify deterministic entitlement resolution
     const customRecord = buildManagedUserRecord({
       profile: {
-        ...cohort[0].profile,
+        ...liveCohort[0].profile,
         role: 'student-free',
         customFeatureOverrides: { ai_cloud_streaming_quota: true },
       },
-      studyTelemetry: cohort[0].studyTelemetry,
-      activeSessions: cohort[0].activeSessions,
+      studyTelemetry: liveCohort[0].studyTelemetry,
+      activeSessions: liveCohort[0].activeSessions,
     });
     expect(customRecord.entitlements.ai_cloud_streaming_quota).toBe(true);
     expect(customRecord.dailyAiRequestsLimit).toBeGreaterThanOrEqual(50);
