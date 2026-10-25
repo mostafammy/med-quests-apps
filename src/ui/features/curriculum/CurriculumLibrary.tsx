@@ -1,63 +1,65 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, BookOpen } from 'lucide-react';
+import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 
 export const CurriculumLibrary: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useLocaleStore();
 
   const documents = [
     {
       id: 'doc-ana-01',
-      subject: 'Anatomy',
+      subject: t.dashboard.subjects.anatomy,
       title: '2nd Year CVS Anatomy of Heart and Mediastinum Handout',
       fileName: '2nd year cvs anatomy of heart and mediastnum hanout.pdf',
       format: 'PDF',
-      size: '49 Pages',
+      size: `49 ${t.curriculum.pages}`,
       chapters: ['Heart & Mediastinum', 'Pericardium', 'Chambers', 'Coronary Vessels'],
     },
     {
       id: 'doc-ana-02',
-      subject: 'Anatomy',
+      subject: t.dashboard.subjects.anatomy,
       title: 'Development of the Heart & Congenital Anomalies',
       fileName: 'Development of the heart.pdf',
       format: 'PDF',
-      size: '16 Pages',
+      size: `16 ${t.curriculum.pages}`,
       chapters: ['Cardiac Looping', 'Atrial Septation', 'ASDs & VSDs', 'TGA'],
     },
     {
       id: 'doc-ana-03',
-      subject: 'Anatomy',
+      subject: t.dashboard.subjects.anatomy,
       title: 'Fetal Circulation and Blood Vessel Development',
       fileName: 'Fetal cirulation and BV development.pdf',
       format: 'PDF',
-      size: '16 Pages',
+      size: `16 ${t.curriculum.pages}`,
       chapters: ['Aortic Arches', 'Cardinal Veins', 'Fetal Shunts'],
     },
     {
       id: 'doc-his-01',
-      subject: 'Histology',
+      subject: t.dashboard.subjects.histology,
       title: 'Histology of Cardiovascular System (Lecture 3)',
       fileName: '3- HISTOLOGY OF CVS ppt (1).pptx',
       format: 'PPTX',
-      size: '16 Slides',
+      size: `16 ${t.curriculum.slides}`,
       chapters: ['Heart Wall Layers', 'Purkinje Fibres', 'Intercalated Discs'],
     },
     {
       id: 'doc-his-02',
-      subject: 'Histology',
+      subject: t.dashboard.subjects.histology,
       title: 'Histology of the Blood Vessels (Lectures 24 & 25)',
       fileName: 'Histology of  the blood vessels 24&25.pptx',
       format: 'PPTX',
-      size: '30 Slides',
+      size: `30 ${t.curriculum.slides}`,
       chapters: ['Tunica Layers', 'Capillaries', 'Carotid Sinus/Body'],
     },
     {
       id: 'doc-mic-01',
-      subject: 'Microbiology',
+      subject: t.dashboard.subjects.microbiology,
       title: 'Handout CVS Microbiology: Rheumatic Fever, IE & Myocarditis',
       fileName: 'handout CVS microbiology.docx',
       format: 'DOCX',
-      size: '3 Lectures',
+      size: `3 ${t.curriculum.lectures}`,
       chapters: ['GAS & Molecular Mimicry', 'JONES Criteria', 'Duke Criteria'],
     },
   ];
@@ -69,18 +71,18 @@ export const CurriculumLibrary: React.FC = () => {
         <div className="space-y-1.5">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-700 dark:text-blue-300 text-xs font-semibold backdrop-blur-md">
             <BookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            <span>Cardiovascular Block 206 Curriculum</span>
+            <span>{t.curriculum.badge}</span>
           </div>
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 dark:from-zinc-100 dark:via-zinc-200 dark:to-blue-200 bg-clip-text text-transparent">
-            Faculty Curriculum Library
+            {t.curriculum.title}
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl leading-relaxed">
-            The authoritative lecture slides, syllabi, and handouts powering every question and explanation.
+            {t.curriculum.subtitle}
           </p>
         </div>
 
         <div className="px-4 py-2 rounded-2xl bg-white/60 dark:bg-zinc-800/60 backdrop-blur-md border border-white/80 dark:border-zinc-700/80 text-xs font-bold text-slate-800 dark:text-zinc-200 shadow-xs self-start md:self-auto">
-          6 Handouts Indexed
+          6 {t.curriculum.badge}
         </div>
       </div>
 
@@ -123,14 +125,14 @@ export const CurriculumLibrary: React.FC = () => {
 
             <div className="pt-2 border-t border-slate-200/60 dark:border-zinc-800/60 flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400">
-                Grounding Document
+                {t.curriculum.badge}
               </span>
               <button
                 onClick={() => navigate('/test/quick')}
                 className="py-2 px-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Practice Topic</span>
+                <span>{t.curriculum.launchPractice}</span>
               </button>
             </div>
           </div>

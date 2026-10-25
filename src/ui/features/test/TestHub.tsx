@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CVS_TAXONOMY } from '../../../domain/taxonomy/cvsTaxonomy.ts';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
+import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 import { 
   Play, 
   Sparkles, 
@@ -23,6 +24,7 @@ type TestMode = 'practice' | 'mock' | 'rapid';
 export const TestHub: React.FC = () => {
   const navigate = useNavigate();
   const { questions } = useQuestionStore();
+  const { t, isRtl } = useLocaleStore();
 
   const [selectedMode, setSelectedMode] = useState<TestMode>('practice');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
@@ -112,10 +114,10 @@ export const TestHub: React.FC = () => {
               <span>Cardiovascular Block 206 Exam Platform</span>
             </div>
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.1]">
-              Examination & Test Hub
+              {t.test.hubTitle}
             </h1>
             <p className="text-xs sm:text-base text-slate-600 dark:text-zinc-400 max-w-xl font-normal leading-relaxed">
-              Targeted high-speed micro-practice or full faculty exam simulations backed by authoritative curriculum sources.
+              {t.test.hubSubtitle}
             </p>
           </div>
 
@@ -126,9 +128,9 @@ export const TestHub: React.FC = () => {
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
               </span>
               <div>
-                <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-zinc-400">Question Pool</div>
+                <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-zinc-400">{t.common.questions}</div>
                 <div className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-zinc-100">
-                  {questions.length} Grounded Qs
+                  {questions.length} {t.common.questions}
                 </div>
               </div>
             </div>
@@ -141,9 +143,8 @@ export const TestHub: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-1 gap-1">
           <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 flex items-center space-x-2">
             <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            <span>1. Choose Testing Mode</span>
+            <span>1. {t.test.hubTitle}</span>
           </label>
-          <span className="text-[11px] sm:text-xs font-medium text-slate-400 dark:text-zinc-500">Touch or keyboard keys (1–4) supported</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
@@ -169,13 +170,13 @@ export const TestHub: React.FC = () => {
                 <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
               )}
             </div>
-            <h3 className="font-extrabold text-slate-900 dark:text-white text-lg sm:text-xl mt-4 sm:mt-5">Quick Practice</h3>
+            <h3 className="font-extrabold text-slate-900 dark:text-white text-lg sm:text-xl mt-4 sm:mt-5">{t.test.practiceMode}</h3>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 mt-2 leading-relaxed">
-              Instant feedback mode. Press <kbd className="px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-zinc-700 font-mono text-[11px] font-bold">1</kbd>–<kbd className="px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-zinc-700 font-mono text-[11px] font-bold">4</kbd> to commit choices with immediate faculty rationale slides.
+              {t.test.practiceModeDesc}
             </p>
             <div className="mt-4 sm:mt-5 pt-3.5 sm:pt-4 border-t border-slate-200/50 dark:border-zinc-800 flex items-center gap-2 text-xs font-bold text-blue-700 dark:text-blue-400">
               <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span>Immediate Answer Feedback</span>
+              <span>{t.test.quickPractice.immediateFeedback}</span>
             </div>
           </button>
 
@@ -201,13 +202,13 @@ export const TestHub: React.FC = () => {
                 <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
               )}
             </div>
-            <h3 className="font-extrabold text-slate-900 dark:text-white text-lg sm:text-xl mt-4 sm:mt-5">Faculty Mock Exam</h3>
+            <h3 className="font-extrabold text-slate-900 dark:text-white text-lg sm:text-xl mt-4 sm:mt-5">{t.test.mockMode}</h3>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 mt-2 leading-relaxed">
-              Standardized 50-question simulation under authentic 2-hour timed conditions with delayed score calibration.
+              {t.test.mockModeDesc}
             </p>
             <div className="mt-4 sm:mt-5 pt-3.5 sm:pt-4 border-t border-slate-200/50 dark:border-zinc-800 flex items-center gap-2 text-xs font-bold text-indigo-700 dark:text-indigo-400">
               <Clock className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              <span>50 Qs • 120 Mins • Strict Exam</span>
+              <span>50 Qs • 120 Mins • {t.test.mockSetup.mode}</span>
             </div>
           </button>
 
@@ -233,13 +234,13 @@ export const TestHub: React.FC = () => {
                 <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 transition-colors" />
               )}
             </div>
-            <h3 className="font-extrabold text-slate-900 dark:text-white text-lg sm:text-xl mt-4 sm:mt-5">High-Yield Sprint</h3>
+            <h3 className="font-extrabold text-slate-900 dark:text-white text-lg sm:text-xl mt-4 sm:mt-5">{t.test.rapidMode}</h3>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 mt-2 leading-relaxed">
-              15 high-frequency questions strictly derived from heavily tested curriculum exam objectives in a blitz.
+              {t.test.rapidModeDesc}
             </p>
             <div className="mt-4 sm:mt-5 pt-3.5 sm:pt-4 border-t border-slate-200/50 dark:border-zinc-800 flex items-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-400">
-              <Flame className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              <span>15 Qs • 15 Mins Rapid Blitz</span>
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <span>{t.test.highYieldOnly}</span>
             </div>
           </button>
         </div>
@@ -310,7 +311,7 @@ export const TestHub: React.FC = () => {
           {/* Discipline Pills */}
           <div>
             <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-3">
-              Target Discipline
+              {t.test.filterSubject}
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <button
@@ -325,7 +326,7 @@ export const TestHub: React.FC = () => {
                     : 'glass-pill-luxury text-slate-700 dark:text-zinc-300'
                 }`}
               >
-                <span>All Subjects</span>
+                <span>{t.test.allSubjects}</span>
                 <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
                   selectedSubject === 'all' ? 'bg-blue-700 text-blue-100' : 'bg-slate-200/80 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'
                 }`}>
@@ -361,7 +362,7 @@ export const TestHub: React.FC = () => {
           {/* Chapter Selector */}
           <div>
             <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
-              Curriculum Chapter
+              {t.test.filterChapter}
             </label>
             <select
               value={selectedChapter}
@@ -369,7 +370,7 @@ export const TestHub: React.FC = () => {
               className="w-full text-sm font-semibold rounded-2xl border border-white/80 dark:border-zinc-800 bg-white/70 dark:bg-zinc-800/70 backdrop-blur-md py-3.5 px-4 focus:ring-2 focus:ring-blue-500 focus:outline-hidden text-slate-900 dark:text-zinc-100 shadow-inner"
             >
               <option value="all">
-                {selectedSubject === 'all' ? 'All Chapters across CVS' : 'All Chapters in Selected Discipline'}
+                {selectedSubject === 'all' ? t.test.allChapters : t.test.filterChapter}
               </option>
               {availableChapters.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -384,7 +385,7 @@ export const TestHub: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
               <div>
                 <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
-                  Question Count
+                  {t.test.questionCount}
                 </label>
                 <div className="grid grid-cols-4 gap-2.5">
                   {[10, 20, 30, 50].map((num) => (
@@ -398,7 +399,7 @@ export const TestHub: React.FC = () => {
                           : 'glass-pill-luxury text-slate-700 dark:text-zinc-300'
                       }`}
                     >
-                      {num} Qs
+                      {num} {t.common.questions}
                     </button>
                   ))}
                 </div>
@@ -406,7 +407,7 @@ export const TestHub: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
-                  Session Modifiers
+                  {t.test.quickPractice.immediateFeedback}
                 </label>
                 <div className="flex gap-2.5">
                   <button
@@ -419,7 +420,7 @@ export const TestHub: React.FC = () => {
                     }`}
                   >
                     <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    <span>High-Yield Only</span>
+                    <span>{t.test.highYieldOnly}</span>
                   </button>
 
                   <button
@@ -432,7 +433,7 @@ export const TestHub: React.FC = () => {
                     }`}
                   >
                     <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                    <span>Timed ({Math.ceil(questionCount * 1.5)}m)</span>
+                    <span>{t.test.timedSprint} ({Math.ceil(questionCount * 1.5)}m)</span>
                   </button>
                 </div>
               </div>
@@ -444,18 +445,18 @@ export const TestHub: React.FC = () => {
       {/* 4. Luxury Obsidian Capsule Action Footer */}
       <div className="glass-dark-capsule rounded-3xl p-5 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5 sm:gap-6 relative overflow-hidden">
         <div className="space-y-1 relative z-10">
-          <div className="text-[10px] sm:text-[11px] text-slate-400 uppercase font-black tracking-widest">Ready to launch</div>
+          <div className="text-[10px] sm:text-[11px] text-slate-400 uppercase font-black tracking-widest">{t.test.matchingQuestions}</div>
           <div className="text-lg sm:text-2xl font-black text-white flex items-center space-x-2">
             <span>
               {selectedMode === 'mock' 
-                ? '50 Questions • 120 Mins Timed Mock' 
+                ? `50 ${t.common.questions} • 120 Mins ${t.test.mockMode}` 
                 : selectedMode === 'rapid' 
-                ? `${Math.min(matchingQuestionCount, 15)} High-Yield Questions • Rapid Blitz` 
-                : `${Math.min(matchingQuestionCount, questionCount)} Questions • Practice Mode`}
+                ? `${Math.min(matchingQuestionCount, 15)} ${t.test.highYieldOnly}` 
+                : `${Math.min(matchingQuestionCount, questionCount)} ${t.common.questions} • ${t.test.practiceMode}`}
             </span>
           </div>
           <p className="text-xs text-slate-400 font-normal">
-            Press <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded-md text-[11px] text-slate-300 font-mono font-bold">1</kbd>–<kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded-md text-[11px] text-slate-300 font-mono font-bold">4</kbd> during test or tap directly on mobile
+            Press <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded-md text-[11px] text-slate-300 font-mono font-bold">1</kbd>–<kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded-md text-[11px] text-slate-300 font-mono font-bold">4</kbd> {t.test.player.answerShortcut}
           </p>
         </div>
 
@@ -473,8 +474,8 @@ export const TestHub: React.FC = () => {
           }`}
         >
           <Play className="w-4 h-4 fill-current" />
-          <span>Launch Session</span>
-          <ChevronRight className="w-4 h-4" />
+          <span>{selectedMode === 'mock' ? t.test.launchMock : selectedMode === 'rapid' ? t.test.launchRapid : t.test.launchPractice}</span>
+          <ChevronRight className={`w-4 h-4 ${isRtl ? 'rotate-180' : ''}`} />
         </button>
       </div>
     </div>

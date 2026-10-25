@@ -67,7 +67,7 @@ export const DesktopNavBar: React.FC<DesktopNavBarProps> = ({ isAdmin, t }) => {
         exact: true,
         priority: 1,
         accent: 'blue',
-        description: 'Command center & readiness',
+        description: t.nav.dashboardDesc,
       },
       {
         id: 'test',
@@ -77,7 +77,7 @@ export const DesktopNavBar: React.FC<DesktopNavBarProps> = ({ isAdmin, t }) => {
         exact: false,
         priority: 1,
         accent: 'blue',
-        description: 'Timed blocks & custom drills',
+        description: t.nav.testDesc,
       },
       {
         id: 'review',
@@ -87,7 +87,7 @@ export const DesktopNavBar: React.FC<DesktopNavBarProps> = ({ isAdmin, t }) => {
         exact: false,
         priority: 1,
         accent: 'blue',
-        description: 'Spaced repetition & missed items',
+        description: t.nav.reviewDesc,
       },
       {
         id: 'curriculum',
@@ -97,7 +97,7 @@ export const DesktopNavBar: React.FC<DesktopNavBarProps> = ({ isAdmin, t }) => {
         exact: false,
         priority: 2,
         accent: 'blue',
-        description: 'Pathophysiology & organ systems',
+        description: t.nav.curriculumDesc,
       },
       {
         id: 'studio',
@@ -107,7 +107,7 @@ export const DesktopNavBar: React.FC<DesktopNavBarProps> = ({ isAdmin, t }) => {
         exact: false,
         priority: 3,
         accent: 'indigo',
-        description: 'AI question authoring laboratory',
+        description: t.nav.studioDesc,
       },
     ];
 
@@ -121,7 +121,7 @@ export const DesktopNavBar: React.FC<DesktopNavBarProps> = ({ isAdmin, t }) => {
         priority: 4,
         accent: 'amber',
         badge: true,
-        description: 'Platform governance & cohorts',
+        description: t.nav.adminDesc,
       });
     }
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStatsStore } from '../../../application/stores/useStatsStore.ts';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
+import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 import { 
   AlertOctagon, 
   TrendingDown, 
@@ -14,6 +15,7 @@ import {
 export const ReviewHub: React.FC = () => {
   const navigate = useNavigate();
   const { questions } = useQuestionStore();
+  const { t, isRtl } = useLocaleStore();
   const { 
     topicStats, 
     totalAttempts, 
@@ -54,13 +56,13 @@ export const ReviewHub: React.FC = () => {
         <div className="space-y-1.5">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-400/20 text-rose-700 dark:text-rose-400 text-xs font-semibold backdrop-blur-md">
             <TrendingDown className="w-3.5 h-3.5" />
-            <span>Targeted Weakness Remediation</span>
+            <span>{t.review.badge}</span>
           </div>
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 dark:from-zinc-100 dark:via-zinc-200 dark:to-rose-200 bg-clip-text text-transparent">
-            Review & Remediation Hub
+            {t.review.title}
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl leading-relaxed">
-            Diagnose repeated mistakes, identify low-accuracy faculty concepts, and launch focused retests.
+            {t.review.subtitle}
           </p>
         </div>
 
@@ -71,7 +73,7 @@ export const ReviewHub: React.FC = () => {
               className="py-2.5 px-4 bg-white/50 dark:bg-zinc-800/50 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 dark:hover:text-rose-400 text-slate-600 dark:text-zinc-400 rounded-2xl text-xs font-bold flex items-center space-x-1.5 border border-white/80 dark:border-zinc-700/80 backdrop-blur-md shadow-xs transition-all duration-200 cursor-pointer apple-tap"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset History</span>
+              <span>{t.common.reset}</span>
             </button>
           )}
         </div>
@@ -88,7 +90,7 @@ export const ReviewHub: React.FC = () => {
           }`}
         >
           <TrendingDown className="w-3.5 h-3.5" />
-          <span>Curriculum Mastery</span>
+          <span>{t.review.tabWeak}</span>
         </button>
 
         <button
@@ -100,7 +102,7 @@ export const ReviewHub: React.FC = () => {
           }`}
         >
           <AlertOctagon className="w-3.5 h-3.5" />
-          <span>Mistakes ({mistakeQuestionIds.length})</span>
+          <span>{t.review.tabMistakes} ({mistakeQuestionIds.length})</span>
         </button>
       </div>
 
@@ -121,7 +123,7 @@ export const ReviewHub: React.FC = () => {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider">
-                        Topic
+                        {t.review.tabWeak}
                       </span>
                       <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-sm mt-0.5">
                         {topic.topicName}
@@ -141,7 +143,7 @@ export const ReviewHub: React.FC = () => {
                         </span>
                       ) : (
                         <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400">
-                          Unattempted
+                          {t.review.notAttempted}
                         </span>
                       )}
                     </div>
@@ -160,13 +162,13 @@ export const ReviewHub: React.FC = () => {
                   )}
 
                   <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400 pt-1">
-                    <span>{topic.totalAttempts} attempts logged</span>
+                    <span>{topic.totalAttempts} {t.dashboard.dueReviewsSub}</span>
                     <button
                       onClick={() => navigate('/test/quick')}
                       className="text-blue-600 dark:text-blue-400 font-bold hover:underline flex items-center space-x-1 cursor-pointer"
                     >
-                      <span>Practice Topic</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
+                      <span>{t.review.startTopicPractice}</span>
+                      <ChevronRight className={`w-3.5 h-3.5 ${isRtl ? 'rotate-180' : ''}`} />
                     </button>
                   </div>
                 </div>
@@ -184,10 +186,10 @@ export const ReviewHub: React.FC = () => {
               <div className="p-6 rounded-3xl bg-rose-500/10 dark:bg-rose-950/30 border border-rose-400/20 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <h3 className="font-extrabold text-rose-900 dark:text-rose-200 text-lg">
-                    {mistakeQuestions.length} Questions Requiring Remediation
+                    {mistakeQuestions.length} {t.review.tabMistakes}
                   </h3>
                   <p className="text-xs text-rose-700/80 dark:text-rose-300 mt-1">
-                    Questions answered incorrectly in practice or mock exams. Retest until mastered.
+                    {t.review.subtitle}
                   </p>
                 </div>
                 <button
@@ -195,7 +197,7 @@ export const ReviewHub: React.FC = () => {
                   className="py-3 px-6 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white rounded-2xl text-xs sm:text-sm font-extrabold flex items-center space-x-2 shadow-lg shadow-rose-600/25 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer shrink-0"
                 >
                   <Play className="w-4 h-4 fill-current" />
-                  <span>Launch Mistake Retest</span>
+                  <span>{t.review.retestMistakesBtn}</span>
                 </button>
               </div>
 
@@ -207,14 +209,14 @@ export const ReviewHub: React.FC = () => {
                   >
                     <div className="flex items-center space-x-2 text-[11px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider">
                       <AlertOctagon className="w-3.5 h-3.5" />
-                      <span>Mistake #{idx + 1} • {q.concept}</span>
+                      <span>{t.review.tabMistakes} #{idx + 1} • {q.concept}</span>
                     </div>
                     <p className="text-sm font-semibold text-slate-900 dark:text-zinc-100 leading-snug">
                       {q.stem}
                     </p>
                     {q.evidence && q.evidence[0] && (
                       <p className="text-xs text-slate-500 dark:text-zinc-400 italic">
-                        Evidence: {q.evidence[0].sourceName} ({q.evidence[0].location})
+                        {t.test.player.curriculumRefTitle} {q.evidence[0].sourceName} ({q.evidence[0].location})
                       </p>
                     )}
                   </div>
@@ -226,9 +228,9 @@ export const ReviewHub: React.FC = () => {
               <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
-              <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-base">No Active Mistakes</h3>
+              <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-base">{t.review.noMistakesTitle}</h3>
               <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">
-                Any questions you miss during Quick Practice or Mock Exams will automatically populate here for targeted remediation.
+                {t.review.noMistakesDesc}
               </p>
             </div>
           )}
