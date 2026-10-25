@@ -449,7 +449,8 @@ export default {
           status: 304,
           headers: {
             ETag: serverEtag,
-            'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
+            'Cache-Control': 'no-cache, must-revalidate',
+            Pragma: 'no-cache',
           },
         });
       }
@@ -528,7 +529,8 @@ export default {
           headers: {
             'Content-Type': 'application/json',
             ETag: serverEtag,
-            'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
+            'Cache-Control': 'no-cache, must-revalidate',
+            Pragma: 'no-cache',
           },
         }
       );
