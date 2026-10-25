@@ -249,6 +249,128 @@ describe('NonDestructiveBankMergeStrategy', () => {
     expect(preserved).toBeDefined();
     expect(canonical?.provenanceScope).toBe('global-canonical');
   });
+
+  it('does not duplicate locally authored questions when they are approved and synced from the global bank (same ID and stemHash)', () => {
+    const mergeStrategy = new NonDestructiveBankMergeStrategy();
+    const commonStem = 'A 55-year-old male presents with retrosternal chest pain radiating to the left arm.';
+    const commonStemHash = QuestionCanonicalHasher.computeStemHashSync(commonStem);
+
+    // 1. User authored locally or submitted for review
+    const localPendingQuestion: GovernedQuestion = {
+      ...SAMPLE_QUESTION,
+      id: 'q-cvs-ana-0099',
+      stem: commonStem,
+      provenanceScope: 'submitted-pending',
+      editorialStatus: 'pending_review',
+      stemHash: commonStemHash,
+      globalRevision: 0,
+      authorId: 'usr-student',
+      authorDisplayName: 'Medical Scholar',
+      reviewedById: null,
+      reviewedByDisplayName: null,
+      reviewerNotes: null,
+      publishedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // 2. Incoming from global bank after reviewer approved and published it
+    const incomingApprovedCanonical: GovernedQuestion = {
+      ...SAMPLE_QUESTION,
+      id: 'q-cvs-ana-0099',
+      stem: commonStem,
+      provenanceScope: 'global-canonical',
+      editorialStatus: 'published',
+      stemHash: commonStemHash,
+      globalRevision: 5,
+      authorId: 'usr-student',
+      authorDisplayName: 'Medical Scholar',
+      reviewedById: 'usr-faculty-admin',
+      reviewedByDisplayName: 'Dr. Faculty',
+      reviewerNotes: 'Verified against anatomy syllabus.',
+      publishedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const result = mergeStrategy.mergeGlobalDeltaIntoLocal({
+      blockId: 'cvs',
+      currentLocalQuestions: [localPendingQuestion],
+      incomingGlobalQuestions: [incomingApprovedCanonical],
+      archivedGlobalIds: [],
+      newRevision: 5 as BankRevisionNumber,
+      syncedAt: new Date().toISOString(),
+    });
+
+    // CRITICAL: MUST NOT DUPLICATE! Exactly 1 question in bank, upgraded to canonical
+    expect(result.mergedQuestions).toHaveLength(1);
+    expect(result.report.updatedCanonicalCount).toBe(1);
+    expect(result.report.insertedCount).toBe(0);
+    expect(result.mergedQuestions[0].id).toBe('q-cvs-ana-0099');
+    expect(result.mergedQuestions[0].provenanceScope).toBe('global-canonical');
+    expect(result.mergedQuestions[0].editorialStatus).toBe('published');
+    expect(result.mergedQuestions.some((q) => q.id.includes('-local-'))).toBe(false);
+  });
+
+  it('reconciles and does not duplicate when local question had a temporary ID and incoming canonical has official ID with same stemHash', () => {
+    const mergeStrategy = new NonDestructiveBankMergeStrategy();
+    const commonStem = 'A 28-year-old female presents with palpitations and mid-systolic click.';
+    const commonStemHash = QuestionCanonicalHasher.computeStemHashSync(commonStem);
+
+    // User authored with temporary local ID
+    const localDraftQuestion: GovernedQuestion = {
+      ...SAMPLE_QUESTION,
+      id: 'temp-local-draft-001',
+      stem: commonStem,
+      provenanceScope: 'local-custom',
+      editorialStatus: 'local_draft',
+      stemHash: commonStemHash,
+      globalRevision: 0,
+      authorId: 'usr-author',
+      authorDisplayName: 'Author',
+      reviewedById: null,
+      reviewedByDisplayName: null,
+      reviewerNotes: null,
+      publishedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Global canonical bank publishes it with official canonical ID
+    const incomingCanonical: GovernedQuestion = {
+      ...SAMPLE_QUESTION,
+      id: 'q-cvs-ana-0150',
+      stem: commonStem,
+      provenanceScope: 'global-canonical',
+      editorialStatus: 'published',
+      stemHash: commonStemHash,
+      globalRevision: 8,
+      authorId: 'usr-author',
+      authorDisplayName: 'Author',
+      reviewedById: 'usr-faculty',
+      reviewedByDisplayName: 'Faculty Reviewer',
+      reviewerNotes: null,
+      publishedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const result = mergeStrategy.mergeGlobalDeltaIntoLocal({
+      blockId: 'cvs',
+      currentLocalQuestions: [localDraftQuestion],
+      incomingGlobalQuestions: [incomingCanonical],
+      archivedGlobalIds: [],
+      newRevision: 8 as BankRevisionNumber,
+      syncedAt: new Date().toISOString(),
+    });
+
+    // Old temporary ID must be retired, canonical ID inserted, no duplicates!
+    expect(result.mergedQuestions).toHaveLength(1);
+    expect(result.mergedQuestions[0].id).toBe('q-cvs-ana-0150');
+    expect(result.mergedQuestions[0].provenanceScope).toBe('global-canonical');
+    expect(result.report.updatedCanonicalCount).toBe(1);
+    expect(result.mergedQuestions.find((q) => q.id === 'temp-local-draft-001')).toBeUndefined();
+  });
 });
 
 describe('QuestionSpecificationBuilder & computeGlobalBankKpis', () => {
