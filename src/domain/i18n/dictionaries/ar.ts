@@ -1,0 +1,68 @@
+import type { TranslationDictionary } from '../types.ts';
+
+export const arDictionary: TranslationDictionary = {
+  common: {
+    appName: 'ميد كويستس',
+    examPrepBadge: 'إعداد الامتحانات',
+    saveAndApply: 'حفظ وتطبيق',
+    saved: 'تم الحفظ!',
+    cancel: 'إلغاء',
+    close: 'إغلاق',
+    loading: 'جارٍ التحميل...',
+    languageLabel: 'اللغة',
+    languageToggleAria: 'تبديل لغة واجهة المنصة (English / العربية)',
+  },
+  nav: {
+    dashboard: 'لوحة التحكم',
+    test: 'الاختبار',
+    review: 'المراجعة',
+    curriculum: 'المنهج',
+    studio: 'الاستوديو',
+    admin: 'الإدارة',
+    activeBlockPrefix: 'CVS',
+  },
+  copilot: {
+    title: 'المساعد الذكي',
+    subtitle: 'مرشد سريري سقراطي ذاتي القيادة',
+    emptyTitle: 'المساعد السريري السقراطي',
+    emptyDescription:
+      'إرشاد معرفي فوري متزامن مع السؤال النشط وبيانات الأداء والتفكير السريري.',
+    inputPlaceholder: 'اطرح سؤالاً أو ناقش التعليل التشخيصي...',
+    inputStreamingPlaceholder: 'جارٍ توليد التوجيه السريري...',
+    reasoningBadge: 'تفكير',
+    clearConversation: 'مسح المحادثة',
+    stopGeneration: 'إيقاف التوليد',
+    sendMessage: 'إرسال الرسالة (Enter)',
+    expandWidth: 'توسيع العرض',
+    collapseWidth: 'تصغير العرض',
+    closeCopilot: 'إغلاق المساعد (Esc)',
+    chatLanguagePillTooltip: 'لغة محادثة المساعد: انقر للتبديل (تلقائي / English / عربي)',
+    starterPrompts: [
+      'ما هو التغير الديناميكي الدموي الأساسي في هذه الحالة؟',
+      'أنا محتار بين الخيارين B و C — ما الذي يفرق بينهما؟',
+      'قم بمحاكاة منحنى الضغط والحجم (P-V Loop) لهذه الآفة القلبية.',
+    ],
+    diagnostics: {
+      analyzingVignette: 'تحليل معطيات الحالة وخريطة الأفخاخ...',
+      readingTelemetry: 'قراءة بيانات التردد والوقت الفعلي...',
+      evaluatingBias: 'تقييم الانحياز المعرفي وأنماط التثبيت...',
+      runningGeneric: 'تشغيل الفحص السريري الخلفي...',
+    },
+    settings: {
+      modalTitle: 'محركات المساعد الذكي السحابية',
+      modalSubtitle: 'اختر محرك التفكير السريري ولغة المحادثة المفضلة',
+      chatLanguageLabel: 'لغة ردود المساعد في المحادثة',
+      chatLanguageSubtext:
+        'تحدد اللغة التي يستخدمها المرشد الذكي في الشات، مع الحفاظ على مصطلحات USMLE الإنجليزية.',
+      langAuto: 'كشف تلقائي',
+      langAutoDesc: 'يطابق لغة كل رسالة تكتبها في الشات تلقائياً.',
+      langEnglish: 'English (الإنجليزية)',
+      langEnglishDesc: 'يرد دائماً بالإنجليزية السريرية المعتمدة لاختبارات البورد.',
+      langArabic: 'العربية (Medical Arabic)',
+      langArabicDesc: 'يرد بالعربية الطبية الفصحى مع إبقاء المصطلحات الإنجليزية بين قوسين.',
+      chooseModelLabel: 'اختر النموذج السريري:',
+      advancedCustomModel: 'متقدم: معرف النموذج المخصص',
+      persistedNotice: 'محفوظ محلياً في قاعدة بيانات IndexedDB المشفرة',
+    },
+  },
+};
