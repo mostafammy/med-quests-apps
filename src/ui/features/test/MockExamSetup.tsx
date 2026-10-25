@@ -1,9 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, Award, Play } from 'lucide-react';
+import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 
 export const MockExamSetup: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useLocaleStore();
 
   const handleStartMock = () => {
     navigate('/session/mock-exam', {
@@ -23,9 +25,9 @@ export const MockExamSetup: React.FC = () => {
         <div className="inline-flex items-center justify-center p-3 bg-slate-900 dark:bg-zinc-800 text-white rounded-2xl shadow-md">
           <Award className="w-8 h-8 text-amber-400" />
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-zinc-100 tracking-tight">Full Mock Examination</h1>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-zinc-100 tracking-tight">{t.test.mockSetup.title}</h1>
         <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
-          Simulate the actual university CVS Block 206 Exam. Standardized conditions with stratified question distribution.
+          {t.test.mockSetup.subtitle}
         </p>
       </div>
 
@@ -33,21 +35,21 @@ export const MockExamSetup: React.FC = () => {
         {/* Exam Specification Badges */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-center">
           <div className="p-3.5 sm:p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-100 dark:border-zinc-800">
-            <div className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 uppercase font-semibold">Length</div>
-            <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-1">50 Questions</div>
-            <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">Stratified Sampling</div>
+            <div className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 uppercase font-semibold">{t.test.mockSetup.length}</div>
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-1">50 {t.common.questions}</div>
+            <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">{t.test.mockSetup.lengthSub}</div>
           </div>
 
           <div className="p-3.5 sm:p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-100 dark:border-zinc-800">
-            <div className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 uppercase font-semibold">Duration</div>
+            <div className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 uppercase font-semibold">{t.test.mockSetup.duration}</div>
             <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-1">2 Hours</div>
-            <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">144s per Question</div>
+            <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">{t.test.mockSetup.durationSub}</div>
           </div>
 
           <div className="p-3.5 sm:p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-100 dark:border-zinc-800 col-span-2 sm:col-span-1">
-            <div className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 uppercase font-semibold">Mode</div>
-            <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">Simulation</div>
-            <div className="text-[10px] sm:text-[11px] text-indigo-700 dark:text-indigo-300 mt-0.5">No Feedback Revealed</div>
+            <div className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 uppercase font-semibold">{t.test.mockSetup.mode}</div>
+            <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">{t.test.mockMode}</div>
+            <div className="text-[10px] sm:text-[11px] text-indigo-700 dark:text-indigo-300 mt-0.5">{t.test.mockSetup.modeSub}</div>
           </div>
         </div>
 
@@ -55,13 +57,13 @@ export const MockExamSetup: React.FC = () => {
         <div className="p-4 bg-slate-900 dark:bg-zinc-950 text-slate-200 dark:text-zinc-300 rounded-2xl text-xs space-y-2 border border-slate-800 dark:border-zinc-800">
           <div className="flex items-center space-x-2 text-amber-400 font-bold uppercase tracking-wider">
             <ShieldAlert className="w-4 h-4" />
-            <span>Strict Examination Rules</span>
+            <span>{t.test.mockSetup.rulesTitle}</span>
           </div>
           <ul className="list-disc list-inside space-y-1 text-slate-300 dark:text-zinc-400">
-            <li>Answers are recorded immediately without revealing correctness or explanations.</li>
-            <li>Timer continues running if you navigate away from the browser window.</li>
-            <li>Flagging and free question navigation (1–50) are enabled during the exam.</li>
-            <li>Comprehensive score report, calibration, and curriculum revision plan are generated upon submission.</li>
+            <li>{t.test.mockSetup.rule1}</li>
+            <li>{t.test.mockSetup.rule2}</li>
+            <li>{t.test.mockSetup.rule3}</li>
+            <li>{t.test.mockSetup.rule4}</li>
           </ul>
         </div>
 
@@ -70,7 +72,7 @@ export const MockExamSetup: React.FC = () => {
           className="w-full py-3.5 px-6 bg-slate-900 dark:bg-zinc-800 hover:bg-slate-800 dark:hover:bg-zinc-700 text-white rounded-2xl text-base font-bold flex items-center justify-center space-x-2 shadow-md transition-all cursor-pointer border border-transparent dark:border-zinc-700 apple-tap"
         >
           <Play className="w-5 h-5 fill-current text-emerald-400" />
-          <span>Start 2-Hour Mock Exam</span>
+          <span>{t.test.mockSetup.startBtn}</span>
         </button>
       </div>
     </div>
