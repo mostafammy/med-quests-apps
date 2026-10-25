@@ -408,6 +408,13 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
       }
 
       if (rafId !== null) cancelAnimationFrame(rafId);
+
+      // Fail-safe: If model only generated reasoning without subsequent text, promote it as answer
+      if (!accumulatedText.trim() && accumulatedThinking.trim()) {
+        accumulatedText = accumulatedThinking;
+        accumulatedThinking = '';
+      }
+
       flushUpdatesToStore();
 
       const finalParts: MessagePart[] = [];
@@ -427,6 +434,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
                 engine: resolvedEngineId,
                 modelId: resolvedModelId,
                 thinking: accumulatedThinking || null,
+                parts: finalParts,
               }
             : m
         ),

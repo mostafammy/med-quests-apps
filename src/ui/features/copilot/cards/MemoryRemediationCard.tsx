@@ -13,6 +13,7 @@ interface SrsProps {
 }
 
 export const SrsFlashcardCard: React.FC<SrsProps> = ({ result }) => {
+  if (!result) return null;
   return (
     <div className="relative my-3 p-4 rounded-2xl border border-emerald-300/80 dark:border-emerald-900/60 bg-gradient-to-br from-emerald-50/70 via-teal-50/40 to-transparent dark:from-emerald-950/30 dark:via-zinc-900/60 backdrop-blur-xl shadow-md shadow-emerald-500/5 space-y-2.5 overflow-hidden">
       <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-400" />
@@ -40,6 +41,11 @@ interface MnemonicProps {
 }
 
 export const MnemonicAnchorCard: React.FC<MnemonicProps> = ({ result }) => {
+  if (!result) return null;
+  const mappings = Array.isArray(result.expansionMappings) ? result.expansionMappings : [];
+  const token = result.mnemonicToken || 'MNEMONIC';
+  const rule = result.clinicalApplicationRule || '';
+
   return (
     <div className="relative my-3 p-4 rounded-2xl border border-purple-300/80 dark:border-purple-900/60 bg-gradient-to-br from-purple-50/70 via-pink-50/40 to-transparent dark:from-purple-950/30 dark:via-zinc-900/60 backdrop-blur-xl shadow-md shadow-purple-500/5 space-y-2.5 overflow-hidden">
       <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500" />
@@ -49,24 +55,28 @@ export const MnemonicAnchorCard: React.FC<MnemonicProps> = ({ result }) => {
           <span className="uppercase tracking-wider">Clinical Mnemonic Anchor</span>
         </div>
         <span className="text-xs font-mono font-black px-2.5 py-0.5 rounded-md bg-purple-600 text-white shadow-xs">
-          {result.mnemonicToken}
+          {token}
         </span>
       </div>
 
-      <div className="space-y-1 text-xs">
-        {result.expansionMappings.map((m: { letter: string; meaning: string }, idx: number) => (
-          <div key={idx} className="flex items-center space-x-2">
-            <span className="w-5 font-mono font-black text-purple-600 dark:text-purple-400 text-center">
-              {m.letter}
-            </span>
-            <span className="text-slate-700 dark:text-zinc-300 font-medium">{m.meaning}</span>
-          </div>
-        ))}
-      </div>
+      {mappings.length > 0 && (
+        <div className="space-y-1 text-xs">
+          {mappings.map((m: { letter: string; meaning: string }, idx: number) => (
+            <div key={idx} className="flex items-center space-x-2">
+              <span className="w-5 font-mono font-black text-purple-600 dark:text-purple-400 text-center">
+                {m?.letter || ''}
+              </span>
+              <span className="text-slate-700 dark:text-zinc-300 font-medium">{m?.meaning || ''}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
-      <div className="p-2.5 rounded-xl bg-purple-100/50 dark:bg-purple-950/40 text-xs text-purple-950 dark:text-purple-200 border border-purple-200/60 dark:border-purple-900/40 leading-relaxed font-medium">
-        <strong>Exam Rule:</strong> {result.clinicalApplicationRule}
-      </div>
+      {rule && (
+        <div className="p-2.5 rounded-xl bg-purple-100/50 dark:bg-purple-950/40 text-xs text-purple-950 dark:text-purple-200 border border-purple-200/60 dark:border-purple-900/40 leading-relaxed font-medium">
+          <strong>Exam Rule:</strong> {rule}
+        </div>
+      )}
     </div>
   );
 };
@@ -79,13 +89,16 @@ export const MicroCurriculumCard: React.FC<MicroCurriculumProps> = ({ result }) 
   const navigate = useNavigate();
   const { closeDrawer } = useCopilotStore();
 
+  if (!result) return null;
+  const questionCount = Array.isArray(result.selectedQuestionIds) ? result.selectedQuestionIds.length : 3;
+
   const handleLaunchDrill = () => {
     closeDrawer();
     navigate('/session/retest-session', {
       state: {
         mode: 'retest',
-        questionCount: result.selectedQuestionIds.length,
-        title: result.targetWeaknessTitle,
+        questionCount,
+        title: result.targetWeaknessTitle || 'Clinical Remediation Drill',
       },
     });
   };
@@ -107,14 +120,14 @@ export const MicroCurriculumCard: React.FC<MicroCurriculumProps> = ({ result }) 
         <div className="font-bold text-slate-900 dark:text-zinc-100 uppercase text-[10px] tracking-wide text-indigo-600 dark:text-indigo-400">
           Step 1: Core Pathophysiological Mechanism
         </div>
-        <p>{result.twoMinuteMechanismReview}</p>
+        <p>{result.twoMinuteMechanismReview || ''}</p>
       </div>
 
       <button
         onClick={handleLaunchDrill}
         className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:via-purple-500 hover:to-pink-500 text-white font-extrabold text-xs flex items-center justify-center space-x-2 transition-all shadow-md shadow-indigo-600/20 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
       >
-        <span>Step 2: Launch Targeted 3-Question Drill</span>
+        <span>Step 2: Launch Targeted {questionCount}-Question Drill</span>
         <ArrowRight className="w-3.5 h-3.5" />
       </button>
     </div>

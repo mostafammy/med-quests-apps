@@ -18,7 +18,7 @@ export const AiSettingsSchema = z.object({
   groqApiKey: z.string().default(''),
   groqModel: z.string().default('openai/gpt-oss-20b'),
   geminiApiKey: z.string().default(''),
-  geminiModel: z.string().default('gemini-3.5-flash-lite'),
+  geminiModel: z.string().default('gemini-2.5-flash'),
 });
 
 export type AiSettings = z.infer<typeof AiSettingsSchema>;
@@ -31,7 +31,7 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
   groqApiKey: '',
   groqModel: 'openai/gpt-oss-20b',
   geminiApiKey: '',
-  geminiModel: 'gemini-3.5-flash-lite',
+  geminiModel: 'gemini-2.5-flash',
 };
 
 export function parseAiSettings(raw: unknown): AiSettings {
@@ -50,8 +50,8 @@ export function parseAiSettings(raw: unknown): AiSettings {
         groqApiKey: data.groqApiKey || DEFAULT_AI_SETTINGS.groqApiKey,
         groqModel: 'openai/gpt-oss-20b',
         geminiModel:
-          data.geminiModel === 'gemini-2.5-pro' || data.geminiModel === 'gemini-2.5-flash-lite'
-            ? 'gemini-3.5-flash-lite'
+          data.geminiModel === 'gemini-3.8-flash' || data.geminiModel === 'gemini-2.5-flash-lite'
+            ? 'gemini-2.5-flash'
             : data.geminiModel,
         openRouterModel:
           data.openRouterModel === 'meta-llama/llama-3.1-8b-instruct:free' ||
@@ -60,9 +60,9 @@ export function parseAiSettings(raw: unknown): AiSettings {
             : data.openRouterModel,
       };
     }
-    // Auto-migrate decommissioned Gemini models
-    if (data.geminiModel === 'gemini-2.5-pro' || data.geminiModel === 'gemini-2.5-flash-lite') {
-      data.geminiModel = 'gemini-3.5-flash-lite';
+    // Auto-migrate decommissioned Gemini models (e.g. gemini-3.8-flash)
+    if (data.geminiModel === 'gemini-3.8-flash' || data.geminiModel === 'gemini-2.5-flash-lite') {
+      data.geminiModel = 'gemini-2.5-flash';
     }
     // Auto-migrate decommissioned OpenRouter models
     if (

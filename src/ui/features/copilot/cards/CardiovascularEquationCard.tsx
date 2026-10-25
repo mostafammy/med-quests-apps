@@ -7,6 +7,7 @@ interface Props {
 }
 
 export const CardiovascularEquationCard: React.FC<Props> = ({ result }) => {
+  if (!result) return null;
   return (
     <div className="relative my-3 p-4 rounded-2xl border border-blue-200/80 dark:border-blue-900/60 bg-gradient-to-br from-blue-50/70 via-indigo-50/40 to-transparent dark:from-blue-950/30 dark:via-zinc-900/60 backdrop-blur-xl shadow-md shadow-blue-500/5 space-y-3 overflow-hidden">
       {/* Top Accent Line */}

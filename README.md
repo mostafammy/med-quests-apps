@@ -691,22 +691,32 @@ If you previously tested adding questions and noticed other users did not see th
 
 ### 6.3 Local-to-Global Bank Recovery & Reset Protocol
 
-To safeguard student devices against corrupted local states, malformed custom imports, or stale draft accumulations, the system exposes an atomic **"Reset to Global Bank"** mechanism in both [`QuestionStudio.tsx`](src/ui/features/studio/QuestionStudio.tsx) and the [`QuestionBankGovernancePanel.tsx`](src/ui/features/admin/QuestionBankGovernancePanel.tsx).
+To safeguard student devices against corrupted local states, malformed custom imports, or stale draft accumulations, the system exposes an atomic **"Reset to Global Bank"** mechanism accessible to **all users (students, guests, pro scholars, and faculty)** across the entire platform:
+
+1. **Persistent Header Navigation**: The interactive [`QuestionBankStatusPill`](src/ui/features/questionBank/QuestionBankStatusPill.tsx) mounted in [`Shell.tsx`](src/ui/app/Shell.tsx) gives users 1-click access to the Question Bank Status popover on every screen.
+2. **Dashboard Command Hub**: Directly accessible in the top header action ribbon and within the Active Bank metric card in [`Dashboard.tsx`](src/ui/features/dashboard/Dashboard.tsx).
+3. **Test Hub Preparation**: Placed immediately adjacent to the matching questions filter in [`TestHub.tsx`](src/ui/features/test/TestHub.tsx), allowing scholars to ensure their bank is 100% up-to-date before launching timed exam sprints.
+4. **Identity & Security Modal**: Integrated into the Data & Continuity settings of [`AuthSecurityModal.tsx`](src/ui/features/auth/AuthSecurityModal.tsx) for both anonymous guests and authenticated scholars.
+5. **Question Studio & Faculty Governance Cockpit**: Direct action ribbons in [`QuestionStudio.tsx`](src/ui/features/studio/QuestionStudio.tsx) and [`QuestionBankGovernancePanel.tsx`](src/ui/features/admin/QuestionBankGovernancePanel.tsx).
+
+Every entrypoint invokes [`ResetBankConfirmationModal.tsx`](src/ui/features/questionBank/ResetBankConfirmationModal.tsx), an Apple Human Interface Guidelines (HIG) spring modal with clear destructive state warnings and live contrast telemetry.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User as Student / Faculty User
-    participant UI as Studio / Governance UI
+    participant UI as Universal Reset Trigger (Header / Dashboard / Test Hub / Modal)
+    participant Modal as ResetBankConfirmationModal.tsx
     participant Store as useQuestionStore.ts
     participant Dexie as IndexedDB (db.questions & db.bankSyncMeta)
     participant Edge as Edge Gateway / Worker
 
     User->>UI: Clicks "Reset to Global Bank" (RotateCcw)
-    UI->>User: Displays Native Confirmation Alert (Apple HIG Destructive Action)
-    User-->>UI: Confirms Reset
+    UI->>Modal: Opens Apple HIG Confirmation Modal
+    Modal->>User: Displays Local vs Canonical Stats & Destructive Warning
+    User-->>Modal: Confirms Reset ("Reset to Global Bank")
 
-    UI->>Store: resetLocalBankToGlobal('cvs')
+    Modal->>Store: resetLocalBankToGlobal('cvs')
     Store->>Dexie: Clear questions (db.questions.where('blockId').equals('cvs').delete())
     Store->>Dexie: Clear sync cursor (db.bankSyncMeta.delete('cvs'))
     

@@ -116,13 +116,74 @@ export class GeminiProvider {
 
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
-      if (response.status === 400 || response.status === 403) {
-        throw new Error('Invalid Gemini API Key or model access denied.');
+      let parsedMessage = '';
+      try {
+        const parsed = JSON.parse(errText);
+        parsedMessage = parsed?.error?.message || '';
+      } catch {
+        // ignore
       }
-      if (response.status === 429) {
-        throw new Error('Gemini rate limit exceeded.');
+
+      // 1. Auto-recovery: If thinkingConfig was rejected on this model, retry without it
+      if (
+        response.status === 400 &&
+        payload.generationConfig?.thinkingConfig &&
+        parsedMessage.toLowerCase().includes('thinking')
+      ) {
+        delete payload.generationConfig.thinkingConfig;
+        try {
+          response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal,
+          });
+        } catch (err) {
+          if ((err as Error).name === 'AbortError') throw err;
+        }
       }
-      throw new Error(`Gemini error (${response.status}): ${errText.slice(0, 200)}`);
+
+      // 2. Auto-recovery: Fall back to standard gemini-2.5-flash if model was unavailable or access denied
+      if (
+        !response.ok &&
+        cleanModel !== 'gemini-2.5-flash' &&
+        (response.status === 404 ||
+          response.status === 503 ||
+          response.status === 403 ||
+          (response.status === 400 && !parsedMessage.includes('API key not valid')))
+      ) {
+        const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${this.apiKey.trim()}`;
+        try {
+          const fallbackRes = await fetch(fallbackUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal,
+          });
+          if (fallbackRes.ok) {
+            response = fallbackRes;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!response.ok) {
+        if (
+          response.status === 401 ||
+          (response.status === 400 && parsedMessage.includes('API key not valid')) ||
+          (response.status === 403 && parsedMessage.includes('API_KEY_INVALID'))
+        ) {
+          throw new Error('Invalid Gemini API Key. Please verify your Google Gemini API key in Co-Pilot settings.');
+        }
+        if (response.status === 429) {
+          throw new Error('Gemini rate limit exceeded. Please wait a moment, or switch to Groq in Co-Pilot Settings.');
+        }
+        if (parsedMessage) {
+          throw new Error(`Gemini: ${parsedMessage}`);
+        }
+        throw new Error(`Gemini error (${response.status}): ${errText.slice(0, 200)}`);
+      }
     }
 
     if (!response.body) {

@@ -7,6 +7,7 @@ interface Props {
 }
 
 export const HemodynamicPvLoopCard: React.FC<Props> = ({ result }) => {
+  if (!result || !result.normalParams || !result.pathologicParams) return null;
   const { pathologyLabel, chronicity, normalParams, pathologicParams, clinicalSummary } = result;
 
   // SVG Coordinate mapping:

@@ -7,6 +7,8 @@ interface Props {
 }
 
 export const PeerCohortTrapCard: React.FC<Props> = ({ result }) => {
+  if (!result) return null;
+  const distribution = result.choiceDistributionPct || {};
   return (
     <div className="relative my-3 p-4 rounded-2xl border border-amber-300/80 dark:border-amber-900/60 bg-gradient-to-br from-amber-50/70 via-orange-50/40 to-transparent dark:from-amber-950/30 dark:via-zinc-900/60 backdrop-blur-xl shadow-md shadow-amber-500/5 space-y-3 overflow-hidden">
       {/* Top Accent Line */}
@@ -28,7 +30,7 @@ export const PeerCohortTrapCard: React.FC<Props> = ({ result }) => {
       {/* Choice Distribution Bars */}
       <div className="space-y-1.5 pt-1">
         <div className="text-[10px] uppercase font-bold text-slate-400">Choice Distribution</div>
-        {Object.entries(result.choiceDistributionPct).map(([choiceId, pct]) => {
+        {Object.entries(distribution).map(([choiceId, pct]) => {
           const isTopTrap = choiceId === result.topTrapChoiceId;
           return (
             <div key={choiceId} className="flex items-center space-x-2 text-xs">

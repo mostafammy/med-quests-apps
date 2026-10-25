@@ -13,8 +13,12 @@ import {
   ShieldCheck,
   Loader2,
   ExternalLink,
+  RotateCcw,
 } from 'lucide-react';
 import { useAuthStore } from '../../../application/stores/useAuthStore.ts';
+import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
+import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
+import { ResetBankConfirmationModal } from '../questionBank/ResetBankConfirmationModal.tsx';
 import { ROLE_ENTITLEMENT_POLICIES } from '../../../domain/auth/entitlements.ts';
 import { db } from '../../../infrastructure/storage/db.ts';
 import type { ActiveDeviceSession } from '../../../domain/auth/types.ts';
@@ -34,6 +38,9 @@ export const AuthSecurityModal: React.FC = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittingProvider, setSubmittingProvider] = useState<'google' | null>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const { questions } = useQuestionStore();
+  const { t } = useLocaleStore();
 
   // Local IndexedDB Guest Stats for Live Continuity Feedback
   const [localStats, setLocalStats] = useState<{ attempts: number; bookmarks: number }>({
@@ -206,6 +213,34 @@ export const AuthSecurityModal: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Question Bank Recovery & Sync Card */}
+                  <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/70 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                            {t.bank.title}
+                          </h4>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                            <CheckCircle2 className="h-3 w-3" />
+                            {questions.length} Qs
+                          </span>
+                        </div>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          {t.bank.resetDescription}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowResetModal(true)}
+                        className="flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 px-3.5 py-2 text-xs font-bold text-rose-700 dark:text-rose-300 cursor-pointer transition-all apple-tap shrink-0"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5 text-rose-500" />
+                        <span>{t.bank.resetToGlobalBtn}</span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Primary Authentication Provider: Google */}
                   <div className="space-y-3 pt-1">
                     {/* Continue with Google */}
@@ -335,6 +370,34 @@ export const AuthSecurityModal: React.FC = () => {
                           )}
                         </div>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* Question Bank Recovery & Sync Card */}
+                  <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/70 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                            {t.bank.title}
+                          </h4>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                            <CheckCircle2 className="h-3 w-3" />
+                            {questions.length} Qs
+                          </span>
+                        </div>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          {t.bank.resetDescription}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowResetModal(true)}
+                        className="flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 px-3.5 py-2 text-xs font-bold text-rose-700 dark:text-rose-300 cursor-pointer transition-all apple-tap shrink-0"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5 text-rose-500" />
+                        <span>{t.bank.resetToGlobalBtn}</span>
+                      </button>
                     </div>
                   </div>
 
@@ -483,6 +546,12 @@ export const AuthSecurityModal: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Global Question Bank Recovery Modal */}
+      <ResetBankConfirmationModal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
+      />
     </div>
   );
 };

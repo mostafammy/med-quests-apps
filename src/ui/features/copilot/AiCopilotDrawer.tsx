@@ -407,26 +407,31 @@ export const AiCopilotDrawer: React.FC = () => {
                     }
 
                     if (part.kind === 'artifact') {
-                      const { artifactPayload } = part.envelope;
+                      const artifactPayload = part.envelope?.artifactPayload;
                       if (!artifactPayload) return null;
 
-                      if (artifactPayload.kind === 'pv_loop') {
-                        return <HemodynamicPvLoopCard key={pIdx} result={artifactPayload} />;
-                      }
-                      if (artifactPayload.kind === 'cv_equation') {
-                        return <CardiovascularEquationCard key={pIdx} result={artifactPayload} />;
-                      }
-                      if (artifactPayload.kind === 'peer_cohort') {
-                        return <PeerCohortTrapCard key={pIdx} result={artifactPayload} />;
-                      }
-                      if (artifactPayload.kind === 'srs_card') {
+                      try {
+                        if (artifactPayload.kind === 'pv_loop') {
+                          return <HemodynamicPvLoopCard key={pIdx} result={artifactPayload} />;
+                        }
+                        if (artifactPayload.kind === 'cv_equation') {
+                          return <CardiovascularEquationCard key={pIdx} result={artifactPayload} />;
+                        }
+                        if (artifactPayload.kind === 'peer_cohort') {
+                          return <PeerCohortTrapCard key={pIdx} result={artifactPayload} />;
+                        }
+                        if (artifactPayload.kind === 'srs_card') {
+                          return null;
+                        }
+                        if (artifactPayload.kind === 'mnemonic_anchor') {
+                          return <MnemonicAnchorCard key={pIdx} result={artifactPayload} />;
+                        }
+                        if (artifactPayload.kind === 'micro_curriculum') {
+                          return <MicroCurriculumCard key={pIdx} result={artifactPayload} />;
+                        }
+                      } catch (err) {
+                        console.warn('Failed to render artifact payload:', err);
                         return null;
-                      }
-                      if (artifactPayload.kind === 'mnemonic_anchor') {
-                        return <MnemonicAnchorCard key={pIdx} result={artifactPayload} />;
-                      }
-                      if (artifactPayload.kind === 'micro_curriculum') {
-                        return <MicroCurriculumCard key={pIdx} result={artifactPayload} />;
                       }
                     }
 

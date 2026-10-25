@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Brain, ChevronDown } from 'lucide-react';
 
 interface ThinkingAccordionProps {
@@ -10,12 +10,18 @@ export const ThinkingAccordion: React.FC<ThinkingAccordionProps> = ({
   thinking,
   isStreaming = false,
 }) => {
-  // Auto-expand during live streaming, collapsed by default when complete
+  // Auto-expand during live streaming, auto-collapse when complete
   const [isOpen, setIsOpen] = useState<boolean>(isStreaming);
+  const wasStreamingRef = useRef(isStreaming);
 
   useEffect(() => {
     if (isStreaming) {
       setIsOpen(true);
+      wasStreamingRef.current = true;
+    } else if (wasStreamingRef.current) {
+      // Auto-collapse when stream finishes so student immediately sees the answer
+      setIsOpen(false);
+      wasStreamingRef.current = false;
     }
   }, [isStreaming]);
 
