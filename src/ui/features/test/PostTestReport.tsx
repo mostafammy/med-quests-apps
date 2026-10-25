@@ -222,30 +222,59 @@ export const PostTestReport: React.FC<{
                 {/* Expanded Details */}
                 {isExpanded && (
                   <div className="pl-6 sm:pl-7 pt-2 space-y-4 text-xs">
-                    {/* Choices breakdown */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* Choices breakdown with Apple Glassmorphism and High Contrast */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {q.choices.map((c) => {
                         const wasChosen = ans?.choiceId === c.id;
+                        const isCorrect = c.isCorrect;
+
+                        let cardStyle = '';
+                        let badgePill = null;
+
+                        if (wasChosen && isCorrect) {
+                          cardStyle = 'bg-emerald-500/15 dark:bg-emerald-500/20 border-2 border-emerald-600 dark:border-emerald-400 text-emerald-950 dark:text-emerald-50 shadow-xs';
+                          badgePill = (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white font-bold text-[10px] flex items-center space-x-1">
+                              <CheckCircle2 className="w-3 h-3 stroke-[2.5]" />
+                              <span>Your Answer • Correct</span>
+                            </span>
+                          );
+                        } else if (wasChosen && !isCorrect) {
+                          cardStyle = 'bg-rose-500/15 dark:bg-rose-500/20 border-2 border-rose-600 dark:border-rose-400 text-rose-950 dark:text-rose-50 shadow-xs';
+                          badgePill = (
+                            <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white font-bold text-[10px] flex items-center space-x-1">
+                              <XCircle className="w-3 h-3 stroke-[2.5]" />
+                              <span>Your Choice • Incorrect</span>
+                            </span>
+                          );
+                        } else if (!wasChosen && isCorrect) {
+                          cardStyle = 'bg-emerald-500/10 dark:bg-emerald-500/15 border-2 border-dashed border-emerald-500 dark:border-emerald-400 text-emerald-950 dark:text-emerald-50 shadow-xs';
+                          badgePill = (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/25 dark:bg-emerald-500/30 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40 font-bold text-[10px] flex items-center space-x-1">
+                              <CheckCircle2 className="w-3 h-3 stroke-[2.5]" />
+                              <span>Correct Key</span>
+                            </span>
+                          );
+                        } else {
+                          cardStyle = 'glass-surface border border-slate-200/50 dark:border-zinc-800/50 text-slate-400 dark:text-zinc-500 opacity-60';
+                          badgePill = null;
+                        }
+
                         return (
                           <div
                             key={c.id}
-                            className={`p-3 rounded-2xl border text-xs ${
-                              c.isCorrect
-                                ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700/60 text-emerald-950 dark:text-emerald-100 font-medium'
-                                : wasChosen
-                                  ? 'bg-rose-50/80 dark:bg-rose-950/40 border-rose-300 dark:border-rose-700/60 text-rose-950 dark:text-rose-100'
-                                  : 'bg-slate-50 dark:bg-zinc-800/60 border-slate-200 dark:border-zinc-700/60 text-slate-600 dark:text-zinc-300'
-                            }`}
+                            className={`p-3.5 rounded-2xl text-xs transition-all ${cardStyle}`}
                           >
-                            <div className="flex items-center justify-between font-bold uppercase mb-1">
-                              <span>Option {c.id}</span>
-                              {c.isCorrect && <span className="text-emerald-700 dark:text-emerald-400 text-[10px]">Key (Correct)</span>}
-                              {wasChosen && !c.isCorrect && <span className="text-rose-700 dark:text-rose-400 text-[10px]">Your Answer</span>}
+                            <div className="flex items-center justify-between font-bold uppercase mb-1.5">
+                              <span className="font-mono text-[11px] font-black">Option {c.id}</span>
+                              {badgePill}
                             </div>
-                            <div>{c.text}</div>
-                            <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1.5 pt-1.5 border-t border-slate-200/50 dark:border-zinc-700/50">
-                              {c.rationale}
-                            </div>
+                            <div className="font-medium text-slate-800 dark:text-zinc-200">{c.text}</div>
+                            {c.rationale && (
+                              <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-2 pt-2 border-t border-slate-200/40 dark:border-zinc-700/40 leading-relaxed">
+                                {c.rationale}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
