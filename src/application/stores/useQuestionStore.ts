@@ -36,6 +36,7 @@ interface QuestionStoreState {
   loadMySubmissions: (authorId?: string) => Promise<void>;
   exportBankJson: () => string;
   clearBank: (blockId?: string) => Promise<void>;
+  resetLocalBankToGlobal: (blockId?: string) => Promise<{ resetCount: number; revision: number }>;
 }
 
 export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
@@ -140,6 +141,17 @@ export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
         lastMergeReport: mergeOutcome.report,
         isSyncing: false,
       });
+
+      // Broadcast sync event to peer tabs in the same browser
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        try {
+          const channel = new BroadcastChannel('medquests_bank_sync');
+          channel.postMessage({ type: 'BANK_SYNCED', revision: newCursor.serverRevision });
+          channel.close();
+        } catch {
+          // Ignore
+        }
+      }
 
       return mergeOutcome.report;
     } catch (err) {
@@ -289,4 +301,113 @@ export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
     await db.questions.where('blockId').equals(blockId).delete();
     set({ questions: [] });
   },
+
+  resetLocalBankToGlobal: async (blockId = 'cvs') => {
+    set({ isSyncing: true, error: null });
+    try {
+      // 1. Clear local IndexedDB questions & sync metadata cursor for this block
+      await db.questions.where('blockId').equals(blockId).delete();
+      await db.bankSyncMeta.delete(blockId);
+
+      // 2. Pull canonical bank from downstream edge gateway starting at revision 0
+      const deltaRes = await edgeQuestionBankGateway.fetchDeltaSync(blockId, {
+        blockId,
+        serverRevision: 0 as BankRevisionNumber,
+        lastSyncedAt: '',
+        etag: '',
+        totalCanonicalCount: 0,
+      });
+
+      let canonicalQuestions: Question[] = [];
+      let revision = 1;
+      let etag = 'W/rev-1';
+
+      if (deltaRes.ok && deltaRes.value.upsertedQuestions && deltaRes.value.upsertedQuestions.length > 0) {
+        canonicalQuestions = [...deltaRes.value.upsertedQuestions] as unknown as Question[];
+        revision = Number(deltaRes.value.revision);
+        etag = deltaRes.value.etag;
+      } else if (blockId === 'cvs' && Array.isArray(defaultCvsBank)) {
+        canonicalQuestions = [...(defaultCvsBank as Question[])];
+        revision = 1;
+        etag = 'W/rev-1';
+      }
+
+      // 3. Bulk put canonical questions into Dexie
+      if (canonicalQuestions.length > 0) {
+        await db.questions.bulkPut(canonicalQuestions);
+      }
+
+      // 4. Update sync metadata cursor
+      const newCursor: BankSyncCursor = {
+        blockId,
+        serverRevision: revision as BankRevisionNumber,
+        lastSyncedAt: new Date().toISOString(),
+        etag,
+        totalCanonicalCount: canonicalQuestions.length,
+      };
+
+      await db.bankSyncMeta.put({
+        blockId,
+        serverRevision: revision,
+        lastSyncedAt: newCursor.lastSyncedAt,
+        etag: newCursor.etag,
+        totalCanonicalCount: newCursor.totalCanonicalCount,
+      });
+
+      // 5. Update Zustand store state
+      set({
+        questions: canonicalQuestions,
+        syncCursor: newCursor,
+        lastMergeReport: null,
+        isSyncing: false,
+      });
+
+      return { resetCount: canonicalQuestions.length, revision };
+    } catch (err) {
+      console.error('[useQuestionStore] Reset to global bank failed:', err);
+      set({ isSyncing: false, error: (err as Error).message });
+      throw err;
+    }
+  },
 }));
+
+// =========================================================================
+// BACKGROUND SYNC REVALIDATION ENGINE (Multi-tab, Window Focus & 60s Pulse)
+// =========================================================================
+if (typeof window !== 'undefined') {
+  // 1. Cross-Tab Instant Synchronization (0ms)
+  if ('BroadcastChannel' in window) {
+    try {
+      const rxChannel = new BroadcastChannel('medquests_bank_sync');
+      rxChannel.onmessage = (event) => {
+        if (event.data?.type === 'BANK_SYNCED') {
+          useQuestionStore.getState().syncWithGlobalBank(useQuestionStore.getState().activeBlockId);
+        }
+      };
+    } catch {
+      // Ignore
+    }
+  }
+
+  // 2. Window Focus & Visibility Change Revalidation
+  const triggerRevalidation = () => {
+    const state = useQuestionStore.getState();
+    if (!state.isSyncing) {
+      state.syncWithGlobalBank(state.activeBlockId);
+    }
+  };
+
+  window.addEventListener('focus', triggerRevalidation);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      triggerRevalidation();
+    }
+  });
+
+  // 3. Periodic Background Sync Heartbeat (every 60 seconds)
+  setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      triggerRevalidation();
+    }
+  }, 60000);
+}
