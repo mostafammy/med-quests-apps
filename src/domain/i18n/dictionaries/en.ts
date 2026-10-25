@@ -19,6 +19,7 @@ export const enDictionary: TranslationDictionary = {
     curriculum: 'Curriculum',
     studio: 'Studio',
     admin: 'Admin',
+    more: 'More',
     activeBlockPrefix: 'CVS',
   },
   copilot: {

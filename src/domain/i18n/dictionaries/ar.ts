@@ -19,6 +19,7 @@ export const arDictionary: TranslationDictionary = {
     curriculum: 'المنهج',
     studio: 'الاستوديو',
     admin: 'الإدارة',
+    more: 'المزيد',
     activeBlockPrefix: 'CVS',
   },
   copilot: {

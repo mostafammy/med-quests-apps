@@ -401,6 +401,23 @@
   will-change: transform, opacity;
 }
 
+@keyframes apple-popover-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(-6px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-apple-popover {
+  animation: apple-popover-enter 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top;
+  will-change: transform, opacity;
+}
+
 /* 1. ULTRA TIER: 120fps ProMotion, Rich Specular Glass & Full Ambient Dynamics */
 html[data-perf-tier="ultra"] {
   --perf-transition-speed: 220ms;

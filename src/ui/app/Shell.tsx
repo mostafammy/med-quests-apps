@@ -2,15 +2,11 @@ import React, { useEffect, Suspense, lazy } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { 
   Heart, 
-  LayoutDashboard, 
-  PenTool, 
-  RotateCcw, 
-  BookOpen, 
-  Sparkles, 
   ChevronDown,
-  Shield,
   X
 } from 'lucide-react';
+import { DesktopNavBar } from './navigation/DesktopNavBar.tsx';
+import { MobileBottomDock } from './navigation/MobileBottomDock.tsx';
 import { ThemeToggle } from './ThemeToggle';
 import { LocaleToggle } from './LocaleToggle.tsx';
 import { CopilotTriggerButton } from '../features/copilot/CopilotTriggerButton.tsx';
@@ -80,118 +76,16 @@ export const Shell: React.FC = () => {
             </div>
           </NavLink>
 
-          {/* Center Navigation Links with Smooth Liquid Pill Highlights */}
-          <nav className="hidden md:flex items-center space-x-1.5 rtl:space-x-reverse p-1 rounded-2xl bg-slate-200/40 dark:bg-zinc-800/40 backdrop-blur-lg border border-white/40 dark:border-zinc-700/40">
-            <NavLink
-              to="/"
-              end
-              className={({ isActive }) =>
-                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse transition-all duration-200 ${
-                  isActive
-                    ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 scale-[1.02]'
-                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-zinc-800/60'
-                }`
-              }
-            >
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>{t.nav.dashboard}</span>
-            </NavLink>
-
-            <NavLink
-              to="/test"
-              className={({ isActive }) =>
-                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse transition-all duration-200 ${
-                  isActive
-                    ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 scale-[1.02]'
-                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-zinc-800/60'
-                }`
-              }
-            >
-              <PenTool className="w-3.5 h-3.5" />
-              <span>{t.nav.test}</span>
-            </NavLink>
-
-            <NavLink
-              to="/review"
-              className={({ isActive }) =>
-                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse transition-all duration-200 ${
-                  isActive
-                    ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 scale-[1.02]'
-                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-zinc-800/60'
-                }`
-              }
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>{t.nav.review}</span>
-            </NavLink>
-
-            <NavLink
-              to="/curriculum"
-              className={({ isActive }) =>
-                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse transition-all duration-200 ${
-                  isActive
-                    ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 scale-[1.02]'
-                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-zinc-800/60'
-                }`
-              }
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>{t.nav.curriculum}</span>
-            </NavLink>
-
-            <NavLink
-              to="/studio"
-              className={({ isActive }) =>
-                `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse transition-all duration-200 ${
-                  isActive
-                    ? 'bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 scale-[1.02]'
-                    : 'text-slate-600 dark:text-zinc-400 hover:text-indigo-900 dark:hover:text-indigo-300 hover:bg-white/50 dark:hover:bg-zinc-800/60'
-                }`
-              }
-            >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
-              <span>{t.nav.studio}</span>
-            </NavLink>
-
-            {/* Admin Governance & Cohort Analytics - Strictly visible only when authenticated as Admin */}
-            {isAdmin && (
-              <NavLink
-                to="/admin"
-                className={({ isActive }) =>
-                  `px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse transition-all duration-200 ${
-                    isActive
-                      ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40 shadow-xs scale-[1.02]'
-                      : 'text-slate-600 dark:text-zinc-400 hover:text-amber-800 dark:hover:text-amber-300 hover:bg-amber-500/10'
-                  }`
-                }
-                title="Platform Owner & Admin Governance Dashboard"
-              >
-                <Shield className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                <span>{t.nav.admin}</span>
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-              </NavLink>
-            )}
-          </nav>
+          {/* Center Navigation: Apple-Caliber Adaptive Fluid Segmented Nav with Progressive Overflow */}
+          <DesktopNavBar isAdmin={isAdmin} t={t} />
 
           {/* Right Header: Identity & Edge Pill, AI Co-Pilot, Theme Switcher & Block Switcher */}
-          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* Bilingual Language Switcher */}
             <LocaleToggle />
 
             {/* Identity, Cloudflare Edge & Hardware Tier Pill */}
             <IdentityStatusPill />
-
-            {/* Mobile Admin Shortcut Button for Authenticated Admins */}
-            {isAdmin && (
-              <NavLink
-                to="/admin"
-                className="md:hidden flex items-center justify-center h-8 px-2.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300 text-xs font-bold gap-1 shadow-xs"
-                title="Admin Dashboard"
-              >
-                <Shield className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                <span className="text-[11px]">Admin</span>
-              </NavLink>
-            )}
 
             {/* AI Co-Pilot Trigger Capsule */}
             <CopilotTriggerButton />
@@ -199,8 +93,8 @@ export const Shell: React.FC = () => {
             {/* Apple Dynamic Appearance Switcher */}
             <ThemeToggle />
 
-            {/* Active Block Glass Pill */}
-            <div className="hidden sm:flex items-center space-x-2 bg-white/60 dark:bg-zinc-800/60 hover:bg-white/80 dark:hover:bg-zinc-800/80 backdrop-blur-md border border-white/80 dark:border-zinc-700/70 px-3 py-1.5 rounded-2xl text-xs font-bold text-slate-800 dark:text-zinc-200 cursor-pointer shadow-xs transition-all duration-200 hover:-translate-y-0.5">
+            {/* Active Block Glass Pill - Fluidly hidden when space is constrained, shown on wide viewports */}
+            <div className="hidden xl:flex items-center space-x-2 bg-white/60 dark:bg-zinc-800/60 hover:bg-white/80 dark:hover:bg-zinc-800/80 backdrop-blur-md border border-white/80 dark:border-zinc-700/70 px-3 py-1.5 rounded-2xl text-xs font-bold text-slate-800 dark:text-zinc-200 cursor-pointer shadow-xs transition-all duration-200 hover:-translate-y-0.5">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -235,153 +129,7 @@ export const Shell: React.FC = () => {
       </main>
 
       {/* Apple Native Frosted Glass Mobile Bottom Dock Navigation (iPhone & Compact Screens) */}
-      <nav 
-        aria-label="Mobile Bottom Navigation"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/85 dark:bg-zinc-950/85 backdrop-blur-2xl border-t border-slate-200/80 dark:border-zinc-800/80 px-2 pt-1.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] shadow-[0_-4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.6)] transition-all select-none touch-manipulation"
-      >
-        <div className={`max-w-md mx-auto grid ${isAdmin ? 'grid-cols-6' : 'grid-cols-5'} gap-1`}>
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) =>
-              `flex flex-col items-center justify-center py-1 px-1 rounded-2xl transition-all duration-200 apple-tap ${
-                isActive
-                  ? 'text-blue-600 dark:text-blue-400 font-extrabold'
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <div className="relative p-1">
-                  <LayoutDashboard className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'scale-110' : ''}`} />
-                  {isActive && (
-                    <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400 shadow-xs shadow-blue-500" />
-                  )}
-                </div>
-                <span className="text-[10px] tracking-tight mt-0.5">{t.nav.dashboard}</span>
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
-            to="/test"
-            className={({ isActive }) =>
-              `flex flex-col items-center justify-center py-1 px-1 rounded-2xl transition-all duration-200 apple-tap ${
-                isActive
-                  ? 'text-blue-600 dark:text-blue-400 font-extrabold'
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <div className="relative p-1">
-                  <PenTool className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'scale-110' : ''}`} />
-                  {isActive && (
-                    <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400 shadow-xs shadow-blue-500" />
-                  )}
-                </div>
-                <span className="text-[10px] tracking-tight mt-0.5">{t.nav.test}</span>
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
-            to="/review"
-            className={({ isActive }) =>
-              `flex flex-col items-center justify-center py-1 px-1 rounded-2xl transition-all duration-200 apple-tap ${
-                isActive
-                  ? 'text-blue-600 dark:text-blue-400 font-extrabold'
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <div className="relative p-1">
-                  <RotateCcw className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'scale-110' : ''}`} />
-                  {isActive && (
-                    <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400 shadow-xs shadow-blue-500" />
-                  )}
-                </div>
-                <span className="text-[10px] tracking-tight mt-0.5">{t.nav.review}</span>
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
-            to="/curriculum"
-            className={({ isActive }) =>
-              `flex flex-col items-center justify-center py-1 px-1 rounded-2xl transition-all duration-200 apple-tap ${
-                isActive
-                  ? 'text-blue-600 dark:text-blue-400 font-extrabold'
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <div className="relative p-1">
-                  <BookOpen className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'scale-110' : ''}`} />
-                  {isActive && (
-                    <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400 shadow-xs shadow-blue-500" />
-                  )}
-                </div>
-                <span className="text-[10px] tracking-tight mt-0.5">{t.nav.curriculum}</span>
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
-            to="/studio"
-            className={({ isActive }) =>
-              `flex flex-col items-center justify-center py-1 px-1 rounded-2xl transition-all duration-200 apple-tap ${
-                isActive
-                  ? 'text-indigo-600 dark:text-indigo-400 font-extrabold'
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <div className="relative p-1">
-                  <Sparkles className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'scale-110' : ''}`} />
-                  {isActive && (
-                    <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 shadow-xs shadow-indigo-500" />
-                  )}
-                </div>
-                <span className="text-[10px] tracking-tight mt-0.5">{t.nav.studio}</span>
-              </>
-            )}
-          </NavLink>
-
-          {isAdmin && (
-            <NavLink
-              to="/admin"
-              className={({ isActive }) =>
-                `flex flex-col items-center justify-center py-1 px-1 rounded-2xl transition-all duration-200 apple-tap ${
-                  isActive
-                    ? 'text-amber-600 dark:text-amber-400 font-extrabold'
-                    : 'text-amber-700/80 dark:text-amber-300/80 hover:text-amber-800 dark:hover:text-amber-200'
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <div className="relative p-1">
-                    <Shield className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'scale-110' : ''}`} />
-                    {isActive && (
-                      <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-amber-500 shadow-xs shadow-amber-500" />
-                    )}
-                  </div>
-                  <span className="text-[10px] tracking-tight mt-0.5">{t.nav.admin}</span>
-                </>
-              )}
-            </NavLink>
-          )}
-        </div>
-      </nav>
+      <MobileBottomDock isAdmin={isAdmin} t={t} />
 
       {/* AI Cognitive Co-Pilot Sliding Drawer */}
       <AiCopilotDrawer />

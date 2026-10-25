@@ -87,6 +87,7 @@ export interface TranslationDictionary {
     readonly curriculum: string;
     readonly studio: string;
     readonly admin: string;
+    readonly more: string;
     readonly activeBlockPrefix: string;
   };
   readonly copilot: {
