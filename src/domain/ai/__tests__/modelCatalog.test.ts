@@ -26,6 +26,8 @@ describe('Model Catalog (Simple Terms for Medical Students)', () => {
     expect(getModelDisplayName('gemini', 'gemini-2.5-flash')).toBe('Gemini 2.5 Flash');
     expect(getModelDisplayName('gemini', 'gemini-2.5-pro')).toBe('Gemini 2.5 Pro');
 
+    expect(getModelDisplayName('openrouter', 'nvidia/nemotron-3.5-lightning:free')).toBe('Nemotron 3.5 (Free)');
+    expect(getModelDisplayName('openrouter', 'recursive/flint-v1.0:free')).toBe('Flint 1.0 (Free)');
     expect(getModelDisplayName('openrouter', 'meta-llama/llama-3.1-8b-instruct:free')).toBe('Llama 3.1 8B (Free)');
   });
 });
