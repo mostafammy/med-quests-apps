@@ -15,6 +15,7 @@ import {
 import { useBankGovernanceStore } from '../../../application/stores/useBankGovernanceStore.ts';
 import { useAuthStore } from '../../../application/stores/useAuthStore.ts';
 import { CVS_TAXONOMY } from '../../../domain/taxonomy/cvsTaxonomy.ts';
+import { AiPromptStudioModal } from './AiPromptStudioModal.tsx';
 import type {
   GovernedQuestion,
   QuestionMutationPatch,
@@ -52,6 +53,9 @@ export const QuestionBankGovernancePanel: React.FC = () => {
   // Modal state for creating canonical items
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createJsonInput, setCreateJsonInput] = useState('');
+
+  // Modal state for AI Prompt Studio
+  const [isPromptStudioOpen, setIsPromptStudioOpen] = useState(false);
 
   useEffect(() => {
     loadGovernanceData('cvs');
@@ -150,14 +154,25 @@ export const QuestionBankGovernancePanel: React.FC = () => {
           </button>
         </div>
 
-        <button
-          onClick={() => loadGovernanceData('cvs')}
-          disabled={isLoading}
-          className="py-2 px-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center space-x-1.5 self-start sm:self-auto hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-indigo-600' : ''}`} />
-          <span>Refresh Cockpit</span>
-        </button>
+        <div className="flex items-center space-x-2 self-start sm:self-auto">
+          <button
+            onClick={() => setIsPromptStudioOpen(true)}
+            className="py-2 px-3.5 rounded-xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/10 hover:from-indigo-500/20 hover:to-purple-500/20 border border-indigo-200/80 dark:border-indigo-800 text-xs font-bold text-indigo-700 dark:text-indigo-300 flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer apple-tap"
+            title="Open AI Prompt Studio to format questions for LLMs"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            <span>AI Prompt Studio</span>
+          </button>
+
+          <button
+            onClick={() => loadGovernanceData('cvs')}
+            disabled={isLoading}
+            className="py-2 px-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center space-x-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-indigo-600' : ''}`} />
+            <span>Refresh Cockpit</span>
+          </button>
+        </div>
       </div>
 
       {/* 2. TAB 1: CURRICULUM REVIEW QUEUE */}
@@ -463,6 +478,15 @@ export const QuestionBankGovernancePanel: React.FC = () => {
 
             <div className="flex items-center space-x-2">
               <button
+                onClick={() => setIsPromptStudioOpen(true)}
+                className="py-1.5 px-3 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center space-x-1.5 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/60 transition-all cursor-pointer"
+                title="Generate AI prompt to format questions into JSON"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>AI Reformat Prompt</span>
+              </button>
+
+              <button
                 onClick={() => setIsCreateModalOpen(true)}
                 className="py-1.5 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center space-x-1.5 shadow-sm cursor-pointer apple-tap"
               >
@@ -553,10 +577,38 @@ export const QuestionBankGovernancePanel: React.FC = () => {
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
           <div className="p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 max-w-xl w-full space-y-4 shadow-2xl">
-            <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Create Canonical Global Question</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Create Canonical Global Question</h3>
+              <button
+                type="button"
+                onClick={() => setIsPromptStudioOpen(true)}
+                className="py-1 px-2.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center space-x-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-all cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                <span>AI Prompt Helper</span>
+              </button>
+            </div>
+
             <p className="text-xs text-zinc-500">
               Paste a validated question JSON object or array. It will be directly committed as canonical and published to all students immediately.
             </p>
+
+            <div className="p-3 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/80 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <span className="text-xs text-indigo-950 dark:text-indigo-200 font-medium">
+                  Have raw questions? Use our AI Prompt to reformat them instantly in ChatGPT or Claude.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPromptStudioOpen(true)}
+                className="shrink-0 ml-2 py-1 px-2.5 rounded-lg text-[11px] font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-all cursor-pointer"
+              >
+                Open Studio
+              </button>
+            </div>
+
             <textarea
               rows={8}
               value={createJsonInput}
@@ -591,6 +643,16 @@ export const QuestionBankGovernancePanel: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* AI PROMPT STUDIO & REFORMATTING MODAL */}
+      <AiPromptStudioModal
+        isOpen={isPromptStudioOpen}
+        onClose={() => setIsPromptStudioOpen(false)}
+        onInsertExample={(exampleJson) => {
+          setCreateJsonInput(exampleJson);
+          setIsCreateModalOpen(true);
+        }}
+      />
     </div>
   );
 };
