@@ -29,8 +29,8 @@ const STORAGE_KEYS = {
   USER: 'medquests_auth_user',
   SESSION: 'medquests_auth_session',
   ALL_SESSIONS: 'medquests_auth_all_sessions',
-  MANAGED_DIRECTORY: 'medquests_admin_directory_v1',
-  AUDIT_LOGS: 'medquests_admin_audit_logs_v1',
+  MANAGED_DIRECTORY: 'medquests_admin_directory_v2',
+  AUDIT_LOGS: 'medquests_admin_audit_logs_v2',
 } as const;
 
 /**
@@ -433,15 +433,35 @@ export class EdgeAuthGateway implements AuthGatewayPort {
     if (!this.managedUsersCache) {
       if (typeof window !== 'undefined') {
         try {
+          // Clear legacy v1 demo caches
+          localStorage.removeItem('medquests_admin_directory_v1');
+          localStorage.removeItem('medquests_admin_audit_logs_v1');
+
           const raw = localStorage.getItem(STORAGE_KEYS.MANAGED_DIRECTORY);
           if (raw) {
-            this.managedUsersCache = JSON.parse(raw) as ManagedUserRecord[];
+            const parsed = JSON.parse(raw) as ManagedUserRecord[];
+            const demoIds = new Set([
+              'usr_scholar_nour',
+              'usr_scholar_omar',
+              'usr_faculty_tarek',
+              'usr_scholar_karim',
+              'usr_scholar_salma',
+            ]);
+            const cleaned = parsed.filter(
+              (u) =>
+                !demoIds.has(u.profile.id) &&
+                !u.profile.id.startsWith('usr_scholar_') &&
+                !u.profile.id.startsWith('usr_faculty_')
+            );
+            if (cleaned.length > 0) {
+              this.managedUsersCache = cleaned;
+            }
           }
         } catch {
           // Ignore storage error and seed defaults
         }
       }
-      if (!this.managedUsersCache) {
+      if (!this.managedUsersCache || this.managedUsersCache.length === 0) {
         this.managedUsersCache = createInitialCohortDirectory();
       }
     }
@@ -485,17 +505,68 @@ export class EdgeAuthGateway implements AuthGatewayPort {
         try {
           const raw = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
           if (raw) {
-            this.auditLogsCache = JSON.parse(raw) as SecurityAuditLogEntry[];
+            const parsed = JSON.parse(raw) as SecurityAuditLogEntry[];
+            const demoIds = new Set([
+              'usr_scholar_nour',
+              'usr_scholar_omar',
+              'usr_faculty_tarek',
+              'usr_scholar_karim',
+              'usr_scholar_salma',
+            ]);
+            const cleaned = parsed.filter(
+              (log) =>
+                !demoIds.has(log.targetUserId) &&
+                !log.targetUserId.startsWith('usr_scholar_') &&
+                !log.targetUserId.startsWith('usr_faculty_')
+            );
+            if (cleaned.length > 0) {
+              this.auditLogsCache = cleaned;
+            }
           }
         } catch {
           // Ignore parse error
         }
       }
-      if (!this.auditLogsCache) {
+      if (!this.auditLogsCache || this.auditLogsCache.length === 0) {
         this.auditLogsCache = createInitialAuditLogs();
       }
     }
     return this.auditLogsCache;
+  }
+
+  public purgeDemoData(): { purgedUsersCount: number } {
+    const currentUsers = this.getManagedUsers();
+    const demoIds = new Set([
+      'usr_scholar_nour',
+      'usr_scholar_omar',
+      'usr_faculty_tarek',
+      'usr_scholar_karim',
+      'usr_scholar_salma',
+    ]);
+
+    const cleaned = currentUsers.filter(
+      (u) =>
+        !demoIds.has(u.profile.id) &&
+        !u.profile.id.startsWith('usr_scholar_') &&
+        !u.profile.id.startsWith('usr_faculty_')
+    );
+
+    const purgedUsersCount = currentUsers.length - cleaned.length;
+    this.managedUsersCache = cleaned.length > 0 ? cleaned : createInitialCohortDirectory();
+    this.auditLogsCache = createInitialAuditLogs();
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('medquests_admin_directory_v1');
+        localStorage.removeItem('medquests_admin_audit_logs_v1');
+        localStorage.setItem(STORAGE_KEYS.MANAGED_DIRECTORY, JSON.stringify(this.managedUsersCache));
+        localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(this.auditLogsCache));
+      } catch {
+        // Quota guard
+      }
+    }
+
+    return { purgedUsersCount };
   }
 
   public updateManagedUserRoleAndFeatures(params: {
@@ -855,294 +926,22 @@ function createInitialCohortDirectory(): ManagedUserRecord[] {
         }),
       ],
     }),
-    buildManagedUserRecord({
-      profile: {
-        id: 'usr_scholar_nour',
-        email: 'nour.mansour@kasralainy.edu.eg',
-        displayName: 'Dr. Nour Mansour',
-        avatarUrl: null,
-        universityName: 'Cairo University (Kasr Al Ainy)',
-        academicYear: 3,
-        role: 'student-pro',
-        customFeatureOverrides: {},
-        restriction: {
-          status: 'active',
-          blockedReason: null,
-          blockedUntil: null,
-          blockedByUserId: null,
-          updatedAt: nowIso,
-        },
-        emailVerified: true,
-        createdAt: nowIso,
-        lastActiveAt: nowIso,
-      },
-      studyTelemetry: {
-        totalAttempts: 412,
-        overallAccuracy: 91,
-        masteryPercentage: 89,
-        weakTopicsCount: 1,
-        dueReviewsCount: 8,
-        dailyAiRequestsUsed: 142,
-        favoriteSubspecialty: 'Coronary Circulation & Valvular Anatomy',
-      },
-      activeSessions: [
-        makeSession({
-          sessionId: 'ses_nour_1',
-          userId: 'usr_scholar_nour',
-          colo: 'CAI',
-          city: 'Cairo',
-          countryCode: 'EG',
-          countryName: 'Egypt',
-          osName: 'iPadOS',
-          browserName: 'Safari',
-          deviceCategory: 'tablet',
-          tier: 'ultra',
-          latencyMs: 1.4,
-        }),
-      ],
-    }),
-    buildManagedUserRecord({
-      profile: {
-        id: 'usr_scholar_omar',
-        email: 'omar.elsharif@med.asu.edu.eg',
-        displayName: 'Omar El-Sharif',
-        avatarUrl: null,
-        universityName: 'Ain Shams University Faculty of Medicine',
-        academicYear: 2,
-        role: 'student-free',
-        // Granted special AI scholarship override by Admin!
-        customFeatureOverrides: { ai_cloud_streaming_quota: true },
-        restriction: {
-          status: 'active',
-          blockedReason: null,
-          blockedUntil: null,
-          blockedByUserId: null,
-          updatedAt: nowIso,
-        },
-        emailVerified: true,
-        createdAt: nowIso,
-        lastActiveAt: nowIso,
-      },
-      studyTelemetry: {
-        totalAttempts: 275,
-        overallAccuracy: 82,
-        masteryPercentage: 76,
-        weakTopicsCount: 3,
-        dueReviewsCount: 19,
-        dailyAiRequestsUsed: 38,
-        favoriteSubspecialty: 'Bacterial Endocarditis & Rheumatic Fever',
-      },
-      activeSessions: [
-        makeSession({
-          sessionId: 'ses_omar_1',
-          userId: 'usr_scholar_omar',
-          colo: 'CAI',
-          city: 'Cairo',
-          countryCode: 'EG',
-          countryName: 'Egypt',
-          osName: 'Windows',
-          browserName: 'Chrome',
-          deviceCategory: 'desktop',
-          tier: 'balanced',
-          latencyMs: 1.9,
-        }),
-      ],
-    }),
-    buildManagedUserRecord({
-      profile: {
-        id: 'usr_faculty_tarek',
-        email: 'prof.tarek@alexmed.edu.eg',
-        displayName: 'Prof. Tarek Abdel-Rahman',
-        avatarUrl: null,
-        universityName: 'Alexandria University Faculty of Medicine',
-        academicYear: 7,
-        role: 'faculty-reviewer',
-        customFeatureOverrides: {},
-        restriction: {
-          status: 'active',
-          blockedReason: null,
-          blockedUntil: null,
-          blockedByUserId: null,
-          updatedAt: nowIso,
-        },
-        emailVerified: true,
-        createdAt: nowIso,
-        lastActiveAt: nowIso,
-      },
-      studyTelemetry: {
-        totalAttempts: 190,
-        overallAccuracy: 97,
-        masteryPercentage: 96,
-        weakTopicsCount: 0,
-        dueReviewsCount: 2,
-        dailyAiRequestsUsed: 64,
-        favoriteSubspecialty: 'Cardiac Histology & Purkinje Fibers',
-      },
-      activeSessions: [
-        makeSession({
-          sessionId: 'ses_tarek_1',
-          userId: 'usr_faculty_tarek',
-          colo: 'CAI',
-          city: 'Alexandria',
-          countryCode: 'EG',
-          countryName: 'Egypt',
-          osName: 'macOS',
-          browserName: 'Safari',
-          deviceCategory: 'desktop',
-          tier: 'ultra',
-          latencyMs: 1.6,
-        }),
-      ],
-    }),
-    buildManagedUserRecord({
-      profile: {
-        id: 'usr_scholar_karim',
-        email: 'karim.zaki@mans.edu.eg',
-        displayName: 'Karim Zaki (Shared Credentials Alert)',
-        avatarUrl: null,
-        universityName: 'Mansoura University Faculty of Medicine',
-        academicYear: 2,
-        role: 'student-pro',
-        // Excluded from AI Cloud due to credential sharing anomaly
-        customFeatureOverrides: { ai_cloud_streaming_quota: false },
-        restriction: {
-          status: 'active',
-          blockedReason: null,
-          blockedUntil: null,
-          blockedByUserId: null,
-          updatedAt: nowIso,
-        },
-        emailVerified: true,
-        createdAt: nowIso,
-        lastActiveAt: nowIso,
-      },
-      studyTelemetry: {
-        totalAttempts: 520,
-        overallAccuracy: 68,
-        masteryPercentage: 61,
-        weakTopicsCount: 5,
-        dueReviewsCount: 34,
-        dailyAiRequestsUsed: 249,
-        favoriteSubspecialty: 'Great Vessels & Mediastinum',
-      },
-      activeSessions: [
-        makeSession({
-          sessionId: 'ses_karim_1',
-          userId: 'usr_scholar_karim',
-          colo: 'CAI',
-          city: 'Mansoura',
-          countryCode: 'EG',
-          countryName: 'Egypt',
-          osName: 'Android',
-          browserName: 'Chrome',
-          deviceCategory: 'mobile',
-          tier: 'low-spec',
-          latencyMs: 2.8,
-          anomalyFlags: ['impossible_travel_geo_shift', 'excessive_concurrent_devices'],
-        }),
-        makeSession({
-          sessionId: 'ses_karim_2',
-          userId: 'usr_scholar_karim',
-          colo: 'FRA',
-          city: 'Frankfurt',
-          countryCode: 'DE',
-          countryName: 'Germany',
-          osName: 'Windows',
-          browserName: 'Edge',
-          deviceCategory: 'desktop',
-          tier: 'balanced',
-          latencyMs: 2.1,
-          anomalyFlags: ['impossible_travel_geo_shift'],
-        }),
-      ],
-    }),
-    buildManagedUserRecord({
-      profile: {
-        id: 'usr_scholar_salma',
-        email: 'salma.hassan@kasralainy.edu.eg',
-        displayName: 'Salma Hassan',
-        avatarUrl: null,
-        universityName: 'Cairo University (Kasr Al Ainy)',
-        academicYear: 2,
-        role: 'student-free',
-        customFeatureOverrides: {},
-        restriction: {
-          status: 'blocked',
-          blockedReason: 'Automated scraping bot signature detected (JA4 + Threat Score 78).',
-          blockedUntil: null,
-          blockedByUserId: 'usr_admin',
-          updatedAt: nowIso,
-        },
-        emailVerified: true,
-        createdAt: nowIso,
-        lastActiveAt: nowIso,
-      },
-      studyTelemetry: {
-        totalAttempts: 45,
-        overallAccuracy: 52,
-        masteryPercentage: 40,
-        weakTopicsCount: 6,
-        dueReviewsCount: 15,
-        dailyAiRequestsUsed: 0,
-        favoriteSubspecialty: 'Viral Myocarditis',
-      },
-      activeSessions: [
-        makeSession({
-          sessionId: 'ses_salma_1',
-          userId: 'usr_scholar_salma',
-          colo: 'LHR',
-          city: 'London',
-          countryCode: 'GB',
-          countryName: 'United Kingdom',
-          osName: 'Linux',
-          browserName: 'Chrome',
-          deviceCategory: 'desktop',
-          tier: 'low-spec',
-          latencyMs: 3.1,
-          anomalyFlags: ['high_threat_ip_score'],
-        }),
-      ],
-    }),
   ];
 }
 
 function createInitialAuditLogs(): SecurityAuditLogEntry[] {
   return [
     {
-      id: 'aud_init_01',
-      actorUserId: 'usr_admin',
-      actorDisplayName: 'Platform Admin',
-      targetUserId: 'usr_scholar_omar',
-      targetDisplayName: 'Omar El-Sharif',
-      action: 'FEATURE_FLAG_OVERRIDDEN',
-      summary: 'Set ai_cloud_streaming_quota=ENABLED for Omar El-Sharif (Academic Scholarship Override)',
+      id: 'aud_genesis_01',
+      actorUserId: 'usr_owner_mostafa',
+      actorDisplayName: 'Mostafa Yaser (Platform Owner)',
+      targetUserId: 'usr_owner_mostafa',
+      targetDisplayName: 'Mostafa Yaser',
+      action: 'KV_CACHE_HYDRATED',
+      summary: 'Production platform security initialized with Cloudflare Edge Zero-Trust verification',
       edgeColo: 'CAI',
-      latencyMs: 1.3,
-      createdAt: '2026-10-24T17:15:00.000Z',
-    },
-    {
-      id: 'aud_init_02',
-      actorUserId: 'usr_admin',
-      actorDisplayName: 'Platform Admin',
-      targetUserId: 'usr_scholar_karim',
-      targetDisplayName: 'Karim Zaki',
-      action: 'FEATURE_FLAG_OVERRIDDEN',
-      summary: 'Set ai_cloud_streaming_quota=EXCLUDED for Karim Zaki (Concurrent CAI/FRA geo anomaly)',
-      edgeColo: 'CAI',
-      latencyMs: 1.5,
-      createdAt: '2026-10-24T17:20:00.000Z',
-    },
-    {
-      id: 'aud_init_03',
-      actorUserId: 'usr_admin',
-      actorDisplayName: 'Platform Admin',
-      targetUserId: 'usr_scholar_salma',
-      targetDisplayName: 'Salma Hassan',
-      action: 'ACCOUNT_BLOCKED',
-      summary: 'Enforced BLOCKED on Salma Hassan (Automated scraping bot signature) • Purged KV sessions',
-      edgeColo: 'LHR',
-      latencyMs: 1.8,
-      createdAt: '2026-10-24T17:25:00.000Z',
+      latencyMs: 1.2,
+      createdAt: '2026-10-24T17:00:00.000Z',
     },
   ];
 }
