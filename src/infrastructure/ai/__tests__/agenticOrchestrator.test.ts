@@ -62,6 +62,7 @@ describe('AgenticOrchestrator (Multi-Turn ReAct Loop)', () => {
 
   const dummySettings: AiSettings = {
     engine: 'openrouter',
+    chatLanguage: 'auto',
     openRouterApiKey: 'test-key',
     openRouterModel: 'test-model',
     groqApiKey: '',
