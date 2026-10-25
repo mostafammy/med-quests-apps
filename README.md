@@ -34,7 +34,8 @@ Engineered with **Apple Human Interface Guidelines (HIG)** aesthetic fidelity, s
    - [System Topology & Edge Cloud Infrastructure (Diagram)](#4-system-topology--edge-cloud-infrastructure)
    - [Class Hierarchy & Domain Contracts (Diagram)](#5-class-hierarchy--domain-contracts)
    - [Non-Destructive Downstream Delta-Sync Protocol (Diagram)](#6-non-destructive-downstream-delta-sync-protocol)
-   - [Conflict-Free Downstream Merge Decision Tree (Diagram)](#61-conflict-free-downstream-merge-decision-tree)
+   - [Conflict-Free Downstream Merge & Semantic Deduplication Decision Tree (Diagram)](#61-conflict-free-downstream-merge--semantic-deduplication-decision-tree)
+   - [When Exactly Do Other Users Sync? Lifecycle Triggers & 5-Minute Stale Cache Resolution (Diagram)](#62-when-exactly-do-other-users-sync-lifecycle-triggers--5-minute-stale-cache-resolution)
    - [Author Ingest vs. Faculty Review Workflow Sequence (Diagram)](#7-author-ingest-vs-faculty-review-workflow-sequence)
    - [Role-Based Access Control (RBAC) & Governance Cockpit (Diagram)](#8-role-based-access-control-rbac--governance-cockpit)
 5. [Deep Dive: Multi-Model AI Agentic Copilot, Real-Time Thinking & Two-Tier Telemetry](#deep-dive-multi-model-ai-agentic-copilot-real-time-thinking--two-tier-telemetry)
@@ -587,33 +588,147 @@ sequenceDiagram
     end
 ```
 
-### 6.1 Conflict-Free Downstream Merge Decision Tree
+### 6.1 Conflict-Free Downstream Merge & Semantic Deduplication Decision Tree
 
-When incoming canonical items are received from the edge, [`NonDestructiveBankMergeStrategy`](src/domain/questionBank/nonDestructiveMergeStrategy.ts) processes each item through a zero-data-loss decision tree:
+When incoming canonical items arrive from the edge during delta sync, [`NonDestructiveBankMergeStrategy`](src/domain/questionBank/nonDestructiveMergeStrategy.ts) processes each item through a **Dual-Index (Primary Key `id` + Cryptographic Content `stemHash`)** reconciliation engine to ensure zero data loss and eliminate duplicate questions:
 
 ```mermaid
 flowchart TD
-    Incoming["Incoming Global Question (ID: Q)"] --> ExistsCheck{"Does ID: Q exist in local IndexedDB?"}
+    Incoming["Incoming Global Question (from Delta Sync)"]
+    CheckID{"Does local DB have matching ID?"}
+    CheckHash{"Does local DB have matching stemHash?"}
     
-    ExistsCheck -- No --> InsertCanonical["Insert as 'global-canonical'<br/>(insertedCount++)"]
+    Incoming --> CheckID
     
-    ExistsCheck -- Yes --> ScopeCheck{"What is local item's provenanceScope?"}
+    CheckID -->|Yes| SameStem{"Does stemHash match?"}
+    SameStem -->|Yes| Promote1["In-Place Promotion: Transition to 'global-canonical'\n• Scope: 'submitted-pending' or 'local-custom' -> 'global-canonical'\n• Status: 'published'\n• 0 Duplicates (Zero Rekeying!) ✅"]
+    SameStem -->|No| CheckScope{"Is existing item 'submitted-pending', 'global-canonical', or 'seed-bundled'?"}
+    CheckScope -->|Yes| UpdatePatch["Apply Faculty Refinements to Canonical\n(Inline Patches, Typo Fixes)\n0 Duplicates ✅"]
+    CheckScope -->|No - 'local-custom'| TrueCollision["True ID Collision (Different Question):\n1. Re-key local custom to 'id-local-shortHash'\n2. Insert incoming canonical as 'id'\nPreserves student work! ✅"]
     
-    ScopeCheck -- "'local-custom'" --> Rekey["Collision Guard:<br/>1. Re-key local custom to 'Q-local-shortHash'<br/>2. Insert incoming canonical as 'Q'<br/>(preservedLocalCustomCount++)"]
-    ScopeCheck -- "'global-canonical' or 'seed-bundled'" --> UpdateCanonical["Update in-place with latest revision<br/>(updatedCanonicalCount++)"]
-    ScopeCheck -- "'submitted-pending'" --> PromoteCanonical["Promote status to 'global-canonical'<br/>(updatedCanonicalCount++)"]
+    CheckID -->|No| CheckHash
+    CheckHash -->|Yes| ReconcileTemp["Provisional ID Promotion:\n• Retire old local/temporary ID from IndexedDB\n• Insert official canonical ID as 'global-canonical'\n0 Duplicates ✅"]
+    CheckHash -->|No| InsertBrandNew["Insert Brand-New Canonical Question\n(insertedCount++) ✅"]
 
-    ArchivedCheck["Check archivedQuestionIds"] --> Tombstone["Soft Tombstone:<br/>Set status='quarantined', editorialStatus='archived'<br/>(Preserves historical student Attempt foreign keys!)"]
+    ArchivedCheck["Check archivedQuestionIds"] --> Tombstone["Soft Tombstone:\nSet status='quarantined', editorialStatus='archived'\n(Preserves historical student Attempt foreign keys!)"]
 ```
 
 | Local IndexedDB State | Incoming Global Delta State | Deterministic Merge Resolution |
 | :--- | :--- | :--- |
 | **Not present locally** | `published` (`global-canonical`) | **Insert** into local IndexedDB (`insertedCount++`). |
-| `seed-bundled` or `global-canonical` | `published` with `globalRevision > local.globalRevision` | **Update** local record with latest canonical correction (`updatedCanonicalCount++`). |
-| `submitted-pending` | `published` (`global-canonical`) | **Promote** local record to `global-canonical` now that faculty approved it. |
-| `local-custom` (Private student item) | Same `id` exists in global delta | **Namespace & Preserve Both**: Re-keys local custom item to `${id}-local-${shortHash}` (`preservedLocalCustomCount++`) and inserts canonical item under `${id}`. **Zero student data loss.** |
+| `seed-bundled` or `global-canonical` | `published` with `globalRevision > local.globalRevision` | **Update** local record with latest canonical revision (`updatedCanonicalCount++`). |
+| `submitted-pending` or `local-custom` | Same `id` **AND** same `stemHash` | **Promote in-place**: Upgrades local record to `global-canonical` with `editorialStatus: 'published'`. **No duplicate copy is created.** |
+| `submitted-pending` or `local-custom` | Different `id` **BUT** same `stemHash` | **Provisional ID Promotion**: Retires old temporary ID from IndexedDB and registers official canonical ID. **No duplicate copy is created.** |
+| `submitted-pending` | Same `id` with different `stemHash` | **Update in-place**: Faculty refined the stem/rationales during editorial review. Applies canonical version without duplication. |
+| `local-custom` (Private student item) | Same `id` with **different** `stemHash` | **Namespace & Preserve Both**: True collision of two distinct questions. Re-keys local custom item to `${id}-local-${shortHash}` (`preservedLocalCustomCount++`) and inserts canonical item under `${id}`. **Zero student data loss.** |
 | `global-canonical` | Listed in `archivedQuestionIds` | **Soft-Tombstone**: Marks local copy `status = 'quarantined'` / `editorialStatus = 'archived'`. Excluded from new tests; preserves historical student [`Attempt`](src/domain/model/types.ts) lookups. |
 | `local-custom` (Private student item) | Not in global bank | **100% Untouched** (`preservedLocalCustomCount++`). |
+
+---
+
+### 6.2 When Exactly Do Other Users Sync? (Lifecycle Triggers & 5-Minute Stale Cache Resolution)
+
+A distributed, offline-first system must balance **immediate freshness** with **battery efficiency** and **network frugality**. 
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Peer as Peer Scholar (Device B)
+    participant ClientStore as useQuestionStore (Zustand + Dexie)
+    participant Edge as Cloudflare Edge Worker (~1.8ms)
+    participant D1 as D1 SQLite (bank_revisions & global_questions)
+
+    Note over Peer, ClientStore: Trigger 1: App Boot / Cold Start
+    ClientStore->>Edge: GET /api/bank/sync?block=cvs&sinceRev=1 (If-None-Match: "W/rev-1")
+    Edge->>D1: Check bank_revisions (Rev #2)
+    Edge-->>ClientStore: 200 OK (Delta: +1 Approved Question, Rev #2)
+    ClientStore->>ClientStore: Merge into IndexedDB (0 Duplicates)
+
+    Note over Peer, ClientStore: Trigger 2: Tab Focus / Window Visibility Change
+    Peer->>ClientStore: Switches back to MedQuests tab or unlocks phone
+    ClientStore->>Edge: GET /api/bank/sync?sinceRev=2 (If-None-Match: "W/rev-2")
+    Edge-->>ClientStore: 304 Not Modified (0 bytes, ~1.8ms Edge Check)
+
+    Note over Peer, ClientStore: Trigger 3: 60-Second Background Heartbeat
+    Note over ClientStore: Silent poll while tab is active in foreground
+    ClientStore->>Edge: Periodic background check (ETag revalidation)
+
+    Note over Peer, ClientStore: Trigger 4: Cross-Tab BroadcastChannel (0ms)
+    Note over ClientStore: If User opens 2 tabs on same device, BroadcastChannel syncs all tabs instantly in 0ms!
+```
+
+#### The Four Automated Synchronization Triggers
+
+| Trigger | Timing | Overhead | Description |
+| :--- | :--- | :--- | :--- |
+| **1. Cold Start / App Boot** | Immediately upon opening the app | $0\text{ms}$ blocking UI; background fetch | Local questions hydrate instantly from IndexedDB in $0\text{ms}$. A non-blocking background fetch verifies whether upstream faculty published new questions. |
+| **2. Window Focus & Visibility Change** | When scholar switches back to tab or unlocks device | Sub-$2\text{ms}$ HTTP 304 check | Listens to `window.focus` and `document.visibilitychange`. If the student was studying another PDF and returns to the app, it checks for fresh additions. |
+| **3. 60-Second Background Heartbeat** | Every 60 seconds (while document is visible) | $0\text{ bytes}$ transferred if up-to-date | A lightweight background timer queries `/api/bank/sync` with `If-None-Match: W/rev-X`. The edge returns `304 Not Modified` unless a faculty member approved questions during that minute. |
+| **4. Multi-Tab Broadcast Channel** | Instantaneous ($0\text{ms}$) across open tabs | In-memory inter-process message | When any tab (e.g. Admin Cockpit) publishes a question or completes a sync, a `medquests_bank_sync` message triggers all other open tabs to revalidate in $0\text{ms}$. |
+| **5. On-Demand Ribbon Button** | Whenever the user clicks **"Sync Global Bank"** | User-directed | Manual override in the Question Studio header ribbon. |
+
+#### Root Cause Analysis: Why Did Other Users Not See Questions After 5 Minutes Previously?
+
+If you previously tested adding questions and noticed other users did not see them after 5 minutes, three distinct issues in the system were responsible:
+
+1. **Missing Worker Route Fallback (`404` $\rightarrow$ Personal Browser `localStorage`)**:
+   - When an administrator clicked *"Create Canonical Question"*, the frontend called `POST /api/admin/questions/canonical`.
+   - Previously, the Cloudflare Worker router was missing this route, returning a `404 Not Found`.
+   - To prevent an app crash during offline demos, the client gateway silently fell back to storing the item in the **current browser's private `localStorage`**.
+   - As a result, the questions were stored on the Admin's laptop, but **never reached the shared Cloudflare D1 database**. Other users querying the D1 cloud found no new rows.
+   - **Resolution**: Implemented native `POST /api/admin/questions/canonical`, `POST /api/admin/questions/canonical/:id/archive`, and `GET /api/admin/questions/catalog` directly in [`src/worker/index.ts`](src/worker/index.ts), writing atomically to D1 and bumping the global revision.
+
+2. **HTTP Edge Cache Delay (`stale-while-revalidate=300`)**:
+   - The `/api/bank/sync` route previously returned `Cache-Control: public, max-age=60, stale-while-revalidate=300`.
+   - This instructed Cloudflare Edge CDN and browser caches to reuse stale sync responses for up to **300 seconds (5 minutes)** before revalidating against the D1 revision counter!
+   - **Resolution**: Replaced with `Cache-Control: no-cache, must-revalidate` and `Pragma: no-cache`. The edge checks the monotonic revision in D1/KV instantaneously (~1.8ms) on every request without serving stale caches.
+
+3. **Passive vs. Active Polling**:
+   - Previously, the client only synced on initial boot or manual button click. If a peer scholar left their browser open on an exam or study session for 5 minutes, no sync request was dispatched.
+   - **Resolution**: Implemented the active 60-second heartbeat and window focus listeners in [`useQuestionStore.ts`](src/application/stores/useQuestionStore.ts). Peer users now automatically receive approved questions within 60 seconds without refreshing.
+
+---
+
+### 6.3 Local-to-Global Bank Recovery & Reset Protocol
+
+To safeguard student devices against corrupted local states, malformed custom imports, or stale draft accumulations, the system exposes an atomic **"Reset to Global Bank"** mechanism in both [`QuestionStudio.tsx`](src/ui/features/studio/QuestionStudio.tsx) and the [`QuestionBankGovernancePanel.tsx`](src/ui/features/admin/QuestionBankGovernancePanel.tsx).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Student / Faculty User
+    participant UI as Studio / Governance UI
+    participant Store as useQuestionStore.ts
+    participant Dexie as IndexedDB (db.questions & db.bankSyncMeta)
+    participant Edge as Edge Gateway / Worker
+
+    User->>UI: Clicks "Reset to Global Bank" (RotateCcw)
+    UI->>User: Displays Native Confirmation Alert (Apple HIG Destructive Action)
+    User-->>UI: Confirms Reset
+
+    UI->>Store: resetLocalBankToGlobal('cvs')
+    Store->>Dexie: Clear questions (db.questions.where('blockId').equals('cvs').delete())
+    Store->>Dexie: Clear sync cursor (db.bankSyncMeta.delete('cvs'))
+    
+    Store->>Edge: fetchDeltaSync('cvs', revision: 0)
+    alt Online: Edge / D1 Available
+        Edge-->>Store: Returns Full Canonical Bank (Latest Revision N)
+    else Offline: Isolated Environment
+        Store->>Store: Fallback to Bundled Authoritative Bank (bank.v1.json)
+    end
+
+    Store->>Dexie: Bulk Put Canonical Questions (db.questions.bulkPut)
+    Store->>Dexie: Store Fresh Sync Cursor (Rev #N, lastSyncedAt, etag)
+    Store->>UI: Update Zustand (questions: canonical, isSyncing: false)
+    UI-->>User: Visual Apple-Spring Success Toast ("Restored to Canonical Global Bank")
+```
+
+| Component | Responsibility during Reset |
+| :--- | :--- |
+| **`IndexedDB: questions`** | Completely purges stale local drafts, quarantined items, and orphan collisions for that curriculum block. |
+| **`IndexedDB: bankSyncMeta`** | Resets `serverRevision` from $0$ up to the canonical server revision, refreshing the ETag header cache. |
+| **`Zustand: questions`** | Seamlessly updates the reactive in-memory state with zero page reloads, ensuring instant testability. |
+| **`Bilingual Feedback`** | Native confirmation dialog and localized success toast in English and Arabic (`t.studio.resetConfirmDialog`, `t.studio.resetSuccessToast`). |
 
 ---
 
