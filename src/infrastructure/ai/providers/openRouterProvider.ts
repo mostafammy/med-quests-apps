@@ -9,7 +9,7 @@ export class OpenRouterProvider extends OpenAiCompatibleProvider {
   readonly baseUrl = 'https://openrouter.ai/api/v1/chat/completions';
   readonly modelsUrl = 'https://openrouter.ai/api/v1/models';
 
-  constructor(apiKey: string, modelId: string = 'meta-llama/llama-3.1-8b-instruct:free') {
+  constructor(apiKey: string, modelId: string = 'nvidia/nemotron-3.5-lightning:free') {
     super(apiKey, modelId);
   }
 
