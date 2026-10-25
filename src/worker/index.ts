@@ -422,6 +422,433 @@ export default {
       );
     }
 
+    // 7. Global Question Bank: Downstream Delta-Sync (Read-Only)
+    if (url.pathname === '/api/bank/sync' && request.method === 'GET') {
+      const blockId = url.searchParams.get('block') || 'cvs';
+      const sinceRev = Number(url.searchParams.get('sinceRev') || 0);
+
+      let currentRev = 1;
+      if (env.MED_QUESTS_DB) {
+        try {
+          const revRow = await env.MED_QUESTS_DB.prepare(
+            'SELECT revision_number FROM bank_revisions WHERE block_id = ?'
+          )
+            .bind(blockId)
+            .first<{ revision_number: number }>();
+          if (revRow) currentRev = revRow.revision_number;
+        } catch {
+          // Fall back to 1
+        }
+      }
+
+      const clientEtag = request.headers.get('if-none-match');
+      const serverEtag = `W/rev-${currentRev}`;
+
+      if (clientEtag === serverEtag || (sinceRev > 0 && sinceRev >= currentRev)) {
+        return new Response(null, {
+          status: 304,
+          headers: {
+            ETag: serverEtag,
+            'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
+          },
+        });
+      }
+
+      let upserted: any[] = [];
+      let archivedIds: string[] = [];
+
+      if (env.MED_QUESTS_DB) {
+        try {
+          const query = await env.MED_QUESTS_DB.prepare(
+            `SELECT * FROM global_questions
+             WHERE block_id = ? AND global_revision > ?
+             ORDER BY global_revision ASC LIMIT 500`
+          )
+            .bind(blockId, sinceRev)
+            .all();
+
+          for (const row of query.results as any[]) {
+            const item = {
+              id: row.id,
+              blockId: row.block_id,
+              subjectId: row.subject_id,
+              chapterId: row.chapter_id,
+              topicId: row.topic_id,
+              concept: row.concept,
+              type: row.type,
+              stem: row.stem,
+              choices: JSON.parse(row.choices_json),
+              explanation: row.explanation,
+              examTip: row.exam_tip,
+              mnemonic: row.mnemonic,
+              difficulty: row.difficulty,
+              cognitiveLevel: row.cognitive_level,
+              highYield: Boolean(row.high_yield),
+              origin: row.origin,
+              evidence: JSON.parse(row.evidence_json),
+              status: row.editorial_status === 'archived' ? 'quarantined' : 'active',
+              bankVersion: row.bank_version,
+              globalRevision: row.global_revision,
+              provenanceScope: 'global-canonical',
+              editorialStatus: row.editorial_status,
+              stemHash: row.stem_hash,
+              authorId: row.author_id,
+              authorDisplayName: row.author_display_name,
+              reviewedById: row.reviewed_by_id,
+              reviewedByDisplayName: row.reviewed_by_display_name,
+              reviewerNotes: row.reviewer_notes,
+              publishedAt: row.published_at,
+              createdAt: row.created_at,
+              updatedAt: row.updated_at,
+            };
+
+            if (row.editorial_status === 'archived') {
+              archivedIds.push(row.id);
+            } else {
+              upserted.push(item);
+            }
+          }
+        } catch {
+          // Default empty if table not yet initialized
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          status: 'delta-applied',
+          blockId,
+          revision: currentRev,
+          syncedAt: new Date().toISOString(),
+          etag: serverEtag,
+          upsertedQuestions: upserted,
+          archivedQuestionIds: archivedIds,
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            ETag: serverEtag,
+            'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
+          },
+        }
+      );
+    }
+
+    // 8. Global Question Bank: Author Submission Queue
+    if (url.pathname === '/api/bank/submissions' && request.method === 'POST') {
+      const payload = (await request.json()) as any;
+      const { questions, authorId, authorDisplayName, authorRole } = payload;
+
+      const tickets: any[] = [];
+      const duplicateQuestionIds: string[] = [];
+      const nowIso = new Date().toISOString();
+
+      if (env.MED_QUESTS_DB && Array.isArray(questions)) {
+        for (const q of questions) {
+          const stemHash = await sha256(q.stem.trim().toLowerCase());
+          const ticketId = `ticket-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+          try {
+            await env.MED_QUESTS_DB.prepare(
+              `INSERT INTO question_review_submissions (
+                ticket_id, question_id, block_id, subject_id, chapter_id, topic_id,
+                stem_hash, question_payload_json, editorial_status,
+                submitted_by_user_id, submitted_by_display_name, submitted_by_role, submitted_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending_review', ?, ?, ?, ?)`
+            )
+              .bind(
+                ticketId,
+                q.id,
+                q.blockId || 'cvs',
+                q.subjectId,
+                q.chapterId,
+                q.topicId,
+                stemHash,
+                JSON.stringify(q),
+                authorId,
+                authorDisplayName,
+                authorRole,
+                nowIso
+              )
+              .run();
+
+            tickets.push({
+              ticketId,
+              question: {
+                ...q,
+                provenanceScope: 'submitted-pending',
+                editorialStatus: 'pending_review',
+                stemHash,
+                authorId,
+                authorDisplayName,
+                submittedAt: nowIso,
+              },
+              submittedByUserId: authorId,
+              submittedByDisplayName: authorDisplayName,
+              submittedByRole: authorRole,
+              submittedAt: nowIso,
+              editorialStatus: 'pending_review',
+            });
+          } catch (e: any) {
+            duplicateQuestionIds.push(q.id);
+          }
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          submittedTickets: tickets,
+          duplicateQuestionIds,
+        }),
+        { status: 201, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 9. Editorial Review: List Review Queue
+    if (url.pathname === '/api/admin/questions/review-queue' && request.method === 'GET') {
+      const blockId = url.searchParams.get('block') || 'cvs';
+      let results: any[] = [];
+
+      if (env.MED_QUESTS_DB) {
+        try {
+          const rows = await env.MED_QUESTS_DB.prepare(
+            `SELECT * FROM question_review_submissions
+             WHERE block_id = ?
+             ORDER BY submitted_at DESC LIMIT 200`
+          )
+            .bind(blockId)
+            .all();
+
+          results = (rows.results as any[]).map((r) => {
+            const rawQ = JSON.parse(r.question_payload_json);
+            return {
+              ticketId: r.ticket_id,
+              question: {
+                ...rawQ,
+                editorialStatus: r.editorial_status,
+                provenanceScope: 'submitted-pending',
+                stemHash: r.stem_hash,
+                authorId: r.submitted_by_user_id,
+                authorDisplayName: r.submitted_by_display_name,
+                reviewedById: r.reviewed_by_user_id,
+                reviewedByDisplayName: r.reviewed_by_display_name,
+                reviewerNotes: r.reviewer_notes,
+                submittedAt: r.submitted_at,
+              },
+              submittedByUserId: r.submitted_by_user_id,
+              submittedByDisplayName: r.submitted_by_display_name,
+              submittedByRole: r.submitted_by_role,
+              submittedAt: r.submitted_at,
+              editorialStatus: r.editorial_status,
+              reviewedByUserId: r.reviewed_by_user_id,
+              reviewedByDisplayName: r.reviewed_by_display_name,
+              reviewedAt: r.reviewed_at,
+              reviewerNotes: r.reviewer_notes,
+            };
+          });
+        } catch {
+          // Table empty
+        }
+      }
+
+      return new Response(JSON.stringify(results), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 10. Editorial Review: Submit Decision (Approve / Request Changes / Reject)
+    const reviewMatch = url.pathname.match(/^\/api\/admin\/questions\/([^/]+)\/review$/);
+    if (reviewMatch && request.method === 'POST') {
+      const questionId = decodeURIComponent(reviewMatch[1]);
+      const command = (await request.json()) as any;
+      const nowIso = new Date().toISOString();
+
+      if (env.MED_QUESTS_DB) {
+        try {
+          const subRow = await env.MED_QUESTS_DB.prepare(
+            'SELECT * FROM question_review_submissions WHERE question_id = ? OR ticket_id = ?'
+          )
+            .bind(questionId, command.ticketId || questionId)
+            .first<any>();
+
+          if (subRow) {
+            let nextStatus = 'pending_review';
+            if (command.decision === 'approve_and_publish') nextStatus = 'published';
+            else if (command.decision === 'request_changes') nextStatus = 'changes_requested';
+            else if (command.decision === 'reject_submission') nextStatus = 'rejected';
+
+            // 1. Update ticket in submissions table
+            await env.MED_QUESTS_DB.prepare(
+              `UPDATE question_review_submissions
+               SET editorial_status = ?, reviewed_by_user_id = ?, reviewed_by_display_name = ?,
+                   reviewed_at = ?, reviewer_notes = ?
+               WHERE ticket_id = ?`
+            )
+              .bind(
+                nextStatus,
+                command.reviewerUserId,
+                command.reviewerDisplayName,
+                nowIso,
+                command.reviewerNotes || null,
+                subRow.ticket_id
+              )
+              .run();
+
+            // 2. If approved, bump bank_revisions and insert/upsert into global_questions
+            let newRev = 1;
+            if (nextStatus === 'published') {
+              await env.MED_QUESTS_DB.prepare(
+                `INSERT INTO bank_revisions (block_id, revision_number, updated_at)
+                 VALUES (?, 2, datetime('now'))
+                 ON CONFLICT(block_id) DO UPDATE SET
+                   revision_number = bank_revisions.revision_number + 1,
+                   updated_at = datetime('now')`
+              )
+                .bind(subRow.block_id)
+                .run();
+
+              const revRow = await env.MED_QUESTS_DB.prepare(
+                'SELECT revision_number FROM bank_revisions WHERE block_id = ?'
+              )
+                .bind(subRow.block_id)
+                .first<{ revision_number: number }>();
+              if (revRow) newRev = revRow.revision_number;
+
+              const rawQ = JSON.parse(subRow.question_payload_json);
+              const patch = command.inlinePatch || {};
+              const mergedQ = { ...rawQ, ...patch };
+
+              await env.MED_QUESTS_DB.prepare(
+                `INSERT INTO global_questions (
+                  id, block_id, subject_id, chapter_id, topic_id, concept, type,
+                  stem, stem_hash, choices_json, explanation, exam_tip, mnemonic,
+                  difficulty, cognitive_level, high_yield, origin, evidence_json,
+                  editorial_status, bank_version, global_revision, author_id,
+                  author_display_name, reviewed_by_id, reviewed_by_display_name,
+                  reviewer_notes, published_at, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  stem = excluded.stem,
+                  choices_json = excluded.choices_json,
+                  explanation = excluded.explanation,
+                  exam_tip = excluded.exam_tip,
+                  evidence_json = excluded.evidence_json,
+                  bank_version = global_questions.bank_version + 1,
+                  global_revision = excluded.global_revision,
+                  editorial_status = 'published',
+                  reviewed_by_id = excluded.reviewed_by_id,
+                  reviewed_by_display_name = excluded.reviewed_by_display_name,
+                  reviewer_notes = excluded.reviewer_notes,
+                  updated_at = excluded.updated_at`
+              )
+                .bind(
+                  mergedQ.id,
+                  mergedQ.blockId || 'cvs',
+                  mergedQ.subjectId,
+                  mergedQ.chapterId,
+                  mergedQ.topicId,
+                  mergedQ.concept,
+                  mergedQ.type || 'single-best-answer',
+                  mergedQ.stem,
+                  subRow.stem_hash,
+                  JSON.stringify(mergedQ.choices),
+                  mergedQ.explanation,
+                  mergedQ.examTip || null,
+                  mergedQ.mnemonic || null,
+                  mergedQ.difficulty || 2,
+                  mergedQ.cognitiveLevel || 'understanding',
+                  mergedQ.highYield !== false ? 1 : 0,
+                  mergedQ.origin || 'authored-grounded',
+                  JSON.stringify(mergedQ.evidence),
+                  mergedQ.bankVersion || 1,
+                  newRev,
+                  subRow.submitted_by_user_id,
+                  subRow.submitted_by_display_name,
+                  command.reviewerUserId,
+                  command.reviewerDisplayName,
+                  command.reviewerNotes || null,
+                  nowIso,
+                  subRow.submitted_at,
+                  nowIso
+                )
+                .run();
+            }
+
+            // 3. Append to editorial audit log
+            await env.MED_QUESTS_DB.prepare(
+              `INSERT INTO question_editorial_audit_log (
+                id, question_id, block_id, action, actor_user_id, actor_display_name,
+                actor_role, previous_status, next_status, revision_after, summary, occurred_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            )
+              .bind(
+                `audit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                questionId,
+                subRow.block_id,
+                command.decision.toUpperCase(),
+                command.reviewerUserId,
+                command.reviewerDisplayName,
+                command.reviewerRole,
+                subRow.editorial_status,
+                nextStatus,
+                newRev,
+                `Decision: ${command.decision} on question ${questionId}. Notes: ${command.reviewerNotes || 'None'}`,
+                nowIso
+              )
+              .run();
+
+            return new Response(
+              JSON.stringify({
+                ok: true,
+                editorialStatus: nextStatus,
+                newBlockRevision: newRev,
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            );
+          }
+        } catch (e: any) {
+          return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+        }
+      }
+
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // 11. Author: List My Submissions
+    if (url.pathname === '/api/bank/submissions/my' && request.method === 'GET') {
+      const authorId = url.searchParams.get('authorId');
+      let results: any[] = [];
+
+      if (env.MED_QUESTS_DB && authorId) {
+        try {
+          const rows = await env.MED_QUESTS_DB.prepare(
+            `SELECT * FROM question_review_submissions
+             WHERE submitted_by_user_id = ?
+             ORDER BY submitted_at DESC LIMIT 100`
+          )
+            .bind(authorId)
+            .all();
+
+          results = (rows.results as any[]).map((r) => ({
+            ticketId: r.ticket_id,
+            question: JSON.parse(r.question_payload_json),
+            editorialStatus: r.editorial_status,
+            submittedAt: r.submitted_at,
+            reviewedByDisplayName: r.reviewed_by_display_name,
+            reviewerNotes: r.reviewer_notes,
+          }));
+        } catch {
+          // Table empty
+        }
+      }
+
+      return new Response(JSON.stringify(results), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response('Not Found', { status: 404 });
   },
 };
