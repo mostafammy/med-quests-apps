@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Question, ChoiceId } from '../../../domain/model/types.ts';
+import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 import { LayoutGrid, Flag } from 'lucide-react';
 
 interface QuestionNavigatorStripProps {
@@ -24,6 +25,7 @@ export const QuestionNavigatorStrip: React.FC<QuestionNavigatorStripProps> = ({
   onSelectQuestion,
   onOpenMatrix,
 }) => {
+  const { t } = useLocaleStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const activePillRef = useRef<HTMLButtonElement>(null);
 
@@ -56,7 +58,7 @@ export const QuestionNavigatorStrip: React.FC<QuestionNavigatorStripProps> = ({
         {/* Left: Interactive Grid Trigger Pill */}
         <button
           onClick={onOpenMatrix}
-          title="Open Question Overview Grid (Press G)"
+          title={t.test.player.questionMatrixShortcut}
           className={`shrink-0 flex items-center space-x-1 sm:space-x-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all duration-150 cursor-pointer apple-tap ${
             isExamMode
               ? 'bg-slate-800/80 hover:bg-slate-750 text-slate-200 border border-slate-700/60 shadow-xs'
@@ -64,7 +66,7 @@ export const QuestionNavigatorStrip: React.FC<QuestionNavigatorStripProps> = ({
           }`}
         >
           <LayoutGrid className="w-3.5 h-3.5 text-blue-500" />
-          <span className="hidden sm:inline">Overview</span>
+          <span className="hidden sm:inline">{t.test.strip.overviewGrid}</span>
           <span className="font-mono text-[11px] opacity-75">
             ({answeredCount}/{questions.length})
           </span>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CVS_TAXONOMY } from '../../../domain/taxonomy/cvsTaxonomy.ts';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 import { useAuthStore } from '../../../application/stores/useAuthStore.ts';
+import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 import {
   Copy,
   Check,
@@ -34,6 +35,7 @@ export const QuestionStudio: React.FC = () => {
   } = useQuestionStore();
 
   const { authState } = useAuthStore();
+  const { t } = useLocaleStore();
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('anatomy');
   const [selectedChapterId, setSelectedChapterId] = useState<string>('cvs-ana-heart-dev');
@@ -226,13 +228,13 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
         <div className="space-y-1.5">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-700 dark:text-indigo-300 text-xs font-semibold backdrop-blur-md">
             <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-            <span>Curriculum Grounding & Ingestion Studio</span>
+            <span>{t.studio.badge}</span>
           </div>
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 dark:from-zinc-100 dark:via-zinc-200 dark:to-indigo-200 bg-clip-text text-transparent">
-            Question Authoring Studio
+            {t.studio.title}
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl leading-relaxed">
-            Generate grounded prompt templates, validate against taxonomy schemas, save privately to your device, or submit for peer & faculty curriculum review.
+            {t.studio.subtitle}
           </p>
         </div>
 
@@ -242,7 +244,7 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
             className="py-2.5 px-4 rounded-2xl bg-white/60 dark:bg-zinc-800/60 hover:bg-white/80 dark:hover:bg-zinc-800 border border-white/80 dark:border-zinc-700/80 text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center space-x-2 shadow-xs transition-all duration-200 cursor-pointer apple-tap"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Export Bank ({questions.length})</span>
+            <span>{t.studio.exportBtn} ({questions.length})</span>
           </button>
         </div>
       </div>
@@ -327,14 +329,14 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
               className="py-1.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center space-x-1.5 shadow-sm shadow-indigo-500/20 transition-all cursor-pointer apple-tap"
             >
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Copied System Prompt' : 'Copy AI Studio Prompt'}</span>
+              <span>{copied ? t.studio.promptCopied : t.studio.copyPrompt}</span>
             </button>
           </div>
 
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
-                Select Academic Subject
+                {t.studio.selectSubject}
               </label>
               <select
                 value={selectedSubjectId}
@@ -355,7 +357,7 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
 
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
-                Select Target Chapter
+                {t.studio.selectChapter}
               </label>
               <select
                 value={selectedChapterId}
@@ -439,7 +441,7 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
               }}
               className="text-xs font-semibold text-rose-600 hover:underline cursor-pointer"
             >
-              Clear Bank
+              {t.studio.clearBtn}
             </button>
           </div>
 
