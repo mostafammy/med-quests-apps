@@ -242,6 +242,23 @@ export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
       };
     }
 
+    // 4. Update local questions provenance to 'submitted-pending' in Dexie and Zustand
+    const updatedSubmittedQuestions = candidates.map((q) => ({
+      ...q,
+      provenanceScope: 'submitted-pending' as const,
+      editorialStatus: 'pending_review' as const,
+      authorId: authorContext.authorId || 'usr_local_author',
+      authorDisplayName: authorContext.authorDisplayName || 'Medical Scholar',
+      updatedAt: new Date().toISOString(),
+    }));
+
+    await db.questions.bulkPut(updatedSubmittedQuestions as unknown as Question[]);
+
+    const currentMap = new Map<string, Question>();
+    get().questions.forEach((q) => currentMap.set(q.id, q));
+    updatedSubmittedQuestions.forEach((q) => currentMap.set(q.id, q as unknown as Question));
+    set({ questions: Array.from(currentMap.values()) });
+
     // Refresh author's own submissions
     await get().loadMySubmissions(authorContext.authorId);
 
