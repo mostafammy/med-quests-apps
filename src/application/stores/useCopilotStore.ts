@@ -76,7 +76,9 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
       return;
     }
     try {
-      const keys = await powerActionCacheService.getCachedActionKeys(questionId);
+      const { settings } = useAiSettingsStore.getState();
+      const lang = settings.chatLanguage === 'ar' ? 'ar' : 'en';
+      const keys = await powerActionCacheService.getCachedActionKeys(questionId, lang);
       set({ cachedActionKeys: keys });
     } catch {
       set({ cachedActionKeys: new Set() });
@@ -97,13 +99,27 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
     const actionDef = POWER_ACTIONS.find((a) => a.key === actionKey);
     if (!actionDef) return;
 
+    const { settings } = useAiSettingsStore.getState();
+    const resolvedLang = settings.chatLanguage === 'ar' ? 'ar' : 'en';
+
     // Check if we already have an instant 0ms cached answer in IndexedDB
-    const cachedRecord = await powerActionCacheService.getCachedAction(activeQuestionId, actionKey);
+    const cachedRecord = await powerActionCacheService.getCachedAction(
+      activeQuestionId,
+      actionKey,
+      resolvedLang
+    );
     if (cachedRecord && cachedRecord.responseParts.length > 0) {
       const userMsg: ChatMessage = {
         id: `msg-user-${Date.now()}`,
         role: 'user',
-        parts: [{ kind: 'text', text: cachedRecord.prompt || actionDef.label }],
+        parts: [
+          {
+            kind: 'text',
+            text:
+              cachedRecord.prompt ||
+              (resolvedLang === 'ar' ? actionDef.labelAr : actionDef.label),
+          },
+        ],
         status: 'complete',
         engine: null,
         createdAt: Date.now(),
@@ -127,16 +143,19 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
       return;
     }
 
-    // Not cached yet: generate deterministic clinical prompt
+    // Not cached yet: generate deterministic clinical prompt in requested language
     const correctChoiceId = surface.question.choices.find((c) => c.isCorrect)?.id ?? 'a';
     const prompt =
       promptOverride ||
-      actionDef.generatePrompt({
-        questionStem: surface.question.stem,
-        choices: surface.question.choices,
-        correctChoiceId,
-        selectedChoiceId: surface.selectedChoiceId,
-      });
+      actionDef.generatePrompt(
+        {
+          questionStem: surface.question.stem,
+          choices: surface.question.choices,
+          correctChoiceId,
+          selectedChoiceId: surface.selectedChoiceId,
+        },
+        resolvedLang
+      );
 
     await get().sendUserMessage(prompt, actionKey);
   },
@@ -366,12 +385,17 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
 
       // Cache power action response in local IndexedDB for 0ms instant future retrieval
       if (cacheActionKey && activeQuestion?.id && finalParts.length > 0) {
+        const langCtx = ChatLanguagePolicy.resolveChatLanguageContext(
+          settings.chatLanguage || 'auto',
+          userText
+        );
         await powerActionCacheService.saveCachedAction(
           activeQuestion.id,
           cacheActionKey,
           userText,
           finalParts,
-          resolvedEngineId
+          resolvedEngineId,
+          langCtx.resolvedLanguage
         );
         await get().loadCachedActionKeys(activeQuestion.id);
       }
