@@ -12,7 +12,9 @@ import {
   Loader2,
   Trash2,
   CheckCircle2,
+  BookOpen,
 } from 'lucide-react';
+import { QuestionBankGovernancePanel } from './QuestionBankGovernancePanel.tsx';
 import { useAuthStore, type GovernanceViewTab } from '../../../application/stores/useAuthStore.ts';
 import type { UserRole, FeatureFlagKey } from '../../../domain/auth/types.ts';
 import {
@@ -98,11 +100,13 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   const isAdmin = authState.status === 'authenticated-active' && authState.user.role === 'admin';
+  const isFaculty = authState.status === 'authenticated-active' && authState.user.role === 'faculty-reviewer';
+  const isAuthorized = isAdmin || isFaculty;
 
   // =========================================================================
-  // GUEST / NON-ADMIN ACCESS GATE
+  // GUEST / UNAUTHORIZED ACCESS GATE
   // =========================================================================
-  if (!isAdmin) {
+  if (!isAuthorized) {
     return (
       <div className="min-h-[75vh] flex items-center justify-center p-4">
         <div className="glass-surface relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-amber-500/30 p-6 sm:p-8 text-center shadow-2xl space-y-5">
@@ -245,23 +249,33 @@ export const AdminDashboardPage: React.FC = () => {
       <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200/60 pb-3 dark:border-zinc-800/60">
         {[
           {
-            id: 'cohort-analytics' as const,
-            label: 'Global Cohort & Telemetry Stats',
-            icon: BarChart3,
-            badge: `${analytics.totalUsers} Users`,
+            id: 'question-bank' as const,
+            label: 'Question Bank & Review Queue',
+            icon: BookOpen,
+            badge: 'Curriculum Cockpit',
           },
-          {
-            id: 'user-directory' as const,
-            label: 'User Directory, AI Toggles & Bans',
-            icon: Users,
-            badge: `${analytics.aiCloudEnabledUsersCount} AI Active`,
-          },
-          {
-            id: 'audit-trail' as const,
-            label: 'Security Audit Log',
-            icon: History,
-            badge: `${auditLogs.length} Events`,
-          },
+          ...(isAdmin
+            ? [
+                {
+                  id: 'cohort-analytics' as const,
+                  label: 'Global Cohort & Telemetry Stats',
+                  icon: BarChart3,
+                  badge: `${analytics.totalUsers} Users`,
+                },
+                {
+                  id: 'user-directory' as const,
+                  label: 'User Directory, AI Toggles & Bans',
+                  icon: Users,
+                  badge: `${analytics.aiCloudEnabledUsersCount} AI Active`,
+                },
+                {
+                  id: 'audit-trail' as const,
+                  label: 'Security Audit Log',
+                  icon: History,
+                  badge: `${auditLogs.length} Events`,
+                },
+              ]
+            : []),
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeGovernanceTab === tab.id;
@@ -291,6 +305,9 @@ export const AdminDashboardPage: React.FC = () => {
           );
         })}
       </div>
+
+      {/* TAB: QUESTION BANK & REVIEW QUEUE */}
+      {activeGovernanceTab === 'question-bank' && <QuestionBankGovernancePanel />}
 
       {/* TAB 1: COHORT ANALYTICS */}
       {activeGovernanceTab === 'cohort-analytics' && (
