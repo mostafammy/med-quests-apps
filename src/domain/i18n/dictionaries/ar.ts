@@ -252,6 +252,10 @@ export const arDictionary: TranslationDictionary = {
     ingestBtn: 'تدقيق واستيراد الأسئلة',
     exportBtn: 'تصدير بنك الأسئلة (JSON)',
     clearBtn: 'مسح بنك الأسئلة',
+    resetToGlobalBtn: 'إعادة ضبط لبنك الأسئلة العام',
+    resetConfirmDialog:
+      'هل أنت متأكد من إعادة ضبط بنك الأسئلة المحلي للنسخة الأكاديمية الرسمية المعتمدة؟ سيتم استبدال أي مسودات محلية غير مرسلة.',
+    resetSuccessToast: 'تمت استعادة بنك الأسئلة بنجاح إلى النسخة العامة المعتمدة.',
     totalQuestions: 'إجمالي الأسئلة في البنك',
     validationSuccess: 'تم تدقيق واستيراد {count} أسئلة بنجاح!',
   },
