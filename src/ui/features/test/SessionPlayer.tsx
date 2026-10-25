@@ -11,6 +11,7 @@ import { questionTelemetryTracker } from '../../../domain/ai/telemetry.ts';
 import { CopilotTriggerButton } from '../copilot/CopilotTriggerButton.tsx';
 import { AiCopilotDrawer } from '../copilot/AiCopilotDrawer.tsx';
 import { ThemeToggle } from '../../app/ThemeToggle.tsx';
+import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -28,6 +29,7 @@ export const SessionPlayer: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { questions: allQuestions } = useQuestionStore();
+  const { t, isRtl } = useLocaleStore();
 
   const sessionConfig = useMemo(() => {
     return (location.state as {
@@ -446,7 +448,7 @@ export const SessionPlayer: React.FC = () => {
               onClick={handleSubmitExam}
               className="hidden sm:inline-flex py-1.5 px-3.5 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 rounded-xl text-xs font-bold transition-all cursor-pointer apple-tap shadow-xs"
             >
-              Finish
+              {t.common.finish}
             </button>
           )}
 
@@ -455,7 +457,7 @@ export const SessionPlayer: React.FC = () => {
               onClick={handleSubmitExam}
               className="hidden sm:inline-flex py-1.5 px-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-600/25 cursor-pointer apple-tap"
             >
-              Submit
+              {t.common.submit}
             </button>
           )}
         </div>
@@ -486,7 +488,7 @@ export const SessionPlayer: React.FC = () => {
             <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2 border-b border-slate-200/60 dark:border-zinc-800/60">
               <div className="flex items-center flex-wrap gap-2 text-xs font-semibold">
                 <span className="glass-pill-luxury px-3 py-1 rounded-full text-blue-700 dark:text-blue-300 font-mono font-bold text-xs border border-blue-400/30">
-                  Question {currentIndex + 1} of {sessionQuestions.length}
+                  {t.test.player.questionOf.replace('{current}', String(currentIndex + 1)).replace('{total}', String(sessionQuestions.length))}
                 </span>
                 <span className="glass-pill-luxury px-3 py-1 rounded-full text-slate-700 dark:text-zinc-300 text-xs">
                   {currentQ.subjectId}
@@ -497,10 +499,10 @@ export const SessionPlayer: React.FC = () => {
               </div>
 
               <div className="flex items-center space-x-2 text-xs text-slate-500 dark:text-zinc-400 font-mono">
-                <span className="hidden sm:inline">Pacing: Target &lt;60s</span>
+                <span className="hidden sm:inline">{t.test.player.pacingTarget}</span>
                 <span className="hidden sm:inline">•</span>
                 <span className="font-bold text-slate-700 dark:text-zinc-300">
-                  {Math.round(((currentIndex + 1) / sessionQuestions.length) * 100)}% Complete
+                  {t.test.player.complete.replace('{percent}', String(Math.round(((currentIndex + 1) / sessionQuestions.length) * 100)))}
                 </span>
               </div>
             </div>
@@ -636,29 +638,29 @@ export const SessionPlayer: React.FC = () => {
                   {currentAnswer.isCorrect ? (
                     <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-extrabold text-xs sm:text-sm border border-emerald-500/30 shadow-xs">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
-                      <span>Correct Answer</span>
+                      <span>{t.test.player.correctAnswer}</span>
                     </div>
                   ) : (
                     <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-rose-500/15 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 font-extrabold text-xs sm:text-sm border border-rose-500/30 shadow-xs">
                       <XCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 stroke-[2.5]" />
-                      <span>Incorrect Choice • Key: Option {currentQ.choices.find((c) => c.isCorrect)?.id.toUpperCase()}</span>
+                      <span>{t.test.player.incorrectChoice.replace('{key}', currentQ.choices.find((c) => c.isCorrect)?.id.toUpperCase() || '')}</span>
                     </div>
                   )}
                 </div>
 
                 <div className="glass-pill-luxury px-3 py-1 rounded-full text-xs font-semibold text-slate-600 dark:text-zinc-300 flex items-center space-x-1.5 self-start sm:self-auto">
-                  <span>Press</span>
+                  <span>{t.test.player.press}</span>
                   <kbd className="px-1.5 py-0.5 rounded-md bg-slate-200/80 dark:bg-zinc-800 font-mono text-[10px] font-bold text-blue-600 dark:text-blue-400 border border-slate-300/80 dark:border-zinc-700 shadow-2xs">
                     Enter ⏎
                   </kbd>
-                  <span>{isLastQuestion ? 'to finish' : 'for next question'}</span>
+                  <span>{isLastQuestion ? t.test.player.toFinish : t.test.player.forNextQuestion}</span>
                 </div>
               </div>
 
               {/* Comprehensive Explanation & Rationale */}
               <div className="space-y-1.5 pt-1">
                 <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-                  Explanation & Clinical Reasoning
+                  {t.test.player.explanationTitle}
                 </div>
                 <p className="text-slate-900 dark:text-zinc-100 text-sm sm:text-base leading-relaxed font-normal">
                   {currentQ.explanation}
@@ -670,7 +672,7 @@ export const SessionPlayer: React.FC = () => {
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/25 flex items-start space-x-3 text-slate-900 dark:text-zinc-100">
                   <span className="text-amber-500 text-base select-none shrink-0 mt-0.5">⚡</span>
                   <div className="text-xs sm:text-sm leading-relaxed">
-                    <strong className="font-extrabold text-amber-800 dark:text-amber-300 mr-1.5">Exam Tip:</strong>
+                    <strong className="font-extrabold text-amber-800 dark:text-amber-300 mr-1.5">{t.test.player.examTipTitle}</strong>
                     <span className="text-slate-800 dark:text-zinc-200 font-medium">{currentQ.examTip}</span>
                   </div>
                 </div>
@@ -731,7 +733,7 @@ export const SessionPlayer: React.FC = () => {
                   <kbd className="px-2 py-0.5 rounded-md bg-white/15 text-white font-mono text-[10px] font-black border border-white/20 shadow-xs">
                     1–4
                   </kbd>
-                  <span className="text-xs font-semibold text-slate-200">Answer</span>
+                  <span className="text-xs font-semibold text-slate-200">{t.test.player.answerShortcut}</span>
                 </div>
                 <span className="w-1 h-1 rounded-full bg-slate-600" />
                 <div className="flex items-center space-x-1.5">
@@ -743,7 +745,7 @@ export const SessionPlayer: React.FC = () => {
                       →
                     </kbd>
                   </div>
-                  <span className="text-xs font-semibold text-slate-200">Navigate</span>
+                  <span className="text-xs font-semibold text-slate-200">{t.test.player.navigateShortcut}</span>
                 </div>
               </div>
             )}
@@ -763,7 +765,7 @@ export const SessionPlayer: React.FC = () => {
                   : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-500/25'
               }`}
             >
-              <span>{isExamMode ? 'Submit Exam' : 'Finish & View Results'}</span>
+              <span>{isExamMode ? t.test.player.submitExam : t.test.player.finishResults}</span>
               <CheckCircle2 className="w-4 h-4" />
             </button>
           ) : (
@@ -771,8 +773,8 @@ export const SessionPlayer: React.FC = () => {
               onClick={handleNext}
               className="py-2.5 px-5 sm:px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold flex items-center space-x-1.5 cursor-pointer shadow-md shadow-blue-500/25 transition-all apple-tap"
             >
-              <span>Next</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <span>{t.common.next}</span>
+              <ArrowRight className={`w-3.5 h-3.5 ${isRtl ? 'rotate-180' : ''}`} />
             </button>
           )}
         </div>
