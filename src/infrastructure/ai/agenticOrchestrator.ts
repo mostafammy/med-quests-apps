@@ -12,6 +12,7 @@
 import type { SafeAiContext } from '../../domain/ai/context.ts';
 import type { AiSettings } from '../../domain/ai/settings.ts';
 import { SystemPromptBuilder } from '../../domain/ai/systemPromptBuilder.ts';
+import { ChatLanguagePolicy } from '../../domain/ai/languagePolicy.ts';
 import { questionTelemetryTracker } from '../../domain/ai/telemetry.ts';
 import {
   agentToolRegistry,
@@ -69,9 +70,14 @@ export class AgenticOrchestrator {
     // 2. Build Authoritative Medical System Prompt
     const telemetrySnapshot = questionTelemetryTracker.getSnapshot();
     const timeSpentSeconds = questionTelemetryTracker.getTimeSpentSeconds();
+    const langContext = ChatLanguagePolicy.resolveChatLanguageContext(
+      settings.chatLanguage || 'auto',
+      userMessage
+    );
 
     const systemPrompt = new SystemPromptBuilder()
       .withRolePersona()
+      .withChatLanguageDirective(langContext)
       .withSafeContext(safeContext)
       .withTelemetrySnapshot(telemetrySnapshot, timeSpentSeconds)
       .withToolOrchestrationRules()
