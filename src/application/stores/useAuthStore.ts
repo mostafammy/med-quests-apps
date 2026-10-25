@@ -20,7 +20,7 @@ import {
 import type { ProgressSyncSummary } from '../../../specs/003-edge-auth-adaptive-telemetry/contracts/auth-telemetry-ports.ts';
 
 export type AuthModalTab = 'sign-in' | 'security-devices' | 'hardware-tier';
-export type GovernanceViewTab = 'cohort-analytics' | 'user-directory' | 'audit-trail';
+export type GovernanceViewTab = 'cohort-analytics' | 'user-directory' | 'audit-trail' | 'question-bank';
 
 export interface AuthStoreState {
   readonly authState: AuthState;
