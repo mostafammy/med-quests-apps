@@ -22,7 +22,9 @@ import {
   Smartphone,
   ExternalLink,
   Trash2,
+  BookOpen,
 } from 'lucide-react';
+import { QuestionBankGovernancePanel } from '../admin/QuestionBankGovernancePanel.tsx';
 import {
   useAuthStore,
   type GovernanceViewTab,
@@ -273,9 +275,15 @@ export const AdminGovernanceDrawer: React.FC = () => {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-zinc-200/60 bg-zinc-100/50 px-4 py-2 sm:px-6 dark:border-zinc-800/60 dark:bg-zinc-900/50">
+        <div className="flex items-center gap-2 border-b border-zinc-200/60 bg-zinc-100/50 px-4 py-2 sm:px-6 dark:border-zinc-800/60 dark:bg-zinc-900/50 overflow-x-auto">
           {(
             [
+              {
+                id: 'question-bank',
+                label: 'Question Bank & Review',
+                icon: BookOpen,
+                badge: 'Curriculum',
+              },
               {
                 id: 'cohort-analytics',
                 label: 'Global Cohort & Telemetry Stats',
@@ -321,6 +329,15 @@ export const AdminGovernanceDrawer: React.FC = () => {
 
         {/* Body Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {/* ========================================================= */}
+          {/* TAB 0: CURRICULUM QUESTION BANK & REVIEW QUEUE            */}
+          {/* ========================================================= */}
+          {activeGovernanceTab === 'question-bank' && (
+            <div className="py-2">
+              <QuestionBankGovernancePanel />
+            </div>
+          )}
+
           {/* ========================================================= */}
           {/* TAB 1: GLOBAL COHORT & TELEMETRY ANALYTICS DASHBOARD      */}
           {/* ========================================================= */}
