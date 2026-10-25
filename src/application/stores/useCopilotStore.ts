@@ -16,6 +16,7 @@ import { db } from '../../infrastructure/storage/db.ts';
 import { powerActionCacheService } from '../../domain/ai/powerActionCacheService.ts';
 import { POWER_ACTIONS, type PowerActionKey } from '../../domain/ai/powerActions.ts';
 import { ChatLanguagePolicy } from '../../domain/ai/languagePolicy.ts';
+import { aiMetricsCacheService } from '../../infrastructure/ai/telemetry/aiMetricsCacheService.ts';
 
 interface CopilotState {
   // Drawer visibility & size
@@ -142,6 +143,22 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
         messages: [...state.messages, userMsg, assistantMsg],
         error: null,
       }));
+
+      // Record 0ms cached retrieval telemetry
+      aiMetricsCacheService.recordMetric({
+        providerId: 'cached',
+        modelId: 'Instant Cache',
+        latencyMs: 0,
+        characterCount: cachedRecord.responseParts.reduce(
+          (acc, p) => acc + (p.kind === 'text' ? p.text.length : 0),
+          0
+        ),
+        hadThinking: false,
+        status: 'success',
+        timestamp: Date.now(),
+        questionId: activeQuestionId,
+      });
+
       return;
     }
 
@@ -415,6 +432,20 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
         ),
       }));
 
+      const durationMs = Math.round(performance.now() - startTime);
+
+      // Record successful generation telemetry in Tier 1 cache -> Tier 2 IndexedDB
+      aiMetricsCacheService.recordMetric({
+        providerId: resolvedEngineId || settings.engine || 'unknown',
+        modelId: resolvedModelId || 'unknown',
+        latencyMs: durationMs,
+        characterCount: accumulatedText.length,
+        hadThinking: Boolean(accumulatedThinking && accumulatedThinking.length > 0),
+        status: 'success',
+        timestamp: Date.now(),
+        questionId: activeQuestion?.id || null,
+      });
+
       // Cache power action response in local IndexedDB for 0ms instant future retrieval
       if (cacheActionKey && activeQuestion?.id && finalParts.length > 0) {
         const langCtx = ChatLanguagePolicy.resolveChatLanguageContext(
@@ -432,7 +463,19 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
         await get().loadCachedActionKeys(activeQuestion.id);
       }
     } catch (err) {
+      const durationMs = Math.round(performance.now() - startTime);
       if ((err as Error).name === 'AbortError') {
+        aiMetricsCacheService.recordMetric({
+          providerId: resolvedEngineId || settings.engine || 'unknown',
+          modelId: resolvedModelId || 'unknown',
+          latencyMs: durationMs,
+          characterCount: accumulatedText.length,
+          hadThinking: Boolean(accumulatedThinking && accumulatedThinking.length > 0),
+          status: 'aborted',
+          timestamp: Date.now(),
+          questionId: activeQuestion?.id || null,
+        });
+
         set((state) => ({
           isStreaming: false,
           activeDiagnosticTool: null,
@@ -442,6 +485,20 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
         }));
       } else {
         const errorMsg = (err as Error).message || 'An error occurred during response generation.';
+        const isRateLimit =
+          errorMsg.toLowerCase().includes('rate limit') || errorMsg.includes('429');
+
+        aiMetricsCacheService.recordMetric({
+          providerId: resolvedEngineId || settings.engine || 'unknown',
+          modelId: resolvedModelId || 'unknown',
+          latencyMs: durationMs,
+          characterCount: accumulatedText.length,
+          hadThinking: Boolean(accumulatedThinking && accumulatedThinking.length > 0),
+          status: isRateLimit ? 'rate-limited' : 'error',
+          timestamp: Date.now(),
+          questionId: activeQuestion?.id || null,
+        });
+
         set((state) => ({
           isStreaming: false,
           activeDiagnosticTool: null,

@@ -17,11 +17,14 @@ import {
   Copy,
   Check,
   Clock,
+  Gauge,
+  Zap,
 } from 'lucide-react';
 import type { ChatMessage } from '../../../domain/ai/conversation.ts';
 import { useCopilotStore } from '../../../application/stores/useCopilotStore.ts';
 import { useAiSettingsStore } from '../../../application/stores/useAiSettingsStore.ts';
 import { CopilotSettingsModal } from './CopilotSettingsModal.tsx';
+import { ModelPerformanceInsightsModal } from './ModelPerformanceInsightsModal.tsx';
 import { CopilotMarkdownView } from './CopilotMarkdownView.tsx';
 import { QuickPowerActionsBar } from './QuickPowerActionsBar.tsx';
 import { HemodynamicPvLoopCard } from './cards/HemodynamicPvLoopCard.tsx';
@@ -33,6 +36,7 @@ import {
 } from './cards/MemoryRemediationCard.tsx';
 import { ThinkingAccordion } from './ThinkingAccordion.tsx';
 import { getModelDisplayName } from '../../../domain/ai/modelCatalog.ts';
+import { formatLatency } from '../../../domain/ai/metrics.ts';
 
 function formatMessageTime(timestamp: number): string {
   if (!timestamp) return '';
@@ -100,6 +104,7 @@ export const AiCopilotDrawer: React.FC = () => {
   const { settings, loadSettings, updateSettings } = useAiSettingsStore();
   const [inputText, setInputText] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -307,6 +312,14 @@ export const AiCopilotDrawer: React.FC = () => {
           {/* Action Icons */}
           <div className="flex items-center space-x-1">
             <button
+              onClick={() => setIsInsightsOpen(true)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-all cursor-pointer"
+              title="Model Speed & Telemetry Insights"
+            >
+              <Gauge className="w-4 h-4" />
+            </button>
+
+            <button
               onClick={() => setIsSettingsOpen(true)}
               className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-all cursor-pointer"
               title="Provider Settings (BYO Key)"
@@ -467,10 +480,14 @@ export const AiCopilotDrawer: React.FC = () => {
                           </span>
                         )}
 
-                        {/* Latency */}
-                        {msg.latencyMs !== null && (
-                          <span className="font-mono text-[9px] text-slate-400 dark:text-zinc-500">
-                            {msg.latencyMs}ms
+                        {/* Latency / Generation Speed Badge */}
+                        {msg.latencyMs !== null && msg.latencyMs !== undefined && (
+                          <span
+                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md font-mono text-[9px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20"
+                            title={`Generation speed: ${formatLatency(msg.latencyMs)} (${msg.latencyMs}ms)`}
+                          >
+                            <Zap className="w-2.5 h-2.5 fill-current text-amber-500" />
+                            <span>{formatLatency(msg.latencyMs)}</span>
                           </span>
                         )}
                       </div>
@@ -623,6 +640,12 @@ export const AiCopilotDrawer: React.FC = () => {
       <CopilotSettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+
+      {/* Model Performance & Speed Insights Modal */}
+      <ModelPerformanceInsightsModal
+        isOpen={isInsightsOpen}
+        onClose={() => setIsInsightsOpen(false)}
       />
     </>
   );

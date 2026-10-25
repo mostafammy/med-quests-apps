@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from 'dexie';
 import { Question, Attempt, ReviewCard } from '../../domain/model/types.ts';
 import type { AiSettings } from '../../domain/ai/settings.ts';
 import type { ChatMessage, MessagePart } from '../../domain/ai/conversation.ts';
+import type { AiModelMetricRecord } from '../../domain/ai/metrics.ts';
 
 export interface BookmarkRecord {
   questionId: string;
@@ -81,6 +82,7 @@ class MedQuestsDB extends Dexie {
   aiCache!: EntityTable<AiPowerActionCacheRecord, 'cacheKey'>;
   bankSyncMeta!: EntityTable<BankSyncMetaRecord, 'blockId'>;
   studioSubmissions!: EntityTable<StudioSubmissionRecord, 'ticketId'>;
+  aiModelMetrics!: EntityTable<AiModelMetricRecord, 'id'>;
 
   constructor() {
     super('MedQuestsDB');
@@ -109,6 +111,10 @@ class MedQuestsDB extends Dexie {
       questions: 'id, blockId, subjectId, chapterId, topicId, highYield, difficulty, provenanceScope, editorialStatus',
       bankSyncMeta: 'blockId, serverRevision, lastSyncedAt',
       studioSubmissions: 'ticketId, questionId, blockId, editorialStatus, submittedAt',
+    });
+
+    this.version(6).stores({
+      aiModelMetrics: 'id, providerId, modelId, latencyMs, timestamp, status',
     });
   }
 }
