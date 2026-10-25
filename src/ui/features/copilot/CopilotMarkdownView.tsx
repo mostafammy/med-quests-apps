@@ -1,5 +1,6 @@
 import React from 'react';
 import { Award, Sparkles, AlertTriangle, Activity } from 'lucide-react';
+import { ScriptDirectionDetector } from '../../../domain/i18n/scriptDetector.ts';
 
 interface Props {
   content: string;
@@ -20,6 +21,8 @@ export const CopilotMarkdownView: React.FC<Props> = ({ content }) => {
       i++;
       continue;
     }
+
+    const blockDir = ScriptDirectionDetector.detectTextDirection(rawLine);
 
     // 2. Horizontal Divider (--- or ***)
     if (/^(\-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
@@ -56,7 +59,7 @@ export const CopilotMarkdownView: React.FC<Props> = ({ content }) => {
       }
 
       if (tableLines.length >= 2) {
-        elements.push(renderTable(`table-${i}`, tableLines));
+        elements.push(renderTable(`table-${i}`, tableLines, blockDir));
       }
       continue;
     }
@@ -64,9 +67,9 @@ export const CopilotMarkdownView: React.FC<Props> = ({ content }) => {
     // 4. Headings
     if (trimmed.startsWith('# ')) {
       elements.push(
-        <div key={`h1-${i}`} className="pt-3 pb-1">
-          <h1 className="text-sm font-black text-slate-900 dark:text-zinc-50 tracking-tight flex items-center space-x-2">
-            <span className="w-1.5 h-4 rounded-full bg-gradient-to-b from-blue-500 via-indigo-500 to-purple-500 shadow-xs" />
+        <div key={`h1-${i}`} dir={blockDir} className="pt-3 pb-1 text-start">
+          <h1 className="text-sm font-black text-slate-900 dark:text-zinc-50 tracking-tight flex items-center gap-2">
+            <span className="w-1.5 h-4 rounded-full bg-gradient-to-b from-blue-500 via-indigo-500 to-purple-500 shadow-xs shrink-0" />
             <span>{formatInline(trimmed.slice(2))}</span>
           </h1>
         </div>
@@ -77,9 +80,9 @@ export const CopilotMarkdownView: React.FC<Props> = ({ content }) => {
 
     if (trimmed.startsWith('## ')) {
       elements.push(
-        <div key={`h2-${i}`} className="pt-2.5 pb-1">
-          <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-zinc-100 flex items-center space-x-2">
-            <span className="w-1.5 h-3.5 rounded-full bg-gradient-to-b from-indigo-500 to-purple-500 shadow-xs" />
+        <div key={`h2-${i}`} dir={blockDir} className="pt-2.5 pb-1 text-start">
+          <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+            <span className="w-1.5 h-3.5 rounded-full bg-gradient-to-b from-indigo-500 to-purple-500 shadow-xs shrink-0" />
             <span>{formatInline(trimmed.slice(3))}</span>
           </h2>
         </div>
@@ -90,9 +93,9 @@ export const CopilotMarkdownView: React.FC<Props> = ({ content }) => {
 
     if (trimmed.startsWith('### ')) {
       elements.push(
-        <div key={`h3-${i}`} className="pt-2 pb-0.5">
-          <h3 className="text-[11px] font-extrabold uppercase tracking-wide text-slate-800 dark:text-zinc-200 flex items-center space-x-1.5">
-            <span className="w-1 h-2.5 rounded-full bg-indigo-500" />
+        <div key={`h3-${i}`} dir={blockDir} className="pt-2 pb-0.5 text-start">
+          <h3 className="text-[11px] font-extrabold uppercase tracking-wide text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
+            <span className="w-1 h-2.5 rounded-full bg-indigo-500 shrink-0" />
             <span>{formatInline(trimmed.slice(4))}</span>
           </h3>
         </div>
@@ -101,15 +104,21 @@ export const CopilotMarkdownView: React.FC<Props> = ({ content }) => {
       continue;
     }
 
-    // 5. Medical Callout Headers (e.g. BOARD EXAM RULE, MEMORY ANCHOR, WHY YOU PICKED, IN 30 SECONDS)
+    // 5. Medical Callout Headers (English + Arabic Recognized Headers)
     const upper = trimmed.toUpperCase();
     if (
       upper.startsWith('BOARD EXAM RULE') ||
-      upper.startsWith('HIGH-YIELD RULE')
+      upper.startsWith('HIGH-YIELD RULE') ||
+      trimmed.includes('قاعدة الاختبار') ||
+      trimmed.includes('قاعدة عالية العائد')
     ) {
       elements.push(
-        <div key={`callout-rule-${i}`} className="my-2.5 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 shadow-2xs">
-          <div className="flex items-center space-x-1.5 text-[11px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-1">
+        <div
+          key={`callout-rule-${i}`}
+          dir={blockDir}
+          className="my-2.5 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 shadow-2xs text-start"
+        >
+          <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-1">
             <Award className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
             <span>{trimmed}</span>
           </div>
@@ -119,10 +128,19 @@ export const CopilotMarkdownView: React.FC<Props> = ({ content }) => {
       continue;
     }
 
-    if (upper.startsWith('MEMORY ANCHOR') || upper.startsWith('MNEMONIC:')) {
+    if (
+      upper.startsWith('MEMORY ANCHOR') ||
+      upper.startsWith('MNEMONIC:') ||
+      trimmed.includes('مرساة الذاكرة') ||
+      trimmed.includes('وسيلة تذكر')
+    ) {
       elements.push(
-        <div key={`callout-anchor-${i}`} className="my-2.5 p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 shadow-2xs">
-          <div className="flex items-center space-x-1.5 text-[11px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-1">
+        <div
+          key={`callout-anchor-${i}`}
+          dir={blockDir}
+          className="my-2.5 p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 shadow-2xs text-start"
+        >
+          <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-1">
             <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0 animate-pulse" />
             <span>{formatInline(trimmed)}</span>
           </div>
@@ -132,10 +150,19 @@ export const CopilotMarkdownView: React.FC<Props> = ({ content }) => {
       continue;
     }
 
-    if (upper.startsWith('WHY YOU PICKED') || upper.startsWith('DISTRACTOR TRAP')) {
+    if (
+      upper.startsWith('WHY YOU PICKED') ||
+      upper.startsWith('DISTRACTOR TRAP') ||
+      trimmed.includes('فخ الخيارات المضللة') ||
+      trimmed.includes('فخ المشتت')
+    ) {
       elements.push(
-        <div key={`callout-trap-${i}`} className="my-2.5 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/25 shadow-2xs">
-          <div className="flex items-center space-x-1.5 text-[11px] font-black uppercase tracking-wider text-rose-700 dark:text-rose-400 mb-1">
+        <div
+          key={`callout-trap-${i}`}
+          dir={blockDir}
+          className="my-2.5 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/25 shadow-2xs text-start"
+        >
+          <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-rose-700 dark:text-rose-400 mb-1">
             <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
             <span>{trimmed}</span>
           </div>
@@ -145,10 +172,15 @@ export const CopilotMarkdownView: React.FC<Props> = ({ content }) => {
       continue;
     }
 
-    if (upper.includes('IN 30 SECONDS') || upper.startsWith('CORE CONCEPT')) {
+    if (
+      upper.includes('IN 30 SECONDS') ||
+      upper.startsWith('CORE CONCEPT') ||
+      trimmed.includes('المفهوم الأساسي') ||
+      trimmed.includes('في 30 ثانية')
+    ) {
       elements.push(
-        <div key={`callout-concept-${i}`} className="pt-2 pb-1">
-          <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 text-[10px] font-extrabold uppercase tracking-wider">
+        <div key={`callout-concept-${i}`} dir={blockDir} className="pt-2 pb-1 text-start">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 text-[10px] font-extrabold uppercase tracking-wider">
             <Activity className="w-3 h-3 text-blue-600 dark:text-blue-400 shrink-0" />
             <span>{trimmed}</span>
           </div>
@@ -163,7 +195,8 @@ export const CopilotMarkdownView: React.FC<Props> = ({ content }) => {
       elements.push(
         <blockquote
           key={`quote-${i}`}
-          className="my-2 pl-3 py-1.5 border-l-2 border-indigo-500 bg-indigo-50/50 dark:bg-zinc-900/40 text-xs italic text-slate-700 dark:text-zinc-300 rounded-r-xl"
+          dir={blockDir}
+          className="my-2 ps-3 py-1.5 border-s-2 border-indigo-500 bg-indigo-50/50 dark:bg-zinc-900/40 text-xs italic text-slate-700 dark:text-zinc-300 rounded-e-xl text-start"
         >
           {formatInline(trimmed.slice(2))}
         </blockquote>
@@ -189,9 +222,12 @@ export const CopilotMarkdownView: React.FC<Props> = ({ content }) => {
       }
 
       elements.push(
-        <ul key={`list-${i}`} className="space-y-1.5 my-2 pl-1">
+        <ul key={`list-${i}`} dir={blockDir} className="space-y-1.5 my-2 ps-1 text-start">
           {listItems.map((item, idx) => (
-            <li key={idx} className="flex items-start space-x-2 text-xs leading-relaxed text-slate-700 dark:text-zinc-300">
+            <li
+              key={idx}
+              className="flex items-start gap-2 text-xs leading-relaxed text-slate-700 dark:text-zinc-300"
+            >
               {item.isNumbered ? (
                 <span className="w-4 h-4 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-mono font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 border border-indigo-500/20">
                   {idx + 1}
@@ -209,7 +245,11 @@ export const CopilotMarkdownView: React.FC<Props> = ({ content }) => {
 
     // 8. Standard paragraph
     elements.push(
-      <p key={`p-${i}`} className="text-xs leading-relaxed text-slate-700 dark:text-zinc-300">
+      <p
+        key={`p-${i}`}
+        dir={blockDir}
+        className="text-xs leading-relaxed text-slate-700 dark:text-zinc-300 text-start"
+      >
         {formatInline(trimmed)}
       </p>
     );
@@ -220,9 +260,9 @@ export const CopilotMarkdownView: React.FC<Props> = ({ content }) => {
 };
 
 /**
- * Parses and renders Markdown tables into clean, responsive glass tables.
+ * Parses and renders Markdown tables into clean, responsive glass tables with BiDi direction support.
  */
-function renderTable(key: string, tableLines: string[]): React.ReactNode {
+function renderTable(key: string, tableLines: string[], dir: 'ltr' | 'rtl'): React.ReactNode {
   const parseRow = (line: string): string[] => {
     return line
       .split('|')
@@ -234,20 +274,26 @@ function renderTable(key: string, tableLines: string[]): React.ReactNode {
   const headers = parseRow(headerLine);
 
   // Skip delimiter row (|---|---|)
-  const dataLines = tableLines.slice(1).filter((l) => !l.replace(/[\|\-\:\s]/g, '').length === false || !/^[\|\-\:\s]+$/.test(l));
+  const dataLines = tableLines
+    .slice(1)
+    .filter((l) => !l.replace(/[\|\-\:\s]/g, '').length === false || !/^[\|\-\:\s]+$/.test(l));
 
   const rows = dataLines.map(parseRow);
 
   return (
-    <div key={key} className="my-3 overflow-hidden rounded-2xl border border-slate-200/90 dark:border-zinc-800 shadow-2xs bg-white/80 dark:bg-zinc-900/70 backdrop-blur-md">
+    <div
+      key={key}
+      dir={dir}
+      className="my-3 overflow-hidden rounded-2xl border border-slate-200/90 dark:border-zinc-800 shadow-2xs bg-white/80 dark:bg-zinc-900/70 backdrop-blur-md text-start"
+    >
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-xs">
+        <table className="w-full text-start border-collapse text-xs">
           <thead>
             <tr className="bg-slate-100/90 dark:bg-zinc-800/90 border-b border-slate-200/80 dark:border-zinc-700/80">
               {headers.map((h, hIdx) => (
                 <th
                   key={hIdx}
-                  className="px-3.5 py-2.5 font-bold uppercase tracking-wider text-[10px] text-slate-800 dark:text-zinc-200 whitespace-nowrap"
+                  className="px-3.5 py-2.5 font-bold uppercase tracking-wider text-[10px] text-slate-800 dark:text-zinc-200 whitespace-nowrap text-start"
                 >
                   {formatInline(h)}
                 </th>
@@ -263,7 +309,7 @@ function renderTable(key: string, tableLines: string[]): React.ReactNode {
                 {row.map((cell, cIdx) => (
                   <td
                     key={cIdx}
-                    className="px-3.5 py-2.5 text-slate-700 dark:text-zinc-300 font-medium leading-relaxed"
+                    className="px-3.5 py-2.5 text-slate-700 dark:text-zinc-300 font-medium leading-relaxed text-start"
                   >
                     {formatInline(cell)}
                   </td>
@@ -278,7 +324,8 @@ function renderTable(key: string, tableLines: string[]): React.ReactNode {
 }
 
 /**
- * Tokenizes and renders bold (**text**), italics (*text*), code (`code`), flow arrows (→, ->), and checkmarks (✅).
+ * Tokenizes and renders bold (**text**), italics (*text*), code (`code`), flow arrows (→, ->), and checkmarks (✅)
+ * with strict BiDi Unicode isolation so inline equations and English medical acronyms never scramble in Arabic prose.
  */
 function formatInline(text: string): React.ReactNode {
   // Regex to match **bold**, *italic*, `code`, arrows, and checkmarks
@@ -288,14 +335,14 @@ function formatInline(text: string): React.ReactNode {
     if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
       return (
         <strong key={i} className="font-extrabold text-slate-900 dark:text-white">
-          {part.slice(2, -2)}
+          {formatInline(part.slice(2, -2))}
         </strong>
       );
     }
     if (part.startsWith('*') && part.endsWith('*') && part.length >= 2) {
       return (
         <em key={i} className="italic font-medium text-slate-800 dark:text-zinc-200">
-          {part.slice(1, -1)}
+          {formatInline(part.slice(1, -1))}
         </em>
       );
     }
@@ -303,7 +350,8 @@ function formatInline(text: string): React.ReactNode {
       return (
         <code
           key={i}
-          className="px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-zinc-800 text-[11px] font-mono font-semibold text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-zinc-700"
+          dir="ltr"
+          className="ltr-isolate px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-zinc-800 text-[11px] font-mono font-semibold text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-zinc-700"
         >
           {part.slice(1, -1)}
         </code>
@@ -311,7 +359,11 @@ function formatInline(text: string): React.ReactNode {
     }
     if (part === '->' || part === '→') {
       return (
-        <span key={i} className="inline-flex items-center px-1 font-bold text-indigo-600 dark:text-indigo-400">
+        <span
+          key={i}
+          dir="ltr"
+          className="ltr-isolate inline-flex items-center px-1 font-bold text-indigo-600 dark:text-indigo-400"
+        >
           →
         </span>
       );
