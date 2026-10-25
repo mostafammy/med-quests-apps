@@ -67,12 +67,19 @@ export const PROVIDER_MODELS: Record<Exclude<CloudProviderId, 'offline-tutor'>, 
 
   openrouter: [
     {
-      id: 'meta-llama/llama-3.1-8b-instruct:free',
-      simpleName: 'Llama 3.1 8B (Free Tier)',
-      badge: '100% Free',
-      speedLabel: '🌐 Free / High Limits',
-      bestFor: 'Generous token limits at zero cost. Reliable backup for standard question reviews.',
+      id: 'nvidia/nemotron-3.5-lightning:free',
+      simpleName: 'Nemotron 3.5 Lightning (Free Tier)',
+      badge: 'Recommended',
+      speedLabel: '⚡ Fast / 1M Context',
+      bestFor: 'High-throughput Socratic clinical guidance with 1M context window at zero cost.',
       isRecommended: true,
+    },
+    {
+      id: 'recursive/flint-v1.0:free',
+      simpleName: 'Recursive Flint (Free Tier)',
+      badge: 'Agentic MoE',
+      speedLabel: '⚡ Ultra-Fast MoE',
+      bestFor: 'Agentic clinical reasoning and fast active-recall hints.',
     },
     {
       id: 'google/gemini-2.5-flash',
@@ -106,6 +113,8 @@ export function getModelDisplayName(engine: CloudProviderId, modelId: string): s
   }
 
   if (engine === 'openrouter') {
+    if (modelId.includes('nemotron')) return 'Nemotron 3.5 (Free)';
+    if (modelId.includes('flint')) return 'Flint 1.0 (Free)';
     if (modelId.includes('llama-3.1-8b')) return 'Llama 3.1 8B (Free)';
     if (modelId.includes('gemini')) return 'Gemini Flash';
     return modelId.split('/').pop() || modelId;
