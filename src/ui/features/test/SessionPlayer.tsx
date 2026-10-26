@@ -36,7 +36,7 @@ export const SessionPlayer: React.FC = () => {
       mode?: 'practice' | 'mock' | 'rapid' | 'retest' | 'exam';
       subjectId?: string;
       chapterId?: string;
-      questionCount?: number;
+      questionCount?: number | 'all';
       timeLimitMinutes?: number;
       highYieldOnly?: boolean;
     }) || { mode: 'practice', questionCount: 20 };
@@ -74,7 +74,13 @@ export const SessionPlayer: React.FC = () => {
         pool = hyPool;
       }
     }
-    const count = sessionConfig.questionCount || 20;
+    const rawCount = sessionConfig.questionCount;
+    const count =
+      rawCount === 'all'
+        ? pool.length
+        : typeof rawCount === 'number'
+        ? rawCount
+        : 20;
     setSessionQuestions(pool.slice(0, count));
   }, [allQuestions, sessionConfig]);
 
