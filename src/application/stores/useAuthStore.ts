@@ -58,6 +58,7 @@ export interface AuthStoreState {
   signIn: (email: string, password?: string) => Promise<boolean>;
   signInWithGoogle: (email?: string) => Promise<boolean>;
   signInWithApple: (email?: string) => Promise<boolean>;
+  updatePhoneNumber: (phoneNumber: string) => Promise<boolean>;
   signUp: (displayName: string, email: string, password?: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   revokeDevice: (sessionId: string) => Promise<void>;
@@ -369,6 +370,27 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
       });
       return false;
     }
+  },
+
+  updatePhoneNumber: async (phoneNumber: string) => {
+    const result = await edgeAuthGateway.updatePhoneNumber(phoneNumber);
+    if (result.ok) {
+      const current = get().authState;
+      if (current.status === 'authenticated-active') {
+        set({
+          authState: {
+            ...current,
+            user: result.value,
+          },
+          notificationToast: {
+            type: 'success',
+            message: 'Phone number updated! Primary communication channel active.',
+          },
+        });
+        return true;
+      }
+    }
+    return false;
   },
 
   signUp: async (displayName: string, email: string, password?: string) => {
