@@ -373,6 +373,7 @@ export interface TranslationDictionary {
       readonly localRetainedBadge: string;
       readonly upToDateBadge: string;
       readonly localLabel: string;
+      readonly localCacheLabel: string;
       readonly globalLabel: string;
       readonly questionsShort: string;
       readonly canonicalShort: string;
@@ -385,6 +386,7 @@ export interface TranslationDictionary {
       readonly deletedBadge: string;
       readonly preservedTab: string;
       readonly preservedBadge: string;
+      readonly preservedCount: string;
       readonly changesDetected: string;
       readonly chooseMerge: string;
       readonly leaveAsIs: string;
