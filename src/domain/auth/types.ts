@@ -152,6 +152,7 @@ export const UserProfileSchema = z.object({
   email: z.string().email(),
   displayName: z.string().min(1),
   avatarUrl: z.string().nullable(),
+  phoneNumber: z.string().nullable().optional(),
   universityName: z.string().nullable(),
   academicYear: z.number().int().min(1).max(7).default(2),
   role: UserRoleSchema,
