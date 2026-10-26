@@ -15,7 +15,7 @@ export const QuestionBankStatusPill: React.FC = () => {
     dismissedRemoteRevision,
     checkForGlobalUpdates,
   } = useQuestionStore();
-  const { t } = useLocaleStore();
+  const { t, isRtl } = useLocaleStore();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
@@ -77,7 +77,8 @@ export const QuestionBankStatusPill: React.FC = () => {
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
         aria-haspopup="true"
-        title="Question Bank Status & Actions (Click to manage)"
+        title={t.bank.syncCenter.statusTitle}
+        aria-label={t.bank.syncCenter.statusTitle}
         className={`flex items-center space-x-2 rtl:space-x-reverse bg-white/60 dark:bg-zinc-800/60 hover:bg-white/80 dark:hover:bg-zinc-800/80 backdrop-blur-md border border-white/80 dark:border-zinc-700/70 px-3 py-1.5 rounded-2xl text-xs font-bold text-slate-800 dark:text-zinc-200 cursor-pointer shadow-xs transition-all duration-200 hover:-translate-y-0.5 apple-tap ${
           isOpen ? 'ring-2 ring-blue-500/40 bg-white/90 dark:bg-zinc-800/90' : ''
         }`}
@@ -95,11 +96,9 @@ export const QuestionBankStatusPill: React.FC = () => {
           />
         </span>
         <span className="hidden sm:inline">
-          {t.nav.activeBlockPrefix}: 206 • {questions.length} Qs
+          {t.nav.activeBlockPrefix} · Block 206 · {questions.length} {t.bank.syncCenter.questionsShort}
         </span>
-        <span className="sm:hidden">
-          206
-        </span>
+        <span className="sm:hidden">{questions.length}</span>
         {hasActionableUpdates && (
           <span className="px-1.5 py-0.2 rounded-full text-[9px] font-extrabold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-400/40">
             v{remoteRev}
@@ -121,15 +120,18 @@ export const QuestionBankStatusPill: React.FC = () => {
               <div className="flex items-center space-x-1.5 rtl:space-x-reverse">
                 <Layers className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 <span className="text-xs font-extrabold text-slate-900 dark:text-white">
-                  Cardiovascular (Block 206)
+                  {t.bank.syncCenter.blockTitle}
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-zinc-400">
-                Official Faculty Question Bank
+                {t.bank.syncCenter.officialBank}
               </p>
             </div>
             <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-500/25 px-2 py-0.5 rounded-full">
-              Local v{localRev}.0 {hasNewGlobalRevision ? `→ Global v${remoteRev}.0` : `(Up to Date)`}
+              {t.bank.syncCenter.localLabel} v{localRev}.0{' '}
+              {hasNewGlobalRevision
+                ? `${isRtl ? '←' : '→'} ${t.bank.syncCenter.globalLabel} v${remoteRev}.0`
+                : `(${t.bank.syncCenter.upToDateBadge})`}
             </span>
           </div>
 
@@ -138,16 +140,19 @@ export const QuestionBankStatusPill: React.FC = () => {
             <div>
               <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1">
                 <Database className="w-3 h-3" />
-                Local Bank
+                {t.bank.syncCenter.localLabel}
               </span>
               <div className="text-base font-extrabold text-slate-900 dark:text-white mt-0.5">
-                {questions.length} <span className="text-xs font-normal text-slate-400">items</span>
+                {questions.length}{' '}
+                <span className="text-xs font-normal text-slate-400">
+                  {t.bank.syncCenter.questionsShort}
+                </span>
               </div>
             </div>
             <div className="border-l border-slate-200 dark:border-zinc-800 pl-2.5 rtl:border-l-0 rtl:border-r rtl:pl-0 rtl:pr-2.5">
               <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 tracking-wider flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3" />
-                Edge Status
+                {t.bank.syncCenter.edgeStatus}
               </span>
               <div className="text-xs font-bold text-emerald-700 dark:text-emerald-300 mt-1">
                 {t.bank.edgeVerified}
@@ -182,7 +187,7 @@ export const QuestionBankStatusPill: React.FC = () => {
                 </span>
               </div>
               <span className="text-[10px] uppercase font-mono tracking-wider opacity-70">
-                Delta
+                {t.bank.syncCenter.deltaLabel}
               </span>
             </button>
 
@@ -200,7 +205,8 @@ export const QuestionBankStatusPill: React.FC = () => {
                 <span>{t.bank.resetToGlobalBtn}</span>
               </div>
               <span className="text-[10px] uppercase font-mono tracking-wider opacity-70">
-                {defaultCvsBank.length} Canonical
+                {pendingDiffPreview?.remoteCanonicalCount ?? defaultCvsBank.length}{' '}
+                {t.bank.syncCenter.canonicalShort}
               </span>
             </button>
           </div>
