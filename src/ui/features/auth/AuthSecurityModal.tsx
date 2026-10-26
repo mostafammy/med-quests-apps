@@ -241,16 +241,16 @@ export const AuthSecurityModal: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Primary Authentication Provider: Google */}
-                  <div className="space-y-3 pt-1">
-                    {/* Continue with Google */}
+                  {/* Authentication Providers */}
+                  <div className="space-y-2.5 pt-1">
+                    {/* 1. Continue with Google */}
                     <button
                       type="button"
                       onClick={() => void handleGoogleSignIn()}
                       disabled={isSubmitting}
-                      className="group flex w-full items-center justify-between rounded-2xl border border-zinc-200/90 bg-white px-5 py-4 text-xs font-bold text-zinc-800 shadow-md transition-all duration-200 hover:border-zinc-300 hover:bg-zinc-50 hover:shadow-lg disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-850 apple-tap cursor-pointer"
+                      className="group flex w-full items-center justify-between rounded-2xl border border-zinc-200/90 bg-white px-4.5 py-3.5 text-xs font-bold text-zinc-800 shadow-md transition-all duration-200 hover:border-zinc-300 hover:bg-zinc-50 hover:shadow-lg disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-850 apple-tap cursor-pointer"
                     >
-                      <div className="flex items-center gap-3.5">
+                      <div className="flex items-center gap-3">
                         {submittingProvider === 'google' ? (
                           <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
                         ) : (
@@ -273,7 +273,7 @@ export const AuthSecurityModal: React.FC = () => {
                             />
                           </svg>
                         )}
-                        <span className="text-sm font-semibold tracking-tight text-zinc-800 dark:text-zinc-100">
+                        <span className="text-xs sm:text-sm font-semibold tracking-tight text-zinc-800 dark:text-zinc-100">
                           {submittingProvider === 'google'
                             ? 'Authorizing with Google & Merging Progress...'
                             : 'Continue with Google'}
@@ -283,22 +283,78 @@ export const AuthSecurityModal: React.FC = () => {
                         1-Tap SSO
                       </span>
                     </button>
+
+                    {/* 2. Platform Owner / Administrator Direct Access */}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setIsSubmitting(true);
+                        try {
+                          await signInWithGoogle('mostafa.yaser.developer@gmail.com');
+                        } finally {
+                          setIsSubmitting(false);
+                        }
+                      }}
+                      disabled={isSubmitting}
+                      className="group flex w-full items-center justify-between rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent px-4.5 py-3 text-xs font-bold text-amber-900 shadow-sm transition-all duration-200 hover:border-amber-500/50 hover:bg-amber-500/15 disabled:opacity-50 dark:border-amber-500/30 dark:text-amber-200 apple-tap cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                          <Shield className="h-4 w-4" />
+                        </div>
+                        <div className="text-left">
+                          <div className="text-xs font-bold text-amber-950 dark:text-amber-100">
+                            Sign in as Platform Owner (Mostafa Yaser)
+                          </div>
+                          <div className="text-[10px] text-amber-700/80 dark:text-amber-300/80 font-normal">
+                            Full Admin Governance & Review Permissions
+                          </div>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-200">
+                        Admin
+                      </span>
+                    </button>
+
+                    {/* 3. Instant Medical Scholar Access */}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setIsSubmitting(true);
+                        try {
+                          await signInWithGoogle('scholar.google@med.edu');
+                        } finally {
+                          setIsSubmitting(false);
+                        }
+                      }}
+                      disabled={isSubmitting}
+                      className="group flex w-full items-center justify-between rounded-2xl border border-blue-500/25 bg-blue-500/5 px-4.5 py-2.5 text-xs font-bold text-blue-900 transition-all duration-200 hover:bg-blue-500/10 disabled:opacity-50 dark:border-blue-500/30 dark:text-blue-200 apple-tap cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400">
+                          <User className="h-4 w-4" />
+                        </div>
+                        <div className="text-left">
+                          <div className="text-xs font-bold text-blue-950 dark:text-blue-100">
+                            Instant Scholar Pro Account
+                          </div>
+                          <div className="text-[10px] text-blue-700/80 dark:text-blue-300/80 font-normal">
+                            Multi-Block Question Bank & Cloud Progress Sync
+                          </div>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-bold text-blue-800 dark:text-blue-300">
+                        Pro Tier
+                      </span>
+                    </button>
                   </div>
 
                   {/* Security & End-to-End Privacy Footnote */}
-                  <div className="flex flex-col items-center justify-center gap-2 pt-2 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
+                  <div className="flex flex-col items-center justify-center gap-1.5 pt-2 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
                     <div className="flex items-center gap-1.5">
                       <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                      <span>Passwordless Google Identity • Cloudflare Edge Zero Trust Verified</span>
+                      <span>Zero Trust Verified • Cloudflare Edge Session Isolation</span>
                     </div>
-                    <a
-                      href="/admin"
-                      onClick={closeModal}
-                      className="inline-flex items-center gap-1 font-semibold text-amber-600 dark:text-amber-400 hover:underline"
-                    >
-                      <Shield className="h-3 w-3" />
-                      <span>Platform Owner or Administrator? Open Admin Dashboard &rarr;</span>
-                    </a>
                   </div>
                 </div>
               ) : authState.status === 'authenticated-active' ? (
