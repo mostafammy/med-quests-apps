@@ -392,7 +392,15 @@ export default {
       }
 
       // Upsert into Cloudflare D1
+      let existingPhoneNumber: string | null = null;
       if (env.MED_QUESTS_DB) {
+        const existingUserRow = await env.MED_QUESTS_DB.prepare(
+          'SELECT phone_number FROM user WHERE email = ?'
+        )
+          .bind(email)
+          .first<{ phone_number: string | null }>();
+        existingPhoneNumber = existingUserRow?.phone_number || null;
+
         await env.MED_QUESTS_DB.prepare(
           `INSERT INTO user (id, name, email, email_verified, image, role, university_name, account_status, last_country_code, last_colo, last_active_at, created_at, updated_at)
            VALUES (?, ?, ?, 1, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
@@ -419,6 +427,7 @@ export default {
             email,
             displayName: name,
             avatarUrl: image,
+            phoneNumber: existingPhoneNumber,
             role,
             universityName,
             emailVerified: true,
@@ -427,6 +436,40 @@ export default {
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
+    }
+
+    // 4b. Scholar Phone Number Communication Channel Update Endpoint
+    if (url.pathname === '/api/auth/profile/phone' && request.method === 'POST') {
+      const body = (await request.json()) as {
+        email?: string;
+        userId?: string;
+        phoneNumber: string;
+      };
+
+      const cleanPhone = (body.phoneNumber || '').trim();
+      if (env.MED_QUESTS_DB) {
+        try {
+          await env.MED_QUESTS_DB.prepare(
+            `UPDATE user
+             SET phone_number = ?, updated_at = datetime('now')
+             WHERE email = ? OR id = ?`
+          )
+            .bind(cleanPhone, body.email || '', body.userId || '')
+            .run();
+
+          return new Response(
+            JSON.stringify({ ok: true, phoneNumber: cleanPhone }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        } catch (e: any) {
+          return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+        }
+      }
+
+      return new Response(JSON.stringify({ ok: true, phoneNumber: cleanPhone }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     // 5. Sign in with Apple Edge Verification Endpoint
