@@ -214,6 +214,13 @@ export interface TranslationDictionary {
     readonly timedSprint: string;
     readonly timedSprintSub: string;
     readonly matchingQuestions: string;
+    readonly testAllCategory: string;
+    readonly testAllCategoryDesc: string;
+    readonly selectFullCategory: string;
+    readonly allCategorySelected: string;
+    readonly launchFullCategory: string;
+    readonly allCategoryOption: string;
+    readonly fullCategoryBadge: string;
     readonly launchPractice: string;
     readonly launchMock: string;
     readonly launchRapid: string;
