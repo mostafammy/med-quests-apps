@@ -28,6 +28,7 @@ import type {
 const STORAGE_KEYS = {
   USER: 'medquests_auth_user',
   SESSION: 'medquests_auth_session',
+  TOKEN: 'medquests_auth_token',
   ALL_SESSIONS: 'medquests_auth_all_sessions',
   MANAGED_DIRECTORY: 'medquests_admin_directory_v2',
   AUDIT_LOGS: 'medquests_admin_audit_logs_v2',
@@ -136,18 +137,37 @@ export class EdgeAuthGateway implements AuthGatewayPort {
       return ok(currentState);
     }
 
-    // Try Cloudflare Worker edge endpoint first if deployed
-    try {
-      const response = await fetch('/api/auth/session', {
-        headers: { 'Accept': 'application/json' },
-      });
-      if (response.ok) {
-        const remoteState = (await response.json()) as AuthState;
-        this.inMemoryState = remoteState;
-        return ok(remoteState);
+    // Try Cloudflare Worker edge endpoint if session token exists
+    const token = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.TOKEN) : null;
+    if (token) {
+      try {
+        const response = await fetch('/api/auth/session', {
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.status === 401 || response.status === 403) {
+          // Token expired or revoked on edge
+          await this.signOut();
+          const sessionId =
+            'currentSession' in currentState
+              ? currentState.currentSession.sessionId
+              : 'session_revoked';
+          return err({
+            code: 'SESSION_EXPIRED_OR_REVOKED',
+            sessionId,
+          });
+        } else if (response.ok) {
+          const remoteData = (await response.json()) as { status: string; role?: string };
+          if (remoteData.status === 'authenticated-active') {
+            return ok(currentState);
+          }
+        }
+      } catch {
+        // Offline or edge unreachable: preserve optimistic local session
       }
-    } catch {
-      // Offline or local dev fallback: simulate sub-5ms KV check
     }
 
     // Edge simulation check: verify restriction status
@@ -333,6 +353,35 @@ export class EdgeAuthGateway implements AuthGatewayPort {
 
     this.persistLocalSession(user, sessionWithAnomalies, [sessionWithAnomalies]);
     this.inMemoryState = state;
+
+    // Edge dual-write: persist session in Cloudflare D1 / Workers KV
+    if (typeof window !== 'undefined') {
+      try {
+        const edgeRes = await fetch('/api/auth/oauth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            idToken: credentials.idToken,
+            claims: {
+              sub: user.id,
+              email: user.email,
+              name: user.displayName,
+              picture: user.avatarUrl || undefined,
+            },
+          }),
+        });
+
+        if (edgeRes.ok) {
+          const edgeData = (await edgeRes.json()) as { sessionToken?: string };
+          if (edgeData.sessionToken) {
+            localStorage.setItem(STORAGE_KEYS.TOKEN, edgeData.sessionToken);
+          }
+        }
+      } catch {
+        // Safe offline simulator fallback
+      }
+    }
+
     return ok({ state, syncSummary });
   }
 
@@ -346,6 +395,7 @@ export class EdgeAuthGateway implements AuthGatewayPort {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(STORAGE_KEYS.USER);
       localStorage.removeItem(STORAGE_KEYS.SESSION);
+      localStorage.removeItem(STORAGE_KEYS.TOKEN);
       localStorage.removeItem(STORAGE_KEYS.ALL_SESSIONS);
     }
     const guestState = createDefaultGuestState();
