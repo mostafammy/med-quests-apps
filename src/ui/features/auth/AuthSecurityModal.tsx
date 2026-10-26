@@ -14,6 +14,7 @@ import {
   Loader2,
   ExternalLink,
   RotateCcw,
+  Phone,
 } from 'lucide-react';
 import { useAuthStore } from '../../../application/stores/useAuthStore.ts';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
@@ -34,13 +35,25 @@ export const AuthSecurityModal: React.FC = () => {
     signInWithGoogle,
     signOut,
     revokeDevice,
+    updatePhoneNumber,
   } = useAuthStore();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittingProvider, setSubmittingProvider] = useState<'google' | null>(null);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [phoneInput, setPhoneInput] = useState<string>(
+    authState.status === 'authenticated-active' ? authState.user.phoneNumber || '' : ''
+  );
+  const [isSavingPhone, setIsSavingPhone] = useState(false);
+  const [phoneSavedSuccess, setPhoneSavedSuccess] = useState(false);
   const { questions } = useQuestionStore();
   const { t } = useLocaleStore();
+
+  useEffect(() => {
+    if (authState.status === 'authenticated-active') {
+      setPhoneInput(authState.user.phoneNumber || '');
+    }
+  }, [authState]);
 
   // Local IndexedDB Guest Stats for Live Continuity Feedback
   const [localStats, setLocalStats] = useState<{ attempts: number; bookmarks: number }>({
@@ -241,16 +254,16 @@ export const AuthSecurityModal: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Authentication Providers */}
-                  <div className="space-y-2.5 pt-1">
-                    {/* 1. Continue with Google */}
+                  {/* Primary Authentication Provider: Google Only */}
+                  <div className="space-y-3 pt-1">
+                    {/* Continue with Google */}
                     <button
                       type="button"
                       onClick={() => void handleGoogleSignIn()}
                       disabled={isSubmitting}
-                      className="group flex w-full items-center justify-between rounded-2xl border border-zinc-200/90 bg-white px-4.5 py-3.5 text-xs font-bold text-zinc-800 shadow-md transition-all duration-200 hover:border-zinc-300 hover:bg-zinc-50 hover:shadow-lg disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-850 apple-tap cursor-pointer"
+                      className="group flex w-full items-center justify-between rounded-2xl border border-blue-500/30 bg-gradient-to-r from-white via-zinc-50 to-blue-50/20 px-5 py-4 text-xs font-bold text-zinc-800 shadow-md transition-all duration-200 hover:border-blue-500/50 hover:shadow-lg disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-850 apple-tap cursor-pointer"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3.5">
                         {submittingProvider === 'google' ? (
                           <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
                         ) : (
@@ -273,78 +286,19 @@ export const AuthSecurityModal: React.FC = () => {
                             />
                           </svg>
                         )}
-                        <span className="text-xs sm:text-sm font-semibold tracking-tight text-zinc-800 dark:text-zinc-100">
-                          {submittingProvider === 'google'
-                            ? 'Authorizing with Google & Merging Progress...'
-                            : 'Continue with Google'}
-                        </span>
+                        <div className="text-left">
+                          <div className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+                            {submittingProvider === 'google'
+                              ? 'Authorizing with Google & Merging Progress...'
+                              : 'Continue with Google'}
+                          </div>
+                          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-normal">
+                            Sign in to save your name, email & sync study progress across devices
+                          </div>
+                        </div>
                       </div>
-                      <span className="hidden sm:inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                      <span className="hidden sm:inline-flex items-center gap-1 rounded-md bg-blue-500/10 text-blue-700 dark:text-blue-300 px-2 py-0.5 text-[10px] font-bold">
                         1-Tap SSO
-                      </span>
-                    </button>
-
-                    {/* 2. Platform Owner / Administrator Direct Access */}
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setIsSubmitting(true);
-                        try {
-                          await signInWithGoogle('mostafa.yaser.developer@gmail.com');
-                        } finally {
-                          setIsSubmitting(false);
-                        }
-                      }}
-                      disabled={isSubmitting}
-                      className="group flex w-full items-center justify-between rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent px-4.5 py-3 text-xs font-bold text-amber-900 shadow-sm transition-all duration-200 hover:border-amber-500/50 hover:bg-amber-500/15 disabled:opacity-50 dark:border-amber-500/30 dark:text-amber-200 apple-tap cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400">
-                          <Shield className="h-4 w-4" />
-                        </div>
-                        <div className="text-left">
-                          <div className="text-xs font-bold text-amber-950 dark:text-amber-100">
-                            Sign in as Platform Owner (Mostafa Yaser)
-                          </div>
-                          <div className="text-[10px] text-amber-700/80 dark:text-amber-300/80 font-normal">
-                            Full Admin Governance & Review Permissions
-                          </div>
-                        </div>
-                      </div>
-                      <span className="inline-flex items-center rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-200">
-                        Admin
-                      </span>
-                    </button>
-
-                    {/* 3. Instant Medical Scholar Access */}
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setIsSubmitting(true);
-                        try {
-                          await signInWithGoogle('scholar.google@med.edu');
-                        } finally {
-                          setIsSubmitting(false);
-                        }
-                      }}
-                      disabled={isSubmitting}
-                      className="group flex w-full items-center justify-between rounded-2xl border border-blue-500/25 bg-blue-500/5 px-4.5 py-2.5 text-xs font-bold text-blue-900 transition-all duration-200 hover:bg-blue-500/10 disabled:opacity-50 dark:border-blue-500/30 dark:text-blue-200 apple-tap cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400">
-                          <User className="h-4 w-4" />
-                        </div>
-                        <div className="text-left">
-                          <div className="text-xs font-bold text-blue-950 dark:text-blue-100">
-                            Instant Scholar Pro Account
-                          </div>
-                          <div className="text-[10px] text-blue-700/80 dark:text-blue-300/80 font-normal">
-                            Multi-Block Question Bank & Cloud Progress Sync
-                          </div>
-                        </div>
-                      </div>
-                      <span className="inline-flex items-center rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-bold text-blue-800 dark:text-blue-300">
-                        Pro Tier
                       </span>
                     </button>
                   </div>
@@ -353,12 +307,12 @@ export const AuthSecurityModal: React.FC = () => {
                   <div className="flex flex-col items-center justify-center gap-1.5 pt-2 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
                     <div className="flex items-center gap-1.5">
                       <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                      <span>Zero Trust Verified • Cloudflare Edge Session Isolation</span>
+                      <span>Google Identity Verified • Cloudflare Edge Zero Trust Session</span>
                     </div>
                   </div>
                 </div>
               ) : authState.status === 'authenticated-active' ? (
-                <div className="space-y-6">
+                <div className="space-y-5">
                   {/* Authenticated Profile Card */}
                   <div className="flex items-center justify-between rounded-2xl border border-zinc-200/80 bg-zinc-50/70 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
                     <div className="flex items-center gap-3">
@@ -397,6 +351,73 @@ export const AuthSecurityModal: React.FC = () => {
                       <LogOut className="h-3.5 w-3.5" />
                       <span>Sign Out</span>
                     </button>
+                  </div>
+
+                  {/* Primary Communication Channel: Phone Number / WhatsApp Card */}
+                  <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent p-4 sm:p-4.5 dark:border-emerald-500/30 dark:from-emerald-950/30 dark:via-teal-950/20">
+                    <div className="flex items-start gap-3.5">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm shadow-emerald-500/25">
+                        <Phone className="h-4.5 w-4.5" />
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-1">
+                          <h4 className="text-xs font-bold text-emerald-950 dark:text-emerald-100">
+                            Primary Communication Channel (WhatsApp / Mobile)
+                          </h4>
+                          {authState.user.phoneNumber ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:text-emerald-300">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Connected
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300 animate-pulse">
+                              Action Required
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-emerald-900/80 dark:text-emerald-200/80">
+                          We use your phone number as our primary direct channel to notify you about syllabus changes, study reminders, and official medical board errata alerts.
+                        </p>
+
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                          <div className="relative flex-1">
+                            <input
+                              type="tel"
+                              value={phoneInput}
+                              onChange={(e) => setPhoneInput(e.target.value)}
+                              placeholder="+20 100 000 0000"
+                              className="w-full rounded-xl border border-emerald-500/40 bg-white/90 dark:bg-zinc-900/90 px-3 py-2 text-xs font-semibold text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            disabled={isSavingPhone || !phoneInput.trim()}
+                            onClick={async () => {
+                              setIsSavingPhone(true);
+                              try {
+                                const ok = await updatePhoneNumber(phoneInput);
+                                if (ok) {
+                                  setPhoneSavedSuccess(true);
+                                  setTimeout(() => setPhoneSavedSuccess(false), 3000);
+                                }
+                              } finally {
+                                setIsSavingPhone(false);
+                              }
+                            }}
+                            className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 text-xs font-bold transition-all disabled:opacity-50 apple-tap cursor-pointer shrink-0"
+                          >
+                            {isSavingPhone ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : phoneSavedSuccess ? (
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            ) : (
+                              <Phone className="h-3.5 w-3.5" />
+                            )}
+                            <span>{phoneSavedSuccess ? 'Saved!' : 'Save Mobile Number'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Entitlements Matrix */}
