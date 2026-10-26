@@ -315,6 +315,7 @@ export const enDictionary: TranslationDictionary = {
       localRetainedBadge: 'Local Retained',
       upToDateBadge: 'Up to Date',
       localLabel: 'Local',
+      localCacheLabel: 'IndexedDB cache',
       globalLabel: 'Global',
       questionsShort: 'Qs',
       canonicalShort: 'Canonical',
@@ -327,6 +328,7 @@ export const enDictionary: TranslationDictionary = {
       deletedBadge: 'Archived',
       preservedTab: 'Local Custom',
       preservedBadge: 'Protected',
+      preservedCount: 'Private items preserved',
       changesDetected: 'Global changes detected',
       chooseMerge:
         'Choose whether to merge the global revision into your local bank. Your private custom questions and pending submissions are always preserved.',
