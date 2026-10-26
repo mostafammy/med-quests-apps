@@ -61,7 +61,7 @@ export const ResetBankConfirmationModal: React.FC<ResetBankConfirmationModalProp
       }
       onClose();
     } catch (err) {
-      setErrorMessage((err as Error).message || 'Failed to restore canonical question bank.');
+      setErrorMessage((err as Error).message || t.bank.resetFailed);
     } finally {
       setIsResetting(false);
     }
@@ -128,7 +128,7 @@ export const ResetBankConfirmationModal: React.FC<ResetBankConfirmationModalProp
             <div className="text-sm font-extrabold text-slate-800 dark:text-zinc-100">
               {questions.length} <span className="text-xs font-normal text-slate-500">{t.bank.syncCenter.questionsShort}</span>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-zinc-400">IndexedDB cache</p>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400">{t.bank.syncCenter.localCacheLabel}</p>
           </div>
           <div className="space-y-1 border-l border-slate-200 dark:border-zinc-800 pl-3 rtl:border-l-0 rtl:border-r rtl:pl-0 rtl:pr-3">
             <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 tracking-wider flex items-center gap-1">
