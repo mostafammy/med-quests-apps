@@ -138,13 +138,28 @@ export class GoogleOAuthClient {
         // 1. Interactive Button Click: Use OAuth 2.0 Token Client for direct account picker popup
         if (window.google?.accounts?.oauth2) {
           return await new Promise<GoogleAuthResult>((resolve) => {
+            let settled = false;
+            const safeResolve = (res: GoogleAuthResult) => {
+              if (!settled) {
+                settled = true;
+                clearTimeout(timeoutTimer);
+                resolve(res);
+              }
+            };
+
+            // Failsafe timeout: if Google popup is closed, blocked, or origin-mismatched, never hang
+            const timeoutTimer = setTimeout(() => {
+              console.warn('[GoogleOAuthClient] Token client prompt timed out or popup closed; falling back to sandbox scholar session.');
+              safeResolve(this.createSandboxGoogleSession());
+            }, 12000);
+
             try {
               const tokenClient = window.google!.accounts.oauth2.initTokenClient({
                 client_id: this.defaultClientId,
                 scope: 'openid email profile',
                 callback: async (tokenResponse) => {
                   if (tokenResponse.error || !tokenResponse.access_token) {
-                    resolve(this.createSandboxGoogleSession());
+                    safeResolve(this.createSandboxGoogleSession());
                     return;
                   }
 
@@ -163,7 +178,7 @@ export class GoogleOAuthClient {
                       hd?: string;
                     };
 
-                    resolve({
+                    safeResolve({
                       idToken: tokenResponse.access_token,
                       claims: {
                         sub: userInfo.sub || `g_${Date.now()}`,
@@ -177,14 +192,15 @@ export class GoogleOAuthClient {
                       },
                     });
                   } catch {
-                    resolve(this.createSandboxGoogleSession());
+                    safeResolve(this.createSandboxGoogleSession());
                   }
                 },
               });
 
               tokenClient.requestAccessToken();
-            } catch {
-              resolve(this.createSandboxGoogleSession());
+            } catch (err) {
+              console.warn('[GoogleOAuthClient] initTokenClient failed to request token:', err);
+              safeResolve(this.createSandboxGoogleSession());
             }
           });
         }
@@ -192,29 +208,42 @@ export class GoogleOAuthClient {
         // 2. Fallback to GIS ID One-Tap prompt if oauth2 client is unavailable
         if (window.google?.accounts?.id) {
           return await new Promise<GoogleAuthResult>((resolve) => {
+            let settled = false;
+            const safeResolve = (res: GoogleAuthResult) => {
+              if (!settled) {
+                settled = true;
+                clearTimeout(timeoutTimer);
+                resolve(res);
+              }
+            };
+
+            const timeoutTimer = setTimeout(() => {
+              safeResolve(this.createSandboxGoogleSession());
+            }, 10000);
+
             try {
               window.google!.accounts.id.initialize({
                 client_id: this.defaultClientId,
                 callback: (response) => {
                   try {
                     const claims = this.parseJwt<GoogleUserClaims>(response.credential);
-                    resolve({
+                    safeResolve({
                       idToken: response.credential,
                       claims,
                     });
                   } catch {
-                    resolve(this.createSandboxGoogleSession());
+                    safeResolve(this.createSandboxGoogleSession());
                   }
                 },
               });
 
               window.google!.accounts.id.prompt((notification) => {
                 if (notification.isDismissedMoment()) {
-                  resolve(this.createSandboxGoogleSession());
+                  safeResolve(this.createSandboxGoogleSession());
                 }
               });
             } catch {
-              resolve(this.createSandboxGoogleSession());
+              safeResolve(this.createSandboxGoogleSession());
             }
           });
         }
