@@ -315,6 +315,7 @@ export const arDictionary: TranslationDictionary = {
       localRetainedBadge: 'محلي محتفظ به',
       upToDateBadge: 'محدث',
       localLabel: 'محلي',
+      localCacheLabel: 'ذاكرة IndexedDB المحلية',
       globalLabel: 'عالمي',
       questionsShort: 'سؤال',
       canonicalShort: 'معتمد',
@@ -327,6 +328,7 @@ export const arDictionary: TranslationDictionary = {
       deletedBadge: 'مؤرشف',
       preservedTab: 'مخصص محلي',
       preservedBadge: 'محمي',
+      preservedCount: 'عناصر خاصة محفوظة',
       changesDetected: 'تم رصد تغييرات عالمية',
       chooseMerge:
         'اختر دمج المراجعة العالمية في بنكك المحلي. يتم دائمًا الحفاظ على أسئلتك المخصصة ومسوداتك المرسلة.',
