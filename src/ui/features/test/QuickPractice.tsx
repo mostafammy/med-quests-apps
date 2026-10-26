@@ -12,20 +12,28 @@ export const QuickPractice: React.FC = () => {
 
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedChapter, setSelectedChapter] = useState<string>('all');
-  const [questionCount, setQuestionCount] = useState<number>(20);
+  const [questionCount, setQuestionCount] = useState<number | 'all'>(20);
   const [highYieldOnly, setHighYieldOnly] = useState<boolean>(true);
 
   const availableChapters = selectedSubject === 'all'
     ? CVS_TAXONOMY.chapters
     : CVS_TAXONOMY.chapters.filter((c) => c.subjectId === selectedSubject);
 
+  const matchingQuestionCount = questions.filter((q) => {
+    if (selectedSubject !== 'all' && q.subjectId !== selectedSubject) return false;
+    if (selectedChapter !== 'all' && q.chapterId !== selectedChapter) return false;
+    if (highYieldOnly && !q.highYield) return false;
+    return true;
+  }).length;
+
   const handleStartTest = () => {
+    const count = questionCount === 'all' ? matchingQuestionCount : Math.min(matchingQuestionCount, questionCount);
     navigate('/session/practice-now', {
       state: {
         mode: 'practice',
         subjectId: selectedSubject,
         chapterId: selectedChapter,
-        questionCount,
+        questionCount: count,
         highYieldOnly,
       },
     });
@@ -90,13 +98,13 @@ export const QuickPractice: React.FC = () => {
             <label className="block text-xs font-semibold text-slate-600 dark:text-zinc-400 uppercase tracking-wider mb-2">
               {t.test.questionCount}
             </label>
-            <div className="flex space-x-2">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {[10, 20, 30, 50].map((num) => (
                 <button
                   key={num}
                   type="button"
                   onClick={() => setQuestionCount(num)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  className={`py-2 rounded-lg text-xs font-semibold transition-all ${
                     questionCount === num
                       ? 'bg-blue-600 text-white shadow-xs'
                       : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-700'
@@ -105,6 +113,17 @@ export const QuickPractice: React.FC = () => {
                   {num} {t.common.questions}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setQuestionCount('all')}
+                className={`py-2 rounded-lg text-xs font-semibold transition-all col-span-2 sm:col-span-1 ${
+                  questionCount === 'all'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-700'
+                }`}
+              >
+                {t.test.allCategoryOption} ({matchingQuestionCount})
+              </button>
             </div>
           </div>
 
@@ -133,7 +152,7 @@ export const QuickPractice: React.FC = () => {
         {/* Start Button */}
         <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="text-xs text-slate-500 dark:text-zinc-400">
-            {t.test.matchingQuestions}: <strong className="text-slate-800 dark:text-zinc-200">{questions.length}</strong>
+            {t.test.matchingQuestions}: <strong className="text-slate-800 dark:text-zinc-200">{matchingQuestionCount}</strong>
           </div>
           <button
             onClick={handleStartTest}
