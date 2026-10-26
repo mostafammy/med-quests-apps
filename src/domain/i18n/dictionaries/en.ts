@@ -285,6 +285,7 @@ export const enDictionary: TranslationDictionary = {
     resetDescription:
       'Restores the authoritative canonical questions from Cloudflare Edge / D1 without deleting your private custom questions or pending submissions.',
     resetPreservedLabel: 'Local custom & pending submissions preserved',
+    resetFailed: 'Failed to restore the canonical question bank. Your local bank was not changed.',
     syncNowBtn: 'Sync with Global Bank',
     syncWarning: 'Could not reach the global bank. Your local bank is safe.',
     checkUpdatesBtn: 'Check for Updates',
@@ -295,6 +296,11 @@ export const enDictionary: TranslationDictionary = {
     activeCanonicalCount: 'Canonical Questions Active',
     syncCenter: {
       title: 'Global Question Bank Sync & Version Control',
+      statusTitle: 'Question bank status and actions — click to manage',
+      officialBank: 'Official faculty question bank',
+      blockTitle: 'Cardiovascular (Block 206)',
+      edgeStatus: 'Edge status',
+      deltaLabel: 'Delta',
       fetching: 'Fetching global question bank changes from the edge…',
       computing: 'Computing cryptographic stem diffs…',
       applying: 'Merging global revisions into your local bank…',
