@@ -343,6 +343,7 @@ export interface TranslationDictionary {
     readonly resetSuccessToast: string;
     readonly resetDescription: string;
     readonly resetPreservedLabel: string;
+    readonly resetFailed: string;
     readonly syncNowBtn: string;
     readonly syncWarning: string;
     readonly checkUpdatesBtn: string;
@@ -353,6 +354,11 @@ export interface TranslationDictionary {
     readonly activeCanonicalCount: string;
     readonly syncCenter: {
       readonly title: string;
+      readonly statusTitle: string;
+      readonly officialBank: string;
+      readonly blockTitle: string;
+      readonly edgeStatus: string;
+      readonly deltaLabel: string;
       readonly fetching: string;
       readonly computing: string;
       readonly applying: string;
