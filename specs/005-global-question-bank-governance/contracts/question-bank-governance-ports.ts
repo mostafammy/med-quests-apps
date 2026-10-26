@@ -184,6 +184,51 @@ export interface BankDeltaSyncResponse {
   readonly etag: string;
   readonly upsertedQuestions: readonly GovernedQuestion[];
   readonly archivedQuestionIds: readonly QuestionId[];
+  /** True when the edge truncated this delta page. Clients must fetch the next offset. */
+  readonly hasMore?: boolean;
+  /** Offset to pass on the follow-up request when hasMore is true. */
+  readonly nextOffset?: number;
+  /** High-water revision of the returned page, for observability and cursor debugging. */
+  readonly nextSinceRev?: number;
+}
+
+/**
+ * Detailed per-question diff item for interactive version comparison and Studio Sync UI.
+ */
+export interface QuestionDiffItem {
+  readonly id: QuestionId;
+  readonly concept: string;
+  readonly subjectId: SubjectId;
+  readonly chapterId: ChapterId;
+  readonly stem: string;
+  readonly previousStem?: string;
+  readonly previousBankVersion?: number;
+  readonly newBankVersion: number;
+  readonly globalRevision: number;
+  readonly diffKind: 'added' | 'edited' | 'deleted' | 'preserved_custom';
+  readonly changedFields?: readonly string[];
+  readonly question: GovernedQuestion;
+  readonly previousQuestion?: GovernedQuestion;
+}
+
+/**
+ * Interactive preview of changes between the user's Local Question Bank and the Global Canonical Bank.
+ */
+export interface BankVersionDiffPreview {
+  readonly blockId: BlockId;
+  readonly localRevision: number;
+  readonly remoteRevision: number;
+  readonly remoteEtag: string;
+  readonly localTotalCount: number;
+  readonly remoteCanonicalCount: number;
+  readonly isOutOfDate: boolean;
+  readonly hasChanges: boolean;
+  readonly addedQuestions: readonly QuestionDiffItem[];
+  readonly editedQuestions: readonly QuestionDiffItem[];
+  readonly deletedQuestions: readonly QuestionDiffItem[];
+  readonly preservedCustomQuestions: readonly QuestionDiffItem[];
+  readonly rawDelta: BankDeltaSyncResponse;
+  readonly checkedAt: IsoDateTime;
 }
 
 /**
@@ -197,6 +242,9 @@ export interface LocalBankMergeReport {
   readonly updatedCanonicalCount: number;
   readonly archivedTombstoneCount: number;
   readonly preservedLocalCustomCount: number;
+  readonly addedItems?: readonly QuestionDiffItem[];
+  readonly editedItems?: readonly QuestionDiffItem[];
+  readonly deletedItems?: readonly QuestionDiffItem[];
   readonly syncedAt: IsoDateTime;
 }
 
@@ -343,6 +391,7 @@ export interface IQuestionMergeStrategy {
     readonly currentLocalQuestions: readonly GovernedQuestion[];
     readonly incomingGlobalQuestions: readonly GovernedQuestion[];
     readonly archivedGlobalIds: readonly QuestionId[];
+    readonly previousRevision?: number;
     readonly newRevision: BankRevisionNumber;
     readonly syncedAt: IsoDateTime;
   }): {

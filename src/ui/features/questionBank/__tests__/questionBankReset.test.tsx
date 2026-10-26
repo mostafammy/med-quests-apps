@@ -3,6 +3,7 @@ import { renderToString } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { ResetBankConfirmationModal } from '../ResetBankConfirmationModal.tsx';
 import { QuestionBankStatusPill } from '../QuestionBankStatusPill.tsx';
+import { StudioBankSyncDiffCenter } from '../../studio/StudioBankSyncDiffCenter.tsx';
 import { Dashboard } from '../../dashboard/Dashboard.tsx';
 import { TestHub } from '../../test/TestHub.tsx';
 import { enDictionary } from '../../../../domain/i18n/dictionaries/en.ts';
@@ -35,7 +36,9 @@ describe('Global Question Bank Reset Feature for All Users', () => {
 
   it('renders QuestionBankStatusPill with active block and question count', () => {
     const html = renderToString(
-      <QuestionBankStatusPill />
+      <MemoryRouter>
+        <QuestionBankStatusPill />
+      </MemoryRouter>
     );
 
     expect(html).toContain('206');
@@ -60,5 +63,18 @@ describe('Global Question Bank Reset Feature for All Users', () => {
     );
 
     expect(html).toContain(enDictionary.bank.resetToGlobalBtn);
+  });
+
+  it('renders StudioBankSyncDiffCenter with version comparison, diff counters, and Check for Updates action', () => {
+    const html = renderToString(
+      <StudioBankSyncDiffCenter onOpenResetModal={() => {}} />
+    );
+
+    expect(html).toContain('Global Question Bank Sync');
+    expect(html).toContain('Added Questions');
+    expect(html).toContain('Edited Questions');
+    expect(html).toContain('Deleted / Retired');
+    expect(html).toContain('Local Custom');
+    expect(html).toContain('Check for Updates');
   });
 });

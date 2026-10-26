@@ -18,11 +18,20 @@ export const ResetBankConfirmationModal: React.FC<ResetBankConfirmationModalProp
   onSuccess,
   blockId = 'cvs',
 }) => {
-  const { questions, isSyncing, resetLocalBankToGlobal } = useQuestionStore();
+  const { questions, syncCursor, pendingDiffPreview, resetLocalBankToGlobal } = useQuestionStore();
   const { t } = useLocaleStore();
   const { showToast } = useAuthStore();
   const [isResetting, setIsResetting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const localRev = syncCursor?.serverRevision ?? 1;
+  const globalRev = pendingDiffPreview?.remoteRevision ?? localRev;
+  const canonicalCount = pendingDiffPreview?.remoteCanonicalCount ?? defaultCvsBank.length;
+  const protectedCount = (questions as Array<{ provenanceScope?: string }>).filter(
+    (question) =>
+      question.provenanceScope === 'local-custom' ||
+      question.provenanceScope === 'submitted-pending'
+  ).length;
 
   // Close on Escape key press
   useEffect(() => {
@@ -114,29 +123,38 @@ export const ResetBankConfirmationModal: React.FC<ResetBankConfirmationModalProp
           <div className="space-y-1">
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1">
               <Database className="w-3 h-3" />
-              Local Storage
+              {t.bank.syncCenter.localLabel} (v{localRev}.0)
             </span>
             <div className="text-sm font-extrabold text-slate-800 dark:text-zinc-100">
-              {questions.length} <span className="text-xs font-normal text-slate-500">questions</span>
+              {questions.length} <span className="text-xs font-normal text-slate-500">{t.bank.syncCenter.questionsShort}</span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-zinc-400">IndexedDB cache</p>
           </div>
           <div className="space-y-1 border-l border-slate-200 dark:border-zinc-800 pl-3 rtl:border-l-0 rtl:border-r rtl:pl-0 rtl:pr-3">
             <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 tracking-wider flex items-center gap-1">
               <ShieldCheck className="w-3 h-3" />
-              Cloudflare Edge / D1
+              {t.bank.syncCenter.globalLabel} (v{globalRev}.0)
             </span>
             <div className="text-sm font-extrabold text-emerald-700 dark:text-emerald-300">
-              {defaultCvsBank.length} <span className="text-xs font-normal text-slate-500">canonical</span>
+              {canonicalCount} <span className="text-xs font-normal text-slate-500">{t.bank.syncCenter.canonicalShort}</span>
             </div>
             <p className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80">{t.bank.edgeVerified}</p>
           </div>
         </div>
 
         {/* Warning Callout Box */}
-        <div className="flex items-start space-x-2.5 rtl:space-x-reverse p-3.5 rounded-2xl bg-rose-500/10 dark:bg-rose-950/30 border border-rose-500/25 text-rose-900 dark:text-rose-200 text-xs leading-relaxed">
-          <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+        <div className="flex items-start space-x-2.5 rtl:space-x-reverse p-3.5 rounded-2xl bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs leading-relaxed">
+          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <span>{t.bank.resetConfirmDialog}</span>
+        </div>
+
+        {/* Non-destructive guarantee */}
+        <div className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 dark:text-emerald-200 text-xs">
+          <span className="flex items-center gap-2 font-semibold">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            {t.bank.resetPreservedLabel}
+          </span>
+          <span className="font-mono font-extrabold text-sm">{protectedCount}</span>
         </div>
 
         {/* Error Feedback */}
@@ -159,10 +177,10 @@ export const ResetBankConfirmationModal: React.FC<ResetBankConfirmationModalProp
           <button
             type="button"
             onClick={handleConfirmReset}
-            disabled={isResetting || isSyncing}
+            disabled={isResetting}
             className="flex items-center space-x-2 rtl:space-x-reverse px-5 py-2.5 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-extrabold text-xs shadow-lg shadow-rose-600/30 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
           >
-            {isResetting || isSyncing ? (
+            {isResetting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>{t.bank.syncing}</span>

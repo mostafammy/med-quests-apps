@@ -460,4 +460,191 @@ describe('QuestionSpecificationBuilder & computeGlobalBankKpis', () => {
     expect(resetBank[0].editorialStatus).toBe('published');
     expect(resetBank.find((q) => q.id === 'q-local-stale-draft')).toBeUndefined();
   });
+
+  it('computes exact Added, Edited, Deleted, and Preserved Custom question diffs via computeDiffPreview', () => {
+    const mergeStrategy = new NonDestructiveBankMergeStrategy();
+
+    const localEditedCandidate: GovernedQuestion = {
+      ...SAMPLE_QUESTION,
+      id: 'q-cvs-edit-01',
+      stem: 'Original clinical stem before faculty errata update.',
+      bankVersion: 1,
+      provenanceScope: 'seed-bundled',
+      editorialStatus: 'published',
+      stemHash: QuestionCanonicalHasher.computeStemHashSync('Original clinical stem before faculty errata update.'),
+      globalRevision: 1,
+      authorId: 'usr-faculty',
+      authorDisplayName: 'Faculty',
+      reviewedById: null,
+      reviewedByDisplayName: null,
+      reviewerNotes: null,
+      publishedAt: null,
+      createdAt: '',
+      updatedAt: '',
+    };
+
+    const localDeleteCandidate: GovernedQuestion = {
+      ...SAMPLE_QUESTION,
+      id: 'q-cvs-retire-02',
+      provenanceScope: 'global-canonical',
+      editorialStatus: 'published',
+      status: 'active',
+      stemHash: QuestionCanonicalHasher.computeStemHashSync(SAMPLE_QUESTION.stem),
+      globalRevision: 1,
+      authorId: 'usr-faculty',
+      authorDisplayName: 'Faculty',
+      reviewedById: null,
+      reviewedByDisplayName: null,
+      reviewerNotes: null,
+      publishedAt: null,
+      createdAt: '',
+      updatedAt: '',
+    };
+
+    const localCustomItem: GovernedQuestion = {
+      ...SAMPLE_QUESTION,
+      id: 'q-my-private-custom-03',
+      stem: 'My private custom student vignette.',
+      provenanceScope: 'local-custom',
+      editorialStatus: 'local_draft',
+      stemHash: QuestionCanonicalHasher.computeStemHashSync('My private custom student vignette.'),
+      globalRevision: 0,
+      authorId: 'usr-me',
+      authorDisplayName: 'Me',
+      reviewedById: null,
+      reviewedByDisplayName: null,
+      reviewerNotes: null,
+      publishedAt: null,
+      createdAt: '',
+      updatedAt: '',
+    };
+
+    const incomingEditedCanonical: GovernedQuestion = {
+      ...localEditedCandidate,
+      stem: 'Updated clinical stem after faculty errata refinement.',
+      bankVersion: 2,
+      globalRevision: 3,
+      stemHash: QuestionCanonicalHasher.computeStemHashSync('Updated clinical stem after faculty errata refinement.'),
+    };
+
+    const incomingBrandNewCanonical: GovernedQuestion = {
+      ...SAMPLE_QUESTION,
+      id: 'q-cvs-brand-new-04',
+      concept: 'New High-Yield Pericarditis Concept',
+      stem: 'A 40-year-old presents with pleuritic chest pain relieved by leaning forward.',
+      provenanceScope: 'global-canonical',
+      editorialStatus: 'published',
+      stemHash: QuestionCanonicalHasher.computeStemHashSync('A 40-year-old presents with pleuritic chest pain relieved by leaning forward.'),
+      globalRevision: 3,
+      authorId: 'usr-faculty',
+      authorDisplayName: 'Faculty',
+      reviewedById: null,
+      reviewedByDisplayName: null,
+      reviewerNotes: null,
+      publishedAt: null,
+      createdAt: '',
+      updatedAt: '',
+    };
+
+    const preview = mergeStrategy.computeDiffPreview({
+      blockId: 'cvs',
+      localRevision: 1,
+      currentLocalQuestions: [localEditedCandidate, localDeleteCandidate, localCustomItem],
+      delta: {
+        status: 'delta-applied',
+        blockId: 'cvs',
+        revision: 3 as BankRevisionNumber,
+        syncedAt: new Date().toISOString(),
+        etag: 'W/rev-3',
+        upsertedQuestions: [incomingEditedCanonical, incomingBrandNewCanonical],
+        archivedQuestionIds: ['q-cvs-retire-02'],
+      },
+    });
+
+    expect(preview.localRevision).toBe(1);
+    expect(preview.remoteRevision).toBe(3);
+    expect(preview.hasChanges).toBe(true);
+    expect(preview.isOutOfDate).toBe(true);
+    expect(preview.addedQuestions).toHaveLength(1);
+    expect(preview.addedQuestions[0].id).toBe('q-cvs-brand-new-04');
+    expect(preview.editedQuestions).toHaveLength(1);
+    expect(preview.editedQuestions[0].id).toBe('q-cvs-edit-01');
+    expect(preview.editedQuestions[0].changedFields).toContain('stem');
+    expect(preview.deletedQuestions).toHaveLength(1);
+    expect(preview.deletedQuestions[0].id).toBe('q-cvs-retire-02');
+    expect(preview.preservedCustomQuestions).toHaveLength(1);
+    expect(preview.preservedCustomQuestions[0].id).toBe('q-my-private-custom-03');
+  });
+
+  it('enforces strict version monotonicity when content diverges (never shows Local v6.0 -> Global v6.0 with +106 added questions)', () => {
+    const mergeStrategy = new NonDestructiveBankMergeStrategy();
+
+    const localBank111: GovernedQuestion[] = Array.from({ length: 111 }, (_, idx) => ({
+      ...SAMPLE_QUESTION,
+      id: `q-cvs-seed-${idx + 1}`,
+      stem: `Canonical seed question #${idx + 1} clinical vignette.`,
+      provenanceScope: 'global-canonical',
+      editorialStatus: 'published',
+      stemHash: QuestionCanonicalHasher.computeStemHashSync(
+        `Canonical seed question #${idx + 1} clinical vignette.`
+      ),
+      globalRevision: 1,
+      authorId: 'usr-faculty',
+      authorDisplayName: 'Faculty',
+      reviewedById: null,
+      reviewedByDisplayName: null,
+      reviewerNotes: null,
+      publishedAt: null,
+      createdAt: '',
+      updatedAt: '',
+    }));
+
+    const globalBank217: GovernedQuestion[] = Array.from({ length: 217 }, (_, idx) => ({
+      ...SAMPLE_QUESTION,
+      id: `q-cvs-seed-${idx + 1}`,
+      stem: `Canonical seed question #${idx + 1} clinical vignette.`,
+      provenanceScope: 'global-canonical',
+      editorialStatus: 'published',
+      stemHash: QuestionCanonicalHasher.computeStemHashSync(
+        `Canonical seed question #${idx + 1} clinical vignette.`
+      ),
+      globalRevision: idx < 111 ? 1 : 7,
+      authorId: 'usr-faculty',
+      authorDisplayName: 'Faculty',
+      reviewedById: null,
+      reviewedByDisplayName: null,
+      reviewerNotes: null,
+      publishedAt: null,
+      createdAt: '',
+      updatedAt: '',
+    }));
+
+    // Even if delta initially arrives with stale revision 6 matching localRevision 6,
+    // computeDiffPreview must advance remoteRevision to 7 when +106 additions are detected.
+    const preview = mergeStrategy.computeDiffPreview({
+      blockId: 'cvs',
+      localRevision: 6,
+      currentLocalQuestions: localBank111,
+      delta: {
+        status: 'delta-applied',
+        blockId: 'cvs',
+        revision: 6 as BankRevisionNumber,
+        syncedAt: new Date().toISOString(),
+        etag: 'W/rev-6',
+        upsertedQuestions: globalBank217,
+        archivedQuestionIds: [],
+      },
+      remoteCanonicalCount: 217,
+    });
+
+    expect(preview.localTotalCount).toBe(111);
+    expect(preview.remoteCanonicalCount).toBe(217);
+    expect(preview.addedQuestions).toHaveLength(106);
+    expect(preview.hasChanges).toBe(true);
+    expect(preview.isOutOfDate).toBe(true);
+    expect(preview.localRevision).toBe(6);
+    expect(preview.remoteRevision).toBe(7);
+    expect(preview.remoteRevision).toBeGreaterThan(preview.localRevision);
+    expect(Number(preview.rawDelta.revision)).toBe(7);
+  });
 });

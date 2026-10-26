@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronDown, RotateCcw, RefreshCw, ShieldCheck, Database, Layers } from 'lucide-react';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
@@ -6,11 +7,28 @@ import defaultCvsBank from '../../../../content/cvs/dist/bank.v1.json';
 import { ResetBankConfirmationModal } from './ResetBankConfirmationModal.tsx';
 
 export const QuestionBankStatusPill: React.FC = () => {
-  const { questions, isSyncing, syncCursor, syncWithGlobalBank } = useQuestionStore();
+  const {
+    questions,
+    isSyncing,
+    syncCursor,
+    pendingDiffPreview,
+    dismissedRemoteRevision,
+    checkForGlobalUpdates,
+  } = useQuestionStore();
   const { t } = useLocaleStore();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [checkMessage, setCheckMessage] = useState<string | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  const localRev = syncCursor?.serverRevision ?? 1;
+  const remoteRev = pendingDiffPreview?.remoteRevision ?? localRev;
+  const hasNewGlobalRevision = Boolean(pendingDiffPreview?.hasChanges || pendingDiffPreview?.isOutOfDate);
+  const isDismissed =
+    dismissedRemoteRevision !== null &&
+    Number(dismissedRemoteRevision) === Number(remoteRev);
+  const hasActionableUpdates = hasNewGlobalRevision && !isDismissed;
 
   // Close popover on outside click and Escape
   useEffect(() => {
@@ -38,9 +56,16 @@ export const QuestionBankStatusPill: React.FC = () => {
 
   const handleSyncClick = async () => {
     try {
-      await syncWithGlobalBank('cvs');
+      setCheckMessage(null);
+      const preview = await checkForGlobalUpdates('cvs', { force: true });
+      if (preview && (preview.hasChanges || preview.isOutOfDate)) {
+        setIsOpen(false);
+        navigate('/studio');
+      } else {
+        setCheckMessage(t.bank.syncedBadge);
+      }
     } catch {
-      // Handled in store
+      setCheckMessage(t.bank.syncWarning);
     }
   };
 
@@ -58,8 +83,16 @@ export const QuestionBankStatusPill: React.FC = () => {
         }`}
       >
         <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          <span
+            className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+              hasActionableUpdates ? 'bg-amber-400' : 'bg-emerald-400'
+            }`}
+          />
+          <span
+            className={`relative inline-flex rounded-full h-2 w-2 ${
+              hasActionableUpdates ? 'bg-amber-500' : 'bg-emerald-500'
+            }`}
+          />
         </span>
         <span className="hidden sm:inline">
           {t.nav.activeBlockPrefix}: 206 • {questions.length} Qs
@@ -67,6 +100,11 @@ export const QuestionBankStatusPill: React.FC = () => {
         <span className="sm:hidden">
           206
         </span>
+        {hasActionableUpdates && (
+          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-extrabold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-400/40">
+            v{remoteRev}
+          </span>
+        )}
         <ChevronDown
           className={`w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 transition-transform duration-200 ${
             isOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
@@ -91,7 +129,7 @@ export const QuestionBankStatusPill: React.FC = () => {
               </p>
             </div>
             <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 border border-emerald-500/25 px-2 py-0.5 rounded-full">
-              Rev #{syncCursor?.serverRevision ?? 1}
+              Local v{localRev}.0 {hasNewGlobalRevision ? `→ Global v${remoteRev}.0` : `(Up to Date)`}
             </span>
           </div>
 
@@ -117,6 +155,13 @@ export const QuestionBankStatusPill: React.FC = () => {
             </div>
           </div>
 
+          {/* Check result feedback */}
+          {checkMessage && (
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-400/30 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 animate-apple-entrance">
+              {checkMessage}
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="space-y-2 pt-1">
             {/* Sync Now */}
@@ -128,7 +173,13 @@ export const QuestionBankStatusPill: React.FC = () => {
             >
               <div className="flex items-center space-x-2 rtl:space-x-reverse">
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>{isSyncing ? t.bank.syncing : t.bank.syncNowBtn}</span>
+                <span>
+                  {isSyncing
+                    ? t.bank.syncing
+                    : hasActionableUpdates
+                    ? t.bank.reviewChangesBtn
+                    : t.bank.checkUpdatesBtn}
+                </span>
               </div>
               <span className="text-[10px] uppercase font-mono tracking-wider opacity-70">
                 Delta

@@ -11,29 +11,23 @@ import {
   Sparkles,
   AlertCircle,
   CheckCircle2,
-  RefreshCw,
-  RotateCcw,
-  Globe,
   ShieldCheck,
   FileText,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
+import { StudioBankSyncDiffCenter } from './StudioBankSyncDiffCenter.tsx';
+import { ResetBankConfirmationModal } from '../questionBank/ResetBankConfirmationModal.tsx';
 
 export const QuestionStudio: React.FC = () => {
   const {
     questions,
-    syncCursor,
-    isSyncing,
-    lastMergeReport,
     mySubmissions,
     ingestQuestions,
     submitQuestionsForGlobalReview,
-    syncWithGlobalBank,
     loadMySubmissions,
     exportBankJson,
     clearBank,
-    resetLocalBankToGlobal,
   } = useQuestionStore();
 
   const { authState } = useAuthStore();
@@ -51,6 +45,7 @@ export const QuestionStudio: React.FC = () => {
   } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSubmissionsTracker, setShowSubmissionsTracker] = useState(false);
+  const [showResetBankModal, setShowResetBankModal] = useState(false);
   const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
 
   const activeSubject = CVS_TAXONOMY.subjects.find((s) => s.id === selectedSubjectId);
@@ -62,24 +57,6 @@ export const QuestionStudio: React.FC = () => {
     const userId = authState.user?.id || 'usr_local_author';
     loadMySubmissions(userId);
   }, [authState.user?.id, loadMySubmissions]);
-
-  const handleResetToGlobal = async () => {
-    if (!window.confirm(t.studio.resetConfirmDialog)) {
-      return;
-    }
-    try {
-      setIsProcessing(true);
-      const res = await resetLocalBankToGlobal('cvs');
-      setResetSuccessMessage(
-        `${t.studio.resetSuccessToast} (${res.resetCount} questions, Rev #${res.revision})`
-      );
-      setTimeout(() => setResetSuccessMessage(null), 5000);
-    } catch {
-      // Handled in store
-    } finally {
-      setIsProcessing(false);
-    }
-  };
   const generatePrompt = () => {
     return `You are a Senior Medical Professor and USMLE Board Item Writer creating high-yield, strictly grounded Multiple Choice Questions for 2nd-year medical students.
 
@@ -197,60 +174,8 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] py-6 sm:py-8 px-3 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 animate-apple-entrance">
-      {/* 1. Global Bank Synchronizer Ribbon */}
-      <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border border-indigo-400/20 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
-        <div className="flex items-center space-x-3">
-          <div className="p-2.5 rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-500/20">
-            <Globe className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                Global Question Bank (CVS)
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30">
-                Rev #{syncCursor?.serverRevision || 1}
-              </span>
-            </div>
-            <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
-              {questions.length} total questions in local database. Read-only delta sync automatically pulls verified additions from peers.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          <button
-            onClick={() => syncWithGlobalBank('cvs')}
-            disabled={isSyncing || isProcessing}
-            className="py-2 px-3.5 rounded-xl bg-white/80 dark:bg-zinc-800/80 hover:bg-white dark:hover:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center space-x-2 shadow-xs transition-all disabled:opacity-50 cursor-pointer apple-tap"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-indigo-600' : ''}`} />
-            <span>{isSyncing ? 'Syncing...' : 'Sync Global Bank'}</span>
-          </button>
-
-          <button
-            onClick={handleResetToGlobal}
-            disabled={isSyncing || isProcessing}
-            title={t.studio.resetToGlobalBtn}
-            className="py-2 px-3.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/15 border border-rose-400/30 text-xs font-bold text-rose-700 dark:text-rose-300 flex items-center space-x-1.5 shadow-xs transition-all disabled:opacity-50 cursor-pointer apple-tap"
-          >
-            <RotateCcw className={`w-3.5 h-3.5 ${isProcessing ? 'animate-spin text-rose-600' : ''}`} />
-            <span>{t.studio.resetToGlobalBtn}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Delta Sync Report Toast */}
-      {lastMergeReport && (
-        <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-400/30 text-emerald-800 dark:text-emerald-300 text-xs flex items-center justify-between animate-apple-entrance">
-          <div className="flex items-center space-x-2 font-medium">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>
-              Synchronized successfully: <strong>+{lastMergeReport.insertedCount} new canonical questions</strong>, {lastMergeReport.preservedLocalCustomCount} local custom questions preserved without modification.
-            </span>
-          </div>
-        </div>
-      )}
+      {/* 1. Interactive Global Bank Sync & Version Diff Glassmorphism Center */}
+      <StudioBankSyncDiffCenter onOpenResetModal={() => setShowResetBankModal(true)} />
 
       {/* Reset Bank Success Toast */}
       {resetSuccessMessage && (
@@ -261,6 +186,18 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
           </div>
         </div>
       )}
+
+      {/* Apple Glassmorphic Reset Confirmation Modal */}
+      <ResetBankConfirmationModal
+        isOpen={showResetBankModal}
+        onClose={() => setShowResetBankModal(false)}
+        onSuccess={(res) => {
+          setResetSuccessMessage(
+            `${t.studio.resetSuccessToast} (${res.resetCount} questions, Rev #${res.revision})`
+          );
+          setTimeout(() => setResetSuccessMessage(null), 5000);
+        }}
+      />
 
       {/* 2. Main Studio Header */}
       <div className="p-5 sm:p-7 md:p-8 rounded-3xl bg-white/65 dark:bg-zinc-900/65 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.06)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all">

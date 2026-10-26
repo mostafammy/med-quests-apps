@@ -327,7 +327,7 @@ export const TestHub: React.FC = () => {
             <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-3">
               {t.test.filterSubject}
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               <button
                 type="button"
                 onClick={() => {

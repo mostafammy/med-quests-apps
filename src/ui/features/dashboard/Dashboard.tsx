@@ -340,7 +340,7 @@ export const Dashboard: React.FC = () => {
           {t.dashboard.taxonomyBreakdownTitle}
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Anatomy Card - Royal Blue Glow */}
           <div className="p-6 rounded-3xl glass-card-interactive space-y-3 border-blue-400/25 dark:border-blue-700/30">
             <div className="flex items-center justify-between">
@@ -354,7 +354,7 @@ export const Dashboard: React.FC = () => {
               Heart chambers, valves, coronaries, pericardium, cardiac looping, atrial & ventricular septation.
             </p>
             <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-100 dark:border-zinc-800">
-              <span className="font-bold text-slate-700 dark:text-zinc-300">58 {t.common.questions}</span>
+              <span className="font-bold text-slate-700 dark:text-zinc-300">56 {t.common.questions}</span>
               <button
                 onClick={() => navigate('/test?subject=anatomy')}
                 className="text-blue-600 dark:text-blue-400 font-bold hover:underline cursor-pointer flex items-center space-x-1"
@@ -404,6 +404,29 @@ export const Dashboard: React.FC = () => {
               <button
                 onClick={() => navigate('/test?subject=microbiology')}
                 className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer flex items-center space-x-1"
+              >
+                <span>{t.dashboard.startPractice} →</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Physiology Card - Amber / Gold Glow */}
+          <div className="p-6 rounded-3xl glass-card-interactive space-y-3 border-amber-400/25 dark:border-amber-700/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50" />
+                <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-sm">{t.dashboard.subjects.physiology}</h3>
+              </div>
+              <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md">3 Chapters</span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
+              Cardiac electrophysiology, AP phases (0–4), cardiac cycle phases, heart sounds, and hemodynamics / BP regulation.
+            </p>
+            <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-100 dark:border-zinc-800">
+              <span className="font-bold text-slate-700 dark:text-zinc-300">106 {t.common.questions}</span>
+              <button
+                onClick={() => navigate('/test?subject=physiology')}
+                className="text-amber-600 dark:text-amber-400 font-bold hover:underline cursor-pointer flex items-center space-x-1"
               >
                 <span>{t.dashboard.startPractice} →</span>
               </button>

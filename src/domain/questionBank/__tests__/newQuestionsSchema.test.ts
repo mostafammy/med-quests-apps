@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import { QuestionSchema } from '../../model/types.ts';
+import { CVS_TAXONOMY } from '../../taxonomy/cvsTaxonomy.ts';
 
 describe('New PDF Questions Schema & Quality Validation', () => {
   const newQuestions = JSON.parse(
@@ -9,6 +10,24 @@ describe('New PDF Questions Schema & Quality Validation', () => {
 
   it('contains exactly 106 high-yield questions extracted from the 24-page PDF', () => {
     expect(newQuestions.length).toBe(106);
+  });
+
+  it('assigns all 106 new questions to the new physiology subject in CVS block', () => {
+    const validPhysiologyChapterIds = CVS_TAXONOMY.chapters
+      .filter((c) => c.subjectId === 'physiology')
+      .map((c) => c.id);
+    const validPhysiologyTopicIds = CVS_TAXONOMY.topics
+      .filter((t) => validPhysiologyChapterIds.includes(t.chapterId))
+      .map((t) => t.id);
+
+    expect(validPhysiologyChapterIds.length).toBe(3);
+    expect(validPhysiologyTopicIds.length).toBe(9);
+
+    for (const q of newQuestions) {
+      expect(q.subjectId).toBe('physiology');
+      expect(validPhysiologyChapterIds).toContain(q.chapterId);
+      expect(validPhysiologyTopicIds).toContain(q.topicId);
+    }
   });
 
   it('validates every single question against QuestionSchema without error', () => {

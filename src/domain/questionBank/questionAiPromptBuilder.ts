@@ -133,7 +133,7 @@ EXACT JSON SCHEMA DEFINITION (TypeScript Equivalent):
 interface Question {
   id: string; // e.g. "q-cvs-ana-0101"
   blockId: "cvs";
-  subjectId: string; // e.g. "anatomy" | "histology" | "microbiology"
+  subjectId: string; // e.g. "anatomy" | "histology" | "microbiology" | "physiology"
   chapterId: string; // e.g. "cvs-ana-heart-dev"
   topicId: string; // e.g. "cvs-ana-congenital-heart-anomalies"
   concept: string; // concise concept name

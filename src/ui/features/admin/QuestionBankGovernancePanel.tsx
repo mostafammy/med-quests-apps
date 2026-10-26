@@ -39,6 +39,7 @@ export const QuestionBankGovernancePanel: React.FC = () => {
     selectTicket,
     submitReviewDecision,
     createCanonicalQuestions,
+    updateCanonicalQuestion,
     setArchiveStatus,
     getFilteredCatalog,
     getFilteredQueue,
@@ -59,6 +60,13 @@ export const QuestionBankGovernancePanel: React.FC = () => {
   // Modal state for creating canonical items
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createJsonInput, setCreateJsonInput] = useState('');
+
+  // Modal state for editing an existing canonical item in-place
+  const [editingCanonicalQuestion, setEditingCanonicalQuestion] = useState<GovernedQuestion | null>(null);
+  const [editConcept, setEditConcept] = useState('');
+  const [editStem, setEditStem] = useState('');
+  const [editExplanation, setEditExplanation] = useState('');
+  const [editReason, setEditReason] = useState('Faculty errata refinement & clinical clarification');
 
   // Modal state for AI Prompt Studio
   const [isPromptStudioOpen, setIsPromptStudioOpen] = useState(false);
@@ -593,6 +601,19 @@ export const QuestionBankGovernancePanel: React.FC = () => {
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end space-x-2">
                             <button
+                              onClick={() => {
+                                setEditingCanonicalQuestion(q);
+                                setEditConcept(q.concept);
+                                setEditStem(q.stem);
+                                setEditExplanation(q.explanation);
+                                setEditReason('Faculty errata refinement & clinical clarification');
+                              }}
+                              className="p-1.5 rounded-lg border border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-xs font-semibold cursor-pointer"
+                              title="Edit canonical question in-place"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
                               onClick={() => handleArchiveToggle(q)}
                               className={`p-1.5 rounded-lg border text-xs font-semibold cursor-pointer ${
                                 isArchived
@@ -680,6 +701,91 @@ export const QuestionBankGovernancePanel: React.FC = () => {
                 className="py-2 px-4 rounded-xl bg-indigo-600 text-white text-xs font-bold"
               >
                 Commit & Distribute
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT CANONICAL QUESTION MODAL */}
+      {editingCanonicalQuestion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 max-w-xl w-full space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                  Editing Canonical Item • {editingCanonicalQuestion.id} (v{editingCanonicalQuestion.bankVersion})
+                </span>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  Update Global Canonical Question
+                </h3>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-zinc-700 dark:text-zinc-300 block mb-1">Concept Title</label>
+                <input
+                  type="text"
+                  value={editConcept}
+                  onChange={(e) => setEditConcept(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 p-2.5 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-zinc-700 dark:text-zinc-300 block mb-1">Clinical Vignette Stem</label>
+                <textarea
+                  rows={4}
+                  value={editStem}
+                  onChange={(e) => setEditStem(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 p-2.5 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-serif"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-zinc-700 dark:text-zinc-300 block mb-1">Clinical Explanation</label>
+                <textarea
+                  rows={3}
+                  value={editExplanation}
+                  onChange={(e) => setEditExplanation(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 p-2.5 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-zinc-700 dark:text-zinc-300 block mb-1">Audit Change Reason</label>
+                <input
+                  type="text"
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 p-2.5 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-2">
+              <button
+                onClick={() => setEditingCanonicalQuestion(null)}
+                className="py-2 px-4 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-700 dark:text-zinc-300 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  await updateCanonicalQuestion(
+                    editingCanonicalQuestion.id,
+                    {
+                      concept: editConcept,
+                      stem: editStem,
+                      explanation: editExplanation,
+                    },
+                    editReason || 'Faculty errata update',
+                    currentActor
+                  );
+                  setEditingCanonicalQuestion(null);
+                }}
+                disabled={isActionInProgress}
+                className="py-2 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer"
+              >
+                {isActionInProgress ? 'Publishing Revision...' : 'Publish Global Revision'}
               </button>
             </div>
           </div>

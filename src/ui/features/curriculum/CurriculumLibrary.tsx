@@ -62,6 +62,15 @@ export const CurriculumLibrary: React.FC = () => {
       size: `3 ${t.curriculum.lectures}`,
       chapters: ['GAS & Molecular Mimicry', 'JONES Criteria', 'Duke Criteria'],
     },
+    {
+      id: 'doc-phy-01',
+      subject: t.dashboard.subjects.physiology,
+      title: 'CVS Physiology & Hemodynamics Self-Assessment Guide',
+      fileName: 'CVS Self-Assessment Curriculum Guide.pdf',
+      format: 'PDF',
+      size: `24 ${t.curriculum.pages}`,
+      chapters: ['Cardiac Electrophysiology', 'Cardiac Cycle & Heart Sounds', 'Hemodynamics & BP Regulation'],
+    },
   ];
 
   return (

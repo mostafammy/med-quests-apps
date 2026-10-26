@@ -6,13 +6,14 @@ export const CVS_TAXONOMY: Taxonomy = {
     name: 'Cardiovascular System',
     shortName: 'CVS',
     code: 'Block 206',
-    description: 'Integrated Cardiovascular Block: Anatomy, Embryology, Histology & Microbiology',
-    subjectIds: ['anatomy', 'histology', 'microbiology'],
+    description: 'Integrated Cardiovascular Block: Anatomy, Embryology, Histology, Microbiology & Physiology',
+    subjectIds: ['anatomy', 'histology', 'microbiology', 'physiology'],
   },
   subjects: [
     { id: 'anatomy', blockId: 'cvs', name: 'CVS Anatomy & Embryology', order: 1 },
     { id: 'histology', blockId: 'cvs', name: 'CVS Histology', order: 2 },
     { id: 'microbiology', blockId: 'cvs', name: 'CVS Microbiology', order: 3 },
+    { id: 'physiology', blockId: 'cvs', name: 'CVS Physiology', order: 4 },
   ],
   chapters: [
     // Anatomy
@@ -82,6 +83,31 @@ export const CVS_TAXONOMY: Taxonomy = {
       order: 8,
       sourceIds: ['SRC-CVS-MIC-01'],
     },
+    // Physiology
+    {
+      id: 'cvs-phy-electrophysiology',
+      blockId: 'cvs',
+      subjectId: 'physiology',
+      name: 'Cardiac Electrophysiology & Conduction',
+      order: 9,
+      sourceIds: ['SRC-CVS-PHY-01'],
+    },
+    {
+      id: 'cvs-phy-cardiac-cycle',
+      blockId: 'cvs',
+      subjectId: 'physiology',
+      name: 'Cardiac Cycle, Valve Dynamics & Heart Sounds',
+      order: 10,
+      sourceIds: ['SRC-CVS-PHY-01'],
+    },
+    {
+      id: 'cvs-phy-hemodynamics-bp',
+      blockId: 'cvs',
+      subjectId: 'physiology',
+      name: 'Hemodynamics, Reflexes & Blood Pressure Regulation',
+      order: 11,
+      sourceIds: ['SRC-CVS-PHY-01'],
+    },
   ],
   topics: [
     // Anatomy - Heart & Mediastinum
@@ -129,5 +155,20 @@ export const CVS_TAXONOMY: Taxonomy = {
     // Microbiology - Viral Myocarditis
     { id: 'cvs-mic-myocarditis-causes', blockId: 'cvs', chapterId: 'cvs-mic-viral-myocarditis', name: 'Viral Pathogens (Coxsackie B, Adenovirus, Parvo B19)', order: 29 },
     { id: 'cvs-mic-myocarditis-clinic-diag', blockId: 'cvs', chapterId: 'cvs-mic-viral-myocarditis', name: 'Pathology, Cardiac Enzymes & Clinical Presentation', order: 30 },
+
+    // Physiology - Cardiac Electrophysiology & Conduction
+    { id: 'cvs-phy-conduction-system', blockId: 'cvs', chapterId: 'cvs-phy-electrophysiology', name: 'Conduction System, Pacemaker Hierarchy & Autonomic Control', order: 31 },
+    { id: 'cvs-phy-action-potentials', blockId: 'cvs', chapterId: 'cvs-phy-electrophysiology', name: 'Ventricular & Nodal Action Potentials (Phases 0-4)', order: 32 },
+    { id: 'cvs-phy-ionic-currents', blockId: 'cvs', chapterId: 'cvs-phy-electrophysiology', name: 'Ion Channels, Refractory Periods & Antiarrhythmic Targets', order: 33 },
+
+    // Physiology - Cardiac Cycle, Valve Dynamics & Heart Sounds
+    { id: 'cvs-phy-cycle-phases', blockId: 'cvs', chapterId: 'cvs-phy-cardiac-cycle', name: 'Cardiac Cycle Phases, Pressures & Ventricular Volumes', order: 34 },
+    { id: 'cvs-phy-heart-sounds', blockId: 'cvs', chapterId: 'cvs-phy-cardiac-cycle', name: 'Heart Sounds (S1, S2, S3, S4) & Valvular Correlation', order: 35 },
+    { id: 'cvs-phy-chambers-valves', blockId: 'cvs', chapterId: 'cvs-phy-cardiac-cycle', name: 'Cardiac Chamber Flow, Septation & Valvular Gating', order: 36 },
+
+    // Physiology - Hemodynamics, Reflexes & BP Regulation
+    { id: 'cvs-phy-arterial-venous-hemodynamics', blockId: 'cvs', chapterId: 'cvs-phy-hemodynamics-bp', name: 'Arterial vs. Venous Hemodynamics, Resistance & Capacitance', order: 37 },
+    { id: 'cvs-phy-baroreceptor-reflex', blockId: 'cvs', chapterId: 'cvs-phy-hemodynamics-bp', name: 'Baroreceptor Reflex & Autonomic Hemorrhage Responses', order: 38 },
+    { id: 'cvs-phy-raas-endocrine-bp', blockId: 'cvs', chapterId: 'cvs-phy-hemodynamics-bp', name: 'RAAS, Juxtaglomerular Renin, ADH & ANP Regulation', order: 39 },
   ],
 };
