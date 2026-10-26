@@ -257,6 +257,7 @@ export class EdgeAuthGateway implements AuthGatewayPort {
       email,
       displayName,
       avatarUrl,
+      phoneNumber: credentials.phoneNumber || null,
       universityName,
       academicYear: isPlatformOwner ? 6 : 2,
       role,
@@ -389,6 +390,48 @@ export class EdgeAuthGateway implements AuthGatewayPort {
     Result<{ readonly state: AuthState; readonly syncSummary: ProgressSyncSummary }, AuthDomainError>
   > {
     return this.signIn(payload);
+  }
+
+  public async updatePhoneNumber(phoneNumber: string): Promise<Result<UserProfile, AuthDomainError>> {
+    const current = this.getInitialOptimisticState();
+    if (current.status !== 'authenticated-active') {
+      return err({ code: 'SESSION_EXPIRED_OR_REVOKED', sessionId: 'none' });
+    }
+
+    const updatedUser: UserProfile = {
+      ...current.user,
+      phoneNumber: phoneNumber.trim(),
+    };
+
+    this.inMemoryState = {
+      ...current,
+      user: updatedUser,
+    };
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
+      } catch {
+        // Quota guard
+      }
+
+      // Edge worker push
+      try {
+        await fetch('/api/auth/profile/phone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: updatedUser.id,
+            email: updatedUser.email,
+            phoneNumber: updatedUser.phoneNumber,
+          }),
+        });
+      } catch {
+        // Offline queue
+      }
+    }
+
+    return ok(updatedUser);
   }
 
   public async signOut(): Promise<Result<AuthState, AuthDomainError>> {
