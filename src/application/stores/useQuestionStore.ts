@@ -106,7 +106,7 @@ function enrichBundledQuestions(rawList: readonly Question[]): GovernedQuestion[
 }
 
 export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
-  questions: [],
+  questions: Array.isArray(defaultCvsBank) ? (defaultCvsBank as Question[]) : [],
   activeBlockId: 'cvs',
   isLoading: false,
   isSyncing: false,
