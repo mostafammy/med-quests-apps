@@ -43,7 +43,7 @@ export const StudioBankSyncDiffCenter: React.FC<StudioBankSyncDiffCenterProps> =
     applyPendingGlobalMerge,
     dismissPendingGlobalMerge,
   } = useQuestionStore();
-  const { t } = useLocaleStore();
+  const { t, isRtl } = useLocaleStore();
 
   const [isDiffDrawerExpanded, setIsDiffDrawerExpanded] = useState<boolean>(true);
   const [activeDiffTab, setActiveDiffTab] = useState<DiffInspectorTab>('added');
@@ -90,7 +90,7 @@ export const StudioBankSyncDiffCenter: React.FC<StudioBankSyncDiffCenterProps> =
       case 'resetting-bank':
         return copy.resetting;
       case 'changes-detected':
-        return `${copy.updateAvailableTitle} (${copy.localLabel} v${localRev}.0 → ${copy.globalLabel} v${remoteRev}.0)`;
+        return `${copy.updateAvailableTitle} (${copy.localLabel} v${localRev}.0 ${isRtl ? '←' : '→'} ${copy.globalLabel} v${remoteRev}.0)`;
       case 'up-to-date':
         return `${copy.upToDateTitle} (${copy.localLabel} v${localRev}.0)`;
       case 'local-retained':
@@ -363,7 +363,7 @@ export const StudioBankSyncDiffCenter: React.FC<StudioBankSyncDiffCenterProps> =
               </span>
             </div>
             <p className="text-xs text-slate-600 dark:text-zinc-300">
-              {t.bank.syncCenter.chooseMerge} ({preservedList.length} {t.bank.syncCenter.preservedTab})
+              {t.bank.syncCenter.chooseMerge} ({t.bank.syncCenter.preservedCount}: {preservedList.length})
             </p>
           </div>
 
@@ -421,7 +421,7 @@ export const StudioBankSyncDiffCenter: React.FC<StudioBankSyncDiffCenterProps> =
               +{lastMergeReport.insertedCount} {t.bank.syncCenter.addedTab}, ~
               {lastMergeReport.updatedCanonicalCount} {t.bank.syncCenter.editedTab}, -
               {lastMergeReport.archivedTombstoneCount} {t.bank.syncCenter.deletedTab},{' '}
-              {lastMergeReport.preservedLocalCustomCount} {t.bank.syncCenter.preservedTab}.
+              {t.bank.syncCenter.preservedCount}: {lastMergeReport.preservedLocalCustomCount}.
             </span>
           </div>
         </div>
@@ -469,7 +469,7 @@ export const StudioBankSyncDiffCenter: React.FC<StudioBankSyncDiffCenterProps> =
                   if (item.diffKind === 'edited') {
                     badgeColor =
                       'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30';
-                    badgeLabel = `${t.bank.syncCenter.editedItemBadge} (v${item.previousBankVersion ?? 1} → v${item.newBankVersion})`;
+                    badgeLabel = `${t.bank.syncCenter.editedItemBadge} (v${item.previousBankVersion ?? 1} ${isRtl ? '←' : '→'} v${item.newBankVersion})`;
                   } else if (item.diffKind === 'deleted') {
                     badgeColor =
                       'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-400/30';
