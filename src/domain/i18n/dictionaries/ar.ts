@@ -285,6 +285,7 @@ export const arDictionary: TranslationDictionary = {
     resetDescription:
       'يستعيد الأسئلة الأكاديمية المعتمدة من خوادم Cloudflare Edge و D1 دون حذف أسئلتك المخصصة أو مسوداتك المرسلة.',
     resetPreservedLabel: 'يتم الحفاظ على الأسئلة المخصصة والمسودات المرسلة',
+    resetFailed: 'تعذّرت استعادة بنك الأسئلة المعتمد. لم يتم تغيير بنكك المحلي.',
     syncNowBtn: 'مزامنة مع البنك العام',
     syncWarning: 'تعذّر الوصول إلى البنك العام. بنكك المحلي آمن.',
     checkUpdatesBtn: 'التحقق من التحديثات',
@@ -295,6 +296,11 @@ export const arDictionary: TranslationDictionary = {
     activeCanonicalCount: 'أسئلة أكاديمية معتمدة نشطة',
     syncCenter: {
       title: 'مزامنة بنك الأسئلة العالمي والتحكم بالإصدارات',
+      statusTitle: 'حالة بنك الأسئلة والإجراءات — انقر للإدارة',
+      officialBank: 'بنك الأسئلة الرسمي لكلية الطب',
+      blockTitle: 'القلب والأوعية الدموية (Block 206)',
+      edgeStatus: 'حالة Edge',
+      deltaLabel: 'الفروقات',
       fetching: 'جارٍ جلب تغييرات بنك الأسئلة العالمي من Edge…',
       computing: 'جارٍ حساب فروقات الجذور بالتشفير…',
       applying: 'جارٍ دمج المراجعة العالمية في بنكك المحلي…',
