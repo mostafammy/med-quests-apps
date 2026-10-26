@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Shell } from './ui/app/Shell.tsx';
 import { Dashboard } from './ui/features/dashboard/Dashboard.tsx';
@@ -8,11 +8,39 @@ import { MockExamSetup } from './ui/features/test/MockExamSetup.tsx';
 import { SessionPlayer } from './ui/features/test/SessionPlayer.tsx';
 import { ReviewHub } from './ui/features/review/ReviewHub.tsx';
 import { CurriculumLibrary } from './ui/features/curriculum/CurriculumLibrary.tsx';
-import { QuestionStudio } from './ui/features/studio/QuestionStudio.tsx';
-import { AdminDashboardPage } from './ui/features/admin/AdminDashboardPage.tsx';
 import { useQuestionStore } from './application/stores/useQuestionStore.ts';
 import { useThemeStore } from './application/stores/useThemeStore.ts';
 import { useAuthStore } from './application/stores/useAuthStore.ts';
+import { useLocaleStore } from './application/stores/useLocaleStore.ts';
+
+// Studio and the governance console are large, low-frequency routes. Keep them out of
+// the initial learner bundle so first paint and offline practice stay fast.
+const QuestionStudio = lazy(() =>
+  import('./ui/features/studio/QuestionStudio.tsx').then((module) => ({
+    default: module.QuestionStudio,
+  }))
+);
+const AdminDashboardPage = lazy(() =>
+  import('./ui/features/admin/AdminDashboardPage.tsx').then((module) => ({
+    default: module.AdminDashboardPage,
+  }))
+);
+
+const RouteLoader: React.FC = () => {
+  const { t } = useLocaleStore();
+  return (
+    <div className="flex min-h-[45vh] items-center justify-center p-6">
+      <div className="glass-surface flex items-center gap-3 rounded-2xl border border-slate-200/70 dark:border-zinc-800 px-5 py-3 text-xs font-semibold text-slate-600 dark:text-zinc-300">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-600" />
+        <span>{t.common.loading}</span>
+      </div>
+    </div>
+  );
+};
+
+const suspense = (node: React.ReactNode) => (
+  <Suspense fallback={<RouteLoader />}>{node}</Suspense>
+);
 
 export const App: React.FC = () => {
   const { loadQuestions } = useQuestionStore();
@@ -47,8 +75,8 @@ export const App: React.FC = () => {
           <Route path="test/mock" element={<MockExamSetup />} />
           <Route path="review" element={<ReviewHub />} />
           <Route path="curriculum" element={<CurriculumLibrary />} />
-          <Route path="studio" element={<QuestionStudio />} />
-          <Route path="admin" element={<AdminDashboardPage />} />
+          <Route path="studio" element={suspense(<QuestionStudio />)} />
+          <Route path="admin" element={suspense(<AdminDashboardPage />)} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
