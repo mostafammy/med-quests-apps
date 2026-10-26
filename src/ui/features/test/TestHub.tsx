@@ -31,7 +31,7 @@ export const TestHub: React.FC = () => {
   const [selectedMode, setSelectedMode] = useState<TestMode>('practice');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedChapter, setSelectedChapter] = useState<string>('all');
-  const [questionCount, setQuestionCount] = useState<number>(20);
+  const [questionCount, setQuestionCount] = useState<number | 'all'>(20);
   const [highYieldOnly, setHighYieldOnly] = useState<boolean>(false);
   const [timedSprint, setTimedSprint] = useState<boolean>(false);
   const [showResetBankModal, setShowResetBankModal] = useState<boolean>(false);
@@ -53,6 +53,27 @@ export const TestHub: React.FC = () => {
     }).length;
   }, [questions, selectedSubject, selectedChapter, highYieldOnly]);
 
+  // Effective question count for the active session configuration
+  const effectiveQuestionCount = useMemo(() => {
+    if (questionCount === 'all') {
+      return matchingQuestionCount;
+    }
+    return Math.min(matchingQuestionCount, questionCount);
+  }, [questionCount, matchingQuestionCount]);
+
+  // Dynamic human-readable label for the currently targeted category
+  const selectedCategoryLabel = useMemo(() => {
+    if (selectedChapter !== 'all') {
+      const ch = CVS_TAXONOMY.chapters.find((c) => c.id === selectedChapter);
+      if (ch) return ch.name;
+    }
+    if (selectedSubject !== 'all') {
+      const sub = CVS_TAXONOMY.subjects.find((s) => s.id === selectedSubject);
+      if (sub) return sub.name;
+    }
+    return t.test.allSubjects;
+  }, [selectedSubject, selectedChapter, t]);
+
   // Subject statistics for badge counters
   const subjectCounts = useMemo(() => {
     const counts: Record<string, number> = { all: questions.length };
@@ -62,7 +83,9 @@ export const TestHub: React.FC = () => {
     return counts;
   }, [questions]);
 
-  const handleLaunchSession = () => {
+  const handleLaunchSession = (overrideCount?: number | 'all') => {
+    const effectiveCountMode = overrideCount !== undefined ? overrideCount : questionCount;
+
     if (selectedMode === 'mock') {
       navigate('/session/mock-exam', {
         state: {
@@ -91,14 +114,18 @@ export const TestHub: React.FC = () => {
     }
 
     // Practice mode
+    const count = effectiveCountMode === 'all'
+      ? matchingQuestionCount
+      : Math.min(matchingQuestionCount, effectiveCountMode);
+
     navigate('/session/practice-now', {
       state: {
         mode: 'practice',
         subjectId: selectedSubject,
         chapterId: selectedChapter,
-        questionCount: Math.min(matchingQuestionCount, questionCount),
+        questionCount: count,
         highYieldOnly,
-        timeLimitMinutes: timedSprint ? Math.ceil(questionCount * 1.5) : undefined,
+        timeLimitMinutes: timedSprint ? Math.ceil(count * 1.5) : undefined,
       },
     });
   };
@@ -394,6 +421,66 @@ export const TestHub: React.FC = () => {
             </select>
           </div>
 
+          {/* Full Category Test Option Card */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-purple-500/10 border border-blue-500/20 dark:border-blue-400/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center space-x-3.5 rtl:space-x-reverse">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-extrabold text-slate-900 dark:text-white">
+                    {t.test.testAllCategory}
+                  </span>
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+                    {matchingQuestionCount} {t.common.questions}
+                  </span>
+                  {questionCount === 'all' && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 uppercase tracking-wide">
+                      {t.test.allCategorySelected}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-600 dark:text-zinc-400 mt-1">
+                  <strong className="text-slate-800 dark:text-zinc-200">{selectedCategoryLabel}</strong>: {t.test.testAllCategoryDesc}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 shrink-0 self-stretch sm:self-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setQuestionCount((prev) => (prev === 'all' ? 20 : 'all'));
+                }}
+                className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer apple-tap flex items-center justify-center space-x-1.5 rtl:space-x-reverse ${
+                  questionCount === 'all'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/25 ring-2 ring-blue-400/40'
+                    : 'bg-white/80 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 border-slate-300 dark:border-zinc-700 hover:border-blue-500'
+                }`}
+              >
+                {questionCount === 'all' ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{t.test.allCategorySelected}</span>
+                  </>
+                ) : (
+                  <span>{t.test.selectFullCategory} ({matchingQuestionCount})</span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleLaunchSession('all')}
+                disabled={matchingQuestionCount === 0}
+                className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md shadow-blue-500/25 flex items-center justify-center space-x-1.5 rtl:space-x-reverse cursor-pointer apple-tap disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>{t.test.launchFullCategory}</span>
+              </button>
+            </div>
+          </div>
+
           {/* Practice Parameters */}
           {selectedMode === 'practice' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
@@ -401,7 +488,7 @@ export const TestHub: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
                   {t.test.questionCount}
                 </label>
-                <div className="grid grid-cols-4 gap-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
                   {[10, 20, 30, 50].map((num) => (
                     <button
                       key={num}
@@ -416,6 +503,17 @@ export const TestHub: React.FC = () => {
                       {num} {t.common.questions}
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => setQuestionCount('all')}
+                    className={`py-3 rounded-xl text-xs font-bold transition-all border cursor-pointer flex items-center justify-center space-x-1 rtl:space-x-reverse col-span-2 sm:col-span-1 ${
+                      questionCount === 'all'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/25 ring-2 ring-blue-400/40'
+                        : 'glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:border-blue-400'
+                    }`}
+                  >
+                    <span>{t.test.allCategoryOption} ({matchingQuestionCount})</span>
+                  </button>
                 </div>
               </div>
 
@@ -447,7 +545,7 @@ export const TestHub: React.FC = () => {
                     }`}
                   >
                     <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                    <span>{t.test.timedSprint} ({Math.ceil(questionCount * 1.5)}m)</span>
+                    <span>{t.test.timedSprint} ({Math.ceil(effectiveQuestionCount * 1.5)}m)</span>
                   </button>
                 </div>
               </div>
@@ -466,7 +564,9 @@ export const TestHub: React.FC = () => {
                 ? `50 ${t.common.questions} • 120 Mins ${t.test.mockMode}` 
                 : selectedMode === 'rapid' 
                 ? `${Math.min(matchingQuestionCount, 15)} ${t.test.highYieldOnly}` 
-                : `${Math.min(matchingQuestionCount, questionCount)} ${t.common.questions} • ${t.test.practiceMode}`}
+                : questionCount === 'all'
+                ? `${effectiveQuestionCount} ${t.common.questions} (${t.test.fullCategoryBadge}) • ${t.test.practiceMode}`
+                : `${effectiveQuestionCount} ${t.common.questions} • ${t.test.practiceMode}`}
             </span>
           </div>
           <p className="text-xs text-slate-400 font-normal">
@@ -475,7 +575,7 @@ export const TestHub: React.FC = () => {
         </div>
 
         <button
-          onClick={handleLaunchSession}
+          onClick={() => handleLaunchSession()}
           disabled={matchingQuestionCount === 0}
           className={`w-full sm:w-auto py-3.5 sm:py-4 px-6 sm:px-9 rounded-2xl text-sm font-black flex items-center justify-center space-x-3 transition-all duration-300 cursor-pointer shadow-xl relative z-10 apple-tap ${
             matchingQuestionCount === 0
