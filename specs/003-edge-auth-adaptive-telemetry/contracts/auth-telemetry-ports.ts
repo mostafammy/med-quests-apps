@@ -38,6 +38,7 @@ export interface SignInCredentials {
   readonly idToken?: string;
   readonly displayName?: string;
   readonly avatarUrl?: string | null;
+  readonly phoneNumber?: string | null;
   readonly claims?: Record<string, unknown>;
   readonly clientProfile: ClientCapabilityProfile;
 }
