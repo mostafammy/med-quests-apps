@@ -15,6 +15,7 @@ import {
 import {
   extractEdgeNetworkTelemetry,
   parseDeviceHeaderProfile,
+  computeDeterministicDeviceSessionId,
 } from '../telemetryParser.ts';
 import {
   SessionAnomalyDetectorService,
@@ -491,5 +492,120 @@ describe('Enterprise Governance, Per-User AI Activation/Exclusion & Cohort Analy
     });
     expect(customRecord.entitlements.ai_cloud_streaming_quota).toBe(true);
     expect(customRecord.dailyAiRequestsLimit).toBeGreaterThanOrEqual(50);
+  });
+});
+
+describe('Device Intelligence & Economic vs. Luxury Market Tier Classification', () => {
+  it('classifies Samsung Galaxy S24 Ultra (SM-S928B) as Flagship / Luxury', () => {
+    const req = {
+      headers: new Headers({
+        'user-agent':
+          'Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
+        'sec-ch-ua-mobile': '?1',
+      }),
+    };
+    const profile = parseDeviceHeaderProfile(req, {
+      gpuRenderer: 'Adreno (TM) 750',
+      deviceMemoryGb: 8,
+      logicalCpuCores: 8,
+      devicePixelRatio: 3,
+      screenWidth: 412,
+      screenHeight: 915,
+    });
+
+    expect(profile.osName).toBe('Android');
+    expect(profile.deviceCategory).toBe('mobile');
+    expect(profile.deviceBrand).toBe('Samsung');
+    expect(profile.deviceModelCode).toBe('SM-S928B');
+    expect(profile.deviceName).toContain('Samsung Galaxy S24 Ultra');
+    expect(profile.marketTier).toBe('flagship-luxury');
+    expect(profile.marketTierLabel).toBe('Flagship / Luxury');
+  });
+
+  it('classifies Samsung Galaxy A05 (SM-A055F) with Mali-G52 GPU as Economical / Budget', () => {
+    const req = {
+      headers: new Headers({
+        'user-agent':
+          'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
+        'sec-ch-ua-mobile': '?1',
+        'sec-ch-ua-model': '"SM-A055F"',
+        'sec-ch-ua-platform-version': '"14.0.0"',
+      }),
+    };
+    const profile = parseDeviceHeaderProfile(req, {
+      gpuRenderer: 'Mali-G52 MC2',
+      deviceMemoryGb: 4,
+      logicalCpuCores: 8,
+      devicePixelRatio: 1.75,
+      screenWidth: 384,
+      screenHeight: 854,
+    });
+
+    expect(profile.osName).toBe('Android');
+    expect(profile.osVersion).toBe('14.0.0');
+    expect(profile.deviceBrand).toBe('Samsung');
+    expect(profile.deviceModelCode).toBe('SM-A055F');
+    expect(profile.deviceName).toContain('Samsung Galaxy A05');
+    expect(profile.marketTier).toBe('economical');
+    expect(profile.marketTierLabel).toBe('Economical / Budget');
+  });
+
+  it('classifies Apple MacBook Air with Apple Silicon GPU as Flagship / Luxury', () => {
+    const req = {
+      headers: new Headers({
+        'user-agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      }),
+    };
+    const profile = parseDeviceHeaderProfile(req, {
+      gpuRenderer: 'ANGLE (Apple, ANGLE Metal Renderer: Apple M2, Unspecified Version)',
+      deviceMemoryGb: 8,
+      logicalCpuCores: 8,
+      devicePixelRatio: 2,
+      screenWidth: 1470,
+      screenHeight: 956,
+    });
+
+    expect(profile.osName).toBe('macOS');
+    expect(profile.deviceCategory).toBe('desktop');
+    expect(profile.deviceBrand).toBe('Apple');
+    expect(profile.deviceName).toContain('Apple MacBook Air');
+    expect(profile.deviceName).toContain('Apple M2');
+    expect(profile.marketTier).toBe('flagship-luxury');
+  });
+
+  it('generates distinct deterministic session IDs for Android vs MacBook Air on the same user', () => {
+    const androidProfile = parseDeviceHeaderProfile(
+      {
+        headers: new Headers({
+          'user-agent':
+            'Mozilla/5.0 (Linux; Android 14; SM-S928B) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36',
+        }),
+      },
+      { screenWidth: 412, screenHeight: 915 }
+    );
+
+    const macProfile = parseDeviceHeaderProfile(
+      {
+        headers: new Headers({
+          'user-agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36',
+        }),
+      },
+      { gpuRenderer: 'Apple M2', screenWidth: 1470, screenHeight: 956 }
+    );
+
+    const androidSessionId = computeDeterministicDeviceSessionId('usr_owner_1', androidProfile, {
+      screenWidth: 412,
+      screenHeight: 915,
+    });
+    const macSessionId = computeDeterministicDeviceSessionId('usr_owner_1', macProfile, {
+      screenWidth: 1470,
+      screenHeight: 956,
+    });
+
+    expect(androidSessionId).not.toBe(macSessionId);
+    expect(androidSessionId.startsWith('ses_android_')).toBe(true);
+    expect(macSessionId.startsWith('ses_macos_')).toBe(true);
   });
 });
