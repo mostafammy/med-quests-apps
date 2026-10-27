@@ -14,6 +14,20 @@ export interface TopicStat {
   status: 'critical' | 'weak' | 'developing' | 'mastered' | 'unattempted';
 }
 
+export interface ScopeCoverageSummary {
+  total: number;
+  answered: number;
+  unanswered: number;
+  correct: number;
+  incorrect: number;
+  accuracy: number;
+  percentComplete: number;
+  unansweredIds: string[];
+  answeredIds: string[];
+  incorrectIds: string[];
+  correctIds: string[];
+}
+
 export interface StatsState {
   totalAttempts: number;
   totalAnsweredQuestions: number;
@@ -23,11 +37,22 @@ export interface StatsState {
   dueReviewsCount: number;
   topicStats: TopicStat[];
   mistakeQuestionIds: string[];
+  answeredQuestionIds: string[];
+  correctQuestionIds: string[];
   isLoading: boolean;
 
   // Actions
   refreshStats: (questions: Question[]) => Promise<void>;
   resetStats: (questions?: Question[]) => Promise<void>;
+  resetSubjectStats: (subjectId: string, questions?: Question[]) => Promise<void>;
+  getScopeCoverage: (
+    questions: Question[],
+    filter?: {
+      subjectId?: string;
+      chapterId?: string;
+      highYieldOnly?: boolean;
+    }
+  ) => ScopeCoverageSummary;
 }
 
 export const useStatsStore = create<StatsState>((set, get) => ({
@@ -39,6 +64,8 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   dueReviewsCount: 0,
   topicStats: [],
   mistakeQuestionIds: [],
+  answeredQuestionIds: [],
+  correctQuestionIds: [],
   isLoading: false,
 
   refreshStats: async (questions: Question[]) => {
@@ -68,6 +95,8 @@ export const useStatsStore = create<StatsState>((set, get) => ({
           dueReviewsCount: reviewCards.length,
           topicStats: initialTopicStats,
           mistakeQuestionIds: [],
+          answeredQuestionIds: [],
+          correctQuestionIds: [],
           isLoading: false,
         });
         return;
@@ -86,15 +115,22 @@ export const useStatsStore = create<StatsState>((set, get) => ({
       const correctAttempts = attempts.filter((a) => a.isCorrect === true).length;
       const overallAccuracy = totalAttempts > 0 ? Math.round((correctAttempts / totalAttempts) * 100) : 0;
 
-      // Identify mistake questions (most recent attempt was incorrect)
+      // Identify question statuses (most recent attempt)
+      const answeredQuestionIds: string[] = [];
+      const correctQuestionIds: string[] = [];
       const mistakeQuestionIds: string[] = [];
       attemptsByQuestion.forEach((qAttempts, qId) => {
+        answeredQuestionIds.push(qId);
         // Sort descending by answeredAt
         const sorted = [...qAttempts].sort((a, b) => 
           new Date(b.answeredAt).getTime() - new Date(a.answeredAt).getTime()
         );
-        if (sorted[0] && sorted[0].isCorrect === false) {
-          mistakeQuestionIds.push(qId);
+        if (sorted[0]) {
+          if (sorted[0].isCorrect === true) {
+            correctQuestionIds.push(qId);
+          } else if (sorted[0].isCorrect === false) {
+            mistakeQuestionIds.push(qId);
+          }
         }
       });
 
@@ -169,11 +205,67 @@ export const useStatsStore = create<StatsState>((set, get) => ({
         dueReviewsCount: reviewCards.length,
         topicStats,
         mistakeQuestionIds,
+        answeredQuestionIds,
+        correctQuestionIds,
         isLoading: false,
       });
     } catch {
       set({ isLoading: false });
     }
+  },
+
+  getScopeCoverage: (questions: Question[], filter) => {
+    const { answeredQuestionIds, correctQuestionIds, mistakeQuestionIds } = get();
+    const answeredSet = new Set(answeredQuestionIds);
+    const correctSet = new Set(correctQuestionIds);
+    const incorrectSet = new Set(mistakeQuestionIds);
+
+    const scopeQuestions = questions.filter((q) => {
+      if (filter?.subjectId && filter.subjectId !== 'all' && q.subjectId !== filter.subjectId) return false;
+      if (filter?.chapterId && filter.chapterId !== 'all' && q.chapterId !== filter.chapterId) return false;
+      if (filter?.highYieldOnly && !q.highYield) return false;
+      return true;
+    });
+
+    const unansweredIds: string[] = [];
+    const answeredIds: string[] = [];
+    const correctIds: string[] = [];
+    const incorrectIds: string[] = [];
+
+    for (const q of scopeQuestions) {
+      if (answeredSet.has(q.id)) {
+        answeredIds.push(q.id);
+        if (incorrectSet.has(q.id)) {
+          incorrectIds.push(q.id);
+        } else if (correctSet.has(q.id)) {
+          correctIds.push(q.id);
+        }
+      } else {
+        unansweredIds.push(q.id);
+      }
+    }
+
+    const total = scopeQuestions.length;
+    const answered = answeredIds.length;
+    const unanswered = unansweredIds.length;
+    const correct = correctIds.length;
+    const incorrect = incorrectIds.length;
+    const accuracy = answered > 0 ? Math.round((correct / answered) * 100) : 0;
+    const percentComplete = total > 0 ? Math.round((answered / total) * 100) : 0;
+
+    return {
+      total,
+      answered,
+      unanswered,
+      correct,
+      incorrect,
+      accuracy,
+      percentComplete,
+      unansweredIds,
+      answeredIds,
+      incorrectIds,
+      correctIds,
+    };
   },
 
   resetStats: async (questions = []) => {
@@ -184,6 +276,21 @@ export const useStatsStore = create<StatsState>((set, get) => ({
       await db.reviewCards.clear();
 
       // Refresh to zero
+      await get().refreshStats(questions);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  resetSubjectStats: async (subjectId: string, questions = []) => {
+    set({ isLoading: true });
+    try {
+      const subjectQIds = new Set(
+        questions.filter((q) => q.subjectId === subjectId).map((q) => q.id)
+      );
+      if (subjectQIds.size > 0) {
+        await db.attempts.where('questionId').anyOf(Array.from(subjectQIds)).delete();
+      }
       await get().refreshStats(questions);
     } finally {
       set({ isLoading: false });
