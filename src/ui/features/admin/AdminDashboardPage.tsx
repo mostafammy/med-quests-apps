@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Shield,
   Sliders,
@@ -13,6 +13,8 @@ import {
   Trash2,
   CheckCircle2,
   BookOpen,
+  Laptop,
+  Smartphone,
 } from 'lucide-react';
 import { QuestionBankGovernancePanel } from './QuestionBankGovernancePanel.tsx';
 import { useAuthStore, type GovernanceViewTab } from '../../../application/stores/useAuthStore.ts';
@@ -68,7 +70,12 @@ export const AdminDashboardPage: React.FC = () => {
     setUserRestriction,
     signInWithGoogle,
     purgeDemoData,
+    revalidate,
   } = useAuthStore();
+
+  useEffect(() => {
+    void revalidate();
+  }, [revalidate]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
@@ -489,9 +496,17 @@ export const AdminDashboardPage: React.FC = () => {
                         {u.role}
                       </span>
                     </div>
-                    <div className="text-[11px] text-zinc-500 truncate">{u.email}</div>
+                    <div className="text-[11px] text-zinc-500 truncate">
+                      {u.email}
+                      {u.phoneNumber ? ` • 📞 ${u.phoneNumber}` : ''}
+                    </div>
                     <div className="mt-1 flex items-center justify-between text-[10px] text-zinc-400">
-                      <span>{record.studyTelemetry.totalAttempts} attempts</span>
+                      <span>
+                        {record.activeSessions.length} device{record.activeSessions.length === 1 ? '' : 's'} •{' '}
+                        {record.activeSessions[0]?.device.deviceName ||
+                          record.activeSessions[0]?.device.osName ||
+                          'No active session'}
+                      </span>
                       <span className={isAiAllowed ? 'text-indigo-600 font-bold' : 'text-zinc-400'}>
                         {isAiAllowed ? 'AI Cloud Enabled' : 'AI Excluded'}
                       </span>
@@ -511,7 +526,11 @@ export const AdminDashboardPage: React.FC = () => {
                     <h3 className="font-heading text-base font-bold text-zinc-900 dark:text-zinc-100">
                       {targetUser.displayName}
                     </h3>
-                    <p className="text-xs text-zinc-500">{targetUser.email} • {targetUser.universityName}</p>
+                    <p className="text-xs text-zinc-500">
+                      {targetUser.email}
+                      {targetUser.phoneNumber ? ` • 📞 ${targetUser.phoneNumber}` : ''} •{' '}
+                      {targetUser.universityName}
+                    </p>
                   </div>
                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
                     targetUser.restriction.status === 'active'
@@ -520,6 +539,91 @@ export const AdminDashboardPage: React.FC = () => {
                   }`}>
                     {targetUser.restriction.status}
                   </span>
+                </div>
+
+                {/* Linked Devices & Economic / Luxury Market Tier Intelligence */}
+                <div className="space-y-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase text-zinc-400">
+                      Linked Devices & Hardware Market Tier ({selectedRecord?.activeSessions.length ?? 0})
+                    </h4>
+                    <span className="text-[10px] font-mono text-indigo-500">
+                      Synced with Cloudflare D1
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {(selectedRecord?.activeSessions ?? []).map((sess) => {
+                      const isDesktop = sess.device.deviceCategory === 'desktop';
+                      const tierBadgeColor =
+                        sess.device.marketTier === 'flagship-luxury'
+                          ? 'border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                          : sess.device.marketTier === 'upper-midrange'
+                          ? 'border-indigo-500/40 bg-indigo-500/15 text-indigo-700 dark:text-indigo-300'
+                          : sess.device.marketTier === 'economical'
+                          ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                          : 'border-blue-500/40 bg-blue-500/15 text-blue-700 dark:text-blue-300';
+
+                      return (
+                        <div
+                          key={sess.sessionId}
+                          className="rounded-xl border border-zinc-200/70 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-850 p-3 text-xs space-y-1.5"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              {isDesktop ? (
+                                <Laptop className="h-4 w-4 text-indigo-500" />
+                              ) : (
+                                <Smartphone className="h-4 w-4 text-emerald-500" />
+                              )}
+                              <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                                {sess.device.deviceName || `${sess.device.osName} • ${sess.device.browserName}`}
+                              </span>
+                              {sess.device.deviceModelCode && (
+                                <span className="rounded bg-zinc-200/80 dark:bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] font-bold">
+                                  {sess.device.deviceModelCode}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${tierBadgeColor}`}
+                              >
+                                {sess.device.marketTierLabel || 'Mid-Range Mainstream'}
+                              </span>
+                              {sess.device.estimatedPriceSegment && (
+                                <span className="font-mono text-[10px] text-zinc-500">
+                                  {sess.device.estimatedPriceSegment}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+                            <span>
+                              OS: <strong>{sess.device.osName} {sess.device.osVersion || ''}</strong>
+                            </span>
+                            <span>
+                              Browser: <strong>{sess.device.browserName} {sess.device.browserVersion || ''}</strong>
+                            </span>
+                            {sess.device.gpuRenderer && (
+                              <span>
+                                GPU: <strong>{sess.device.gpuRenderer}</strong>
+                              </span>
+                            )}
+                            {sess.hardwareProfile && (
+                              <span>
+                                Hardware: <strong>{sess.hardwareProfile.logicalCpuCores} Cores{sess.hardwareProfile.deviceMemoryGb ? ` / ${sess.hardwareProfile.deviceMemoryGb}GB RAM` : ''}</strong>
+                              </span>
+                            )}
+                            <span>
+                              Edge: <strong>{sess.edgeNetwork.colo} ({sess.edgeNetwork.city || sess.edgeNetwork.countryCode}) • {sess.edgeNetwork.ipAddress}</strong>
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Per-User Feature Overrides */}
