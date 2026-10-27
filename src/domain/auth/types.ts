@@ -46,6 +46,14 @@ export const DeviceCategorySchema = z.enum([
 ]);
 export type DeviceCategory = z.infer<typeof DeviceCategorySchema>;
 
+export const DeviceMarketTierSchema = z.enum([
+  'flagship-luxury',
+  'upper-midrange',
+  'mid-range',
+  'economical',
+]);
+export type DeviceMarketTier = z.infer<typeof DeviceMarketTierSchema>;
+
 export const ParsedDeviceProfileSchema = z.object({
   deviceCategory: DeviceCategorySchema,
   osName: z.string(),
@@ -57,6 +65,14 @@ export const ParsedDeviceProfileSchema = z.object({
   isMobileHint: z.boolean(),
   preferredLanguage: z.string(),
   rawUserAgent: z.string(),
+  // Enriched Hardware & Market Tier Intelligence
+  deviceName: z.string().optional(),
+  deviceBrand: z.string().optional(),
+  deviceModelCode: z.string().nullable().optional(),
+  gpuRenderer: z.string().nullable().optional(),
+  marketTier: DeviceMarketTierSchema.optional(),
+  marketTierLabel: z.string().optional(),
+  estimatedPriceSegment: z.string().optional(),
 });
 export type ParsedDeviceProfile = z.infer<typeof ParsedDeviceProfileSchema>;
 
@@ -132,6 +148,11 @@ export const ClientCapabilityProfileSchema = z.object({
   computedTier: PerformanceTierSchema,
   activeTier: PerformanceTierSchema,
   probedAt: z.string(),
+  gpuRenderer: z.string().nullable().optional(),
+  gpuVendor: z.string().nullable().optional(),
+  detectedModelCode: z.string().nullable().optional(),
+  detectedPlatformVersion: z.string().nullable().optional(),
+  detectedCpuArch: z.string().nullable().optional(),
 });
 export type ClientCapabilityProfile = z.infer<typeof ClientCapabilityProfileSchema>;
 
