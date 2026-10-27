@@ -224,6 +224,24 @@ export interface TranslationDictionary {
     readonly launchPractice: string;
     readonly launchMock: string;
     readonly launchRapid: string;
+    readonly repetitionFilterTitle: string;
+    readonly repetitionFilterSub: string;
+    readonly filterUnanswered: string;
+    readonly filterUnansweredDesc: string;
+    readonly filterAllPool: string;
+    readonly filterAllPoolDesc: string;
+    readonly filterIncorrectOnly: string;
+    readonly filterIncorrectOnlyDesc: string;
+    readonly freshQuestionsRemaining: string;
+    readonly continueBankTitle: string;
+    readonly continueBankDesc: string;
+    readonly continueBankCta: string;
+    readonly reviewMissedCta: string;
+    readonly bankCompletedCelebration: string;
+    readonly bankCompletedCelebrationDesc: string;
+    readonly restartCategoryBtn: string;
+    readonly resetSubjectProgressBtn: string;
+    readonly zeroDuplicatesBadge: string;
     readonly quickPractice: {
       readonly title: string;
       readonly subtitle: string;
