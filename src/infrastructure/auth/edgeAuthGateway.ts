@@ -13,7 +13,14 @@ import {
   type ManagedUserRecord,
   type SecurityAuditLogEntry,
 } from '../../domain/auth/governanceAnalytics.ts';
-import { probeClientCapabilities } from './clientCapabilityProbe.ts';
+import {
+  probeClientCapabilities,
+  probeClientCapabilitiesAsync,
+} from './clientCapabilityProbe.ts';
+import {
+  resolveBrowserDeviceProfile,
+  computeDeterministicDeviceSessionId,
+} from '../../domain/auth/telemetryParser.ts';
 import { detectSessionAnomalies } from '../../domain/auth/anomalyDetector.ts';
 import { db } from '../storage/db.ts';
 import { mergeLocalProgressIntoAccount } from '../../domain/auth/progressMerge.ts';
@@ -97,9 +104,38 @@ export class EdgeAuthGateway implements AuthGatewayPort {
 
       if (storedUser && storedSession) {
         const user = JSON.parse(storedUser) as UserProfile;
-        const currentSession = JSON.parse(storedSession) as ActiveDeviceSession;
-        const activeSessions = storedAllSessions ? (JSON.parse(storedAllSessions) as ActiveDeviceSession[]) : [currentSession];
+        const rawStoredSession = JSON.parse(storedSession) as ActiveDeviceSession;
         const clientProfile = probeClientCapabilities('auto');
+        const liveDevice = resolveBrowserDeviceProfile(clientProfile);
+        const deterministicSessionId = computeDeterministicDeviceSessionId(
+          user.id,
+          liveDevice,
+          clientProfile
+        );
+
+        // Self-heal current session with real browser hardware & User-Agent intelligence
+        const currentSession: ActiveDeviceSession = {
+          ...rawStoredSession,
+          sessionId: deterministicSessionId,
+          userId: user.id,
+          isCurrentDevice: true,
+          device: liveDevice,
+          clientTimezone: clientProfile.clientTimezone,
+          clientTier: clientProfile.activeTier,
+          hardwareProfile: clientProfile,
+        };
+
+        const rawAllSessions = storedAllSessions
+          ? (JSON.parse(storedAllSessions) as ActiveDeviceSession[])
+          : [];
+        const otherSessions = rawAllSessions
+          .filter(
+            (s) =>
+              s.sessionId !== deterministicSessionId &&
+              s.sessionId !== rawStoredSession.sessionId
+          )
+          .map((s) => ({ ...s, isCurrentDevice: false }));
+        const activeSessions: ActiveDeviceSession[] = [currentSession, ...otherSessions];
 
         if (user.restriction.status === 'blocked') {
           this.inMemoryState = {
@@ -132,55 +168,149 @@ export class EdgeAuthGateway implements AuthGatewayPort {
   }
 
   public async revalidateEdgeSession(_signal?: AbortSignal): Promise<Result<AuthState, AuthDomainError>> {
+    // 1. Resolve async high-entropy Client Hints (exact Android model code, platformVersion, arch)
+    const clientProfile = await probeClientCapabilitiesAsync('auto');
+    const liveDevice = resolveBrowserDeviceProfile(clientProfile);
+
     const currentState = this.getInitialOptimisticState();
     if (currentState.status === 'anonymous-guest') {
-      return ok(currentState);
-    }
-
-    // Try Cloudflare Worker edge endpoint if session token exists
-    const token = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.TOKEN) : null;
-    if (token) {
-      try {
-        const response = await fetch('/api/auth/session', {
-          headers: {
-            Accept: 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (response.status === 401 || response.status === 403) {
-          // Token expired or revoked on edge
-          await this.signOut();
-          const sessionId =
-            'currentSession' in currentState
-              ? currentState.currentSession.sessionId
-              : 'session_revoked';
-          return err({
-            code: 'SESSION_EXPIRED_OR_REVOKED',
-            sessionId,
-          });
-        } else if (response.ok) {
-          const remoteData = (await response.json()) as { status: string; role?: string };
-          if (remoteData.status === 'authenticated-active') {
-            return ok(currentState);
-          }
-        }
-      } catch {
-        // Offline or edge unreachable: preserve optimistic local session
-      }
-    }
-
-    // Edge simulation check: verify restriction status
-    if (currentState.status === 'authenticated-active' && currentState.user.restriction.status === 'blocked') {
-      const blockedState: AuthState = {
-        status: 'account-blocked',
-        user: currentState.user,
-        restriction: currentState.user.restriction,
-        edgeNetwork: currentState.currentSession.edgeNetwork,
-        clientProfile: currentState.clientProfile,
+      const updatedGuest: AuthState = {
+        ...currentState,
+        clientProfile,
       };
-      this.inMemoryState = blockedState;
-      return err({ code: 'ACCOUNT_BLOCKED', restriction: currentState.user.restriction });
+      this.inMemoryState = updatedGuest;
+      return ok(updatedGuest);
+    }
+
+    if (currentState.status === 'authenticated-active') {
+      const deterministicSessionId = computeDeterministicDeviceSessionId(
+        currentState.user.id,
+        liveDevice,
+        clientProfile
+      );
+      let updatedCurrentSession: ActiveDeviceSession = {
+        ...currentState.currentSession,
+        sessionId: deterministicSessionId,
+        device: liveDevice,
+        clientTimezone: clientProfile.clientTimezone,
+        clientTier: clientProfile.activeTier,
+        hardwareProfile: clientProfile,
+        lastVerifiedAt: new Date().toISOString(),
+      };
+
+      const token = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.TOKEN) : null;
+      if (typeof window !== 'undefined') {
+        try {
+          const response = await fetch('/api/auth/session', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              userId: currentState.user.id,
+              email: currentState.user.email,
+              displayName: currentState.user.displayName,
+              role: currentState.user.role,
+              sessionId: deterministicSessionId,
+              deviceProfile: liveDevice,
+              hardwareProfile: clientProfile,
+            }),
+          });
+
+          if (response.status === 401 || response.status === 403) {
+            await this.signOut();
+            return err({
+              code: 'SESSION_EXPIRED_OR_REVOKED',
+              sessionId: deterministicSessionId,
+            });
+          } else if (response.ok) {
+            const remoteData = (await response.json()) as {
+              status: string;
+              role?: UserRole;
+              phoneNumber?: string | null;
+              edgeNetwork?: EdgeNetworkTelemetry;
+              activeSessions?: ActiveDeviceSession[];
+            };
+
+            if (remoteData.edgeNetwork) {
+              updatedCurrentSession = {
+                ...updatedCurrentSession,
+                edgeNetwork: remoteData.edgeNetwork,
+              };
+            }
+
+            const remoteSessions = Array.isArray(remoteData.activeSessions)
+              ? remoteData.activeSessions.map((s) => ({
+                  ...s,
+                  isCurrentDevice: s.sessionId === deterministicSessionId,
+                }))
+              : [];
+
+            const mergedSessions = [
+              updatedCurrentSession,
+              ...remoteSessions.filter((s) => s.sessionId !== deterministicSessionId),
+            ];
+
+            const updatedUser: UserProfile = {
+              ...currentState.user,
+              role: remoteData.role ?? currentState.user.role,
+              phoneNumber:
+                remoteData.phoneNumber !== undefined
+                  ? remoteData.phoneNumber
+                  : currentState.user.phoneNumber,
+            };
+
+            const nextState: AuthState = {
+              ...currentState,
+              user: updatedUser,
+              currentSession: updatedCurrentSession,
+              activeSessions: mergedSessions,
+              entitlements: resolveFeatureEntitlements(
+                updatedUser.role,
+                updatedUser.customFeatureOverrides
+              ),
+              clientProfile,
+              syncStatus: 'synced',
+            };
+            this.inMemoryState = nextState;
+            this.persistLocalSession(updatedUser, updatedCurrentSession, mergedSessions);
+            return ok(nextState);
+          }
+        } catch {
+          // Offline or edge unreachable: preserve optimistic local session with updated live device
+        }
+      }
+
+      const fallbackSessions = [
+        updatedCurrentSession,
+        ...currentState.activeSessions
+          .filter((s) => s.sessionId !== deterministicSessionId)
+          .map((s) => ({ ...s, isCurrentDevice: false })),
+      ];
+      const nextLocalState: AuthState = {
+        ...currentState,
+        currentSession: updatedCurrentSession,
+        activeSessions: fallbackSessions,
+        clientProfile,
+      };
+      this.inMemoryState = nextLocalState;
+      this.persistLocalSession(currentState.user, updatedCurrentSession, fallbackSessions);
+
+      if (currentState.user.restriction.status === 'blocked') {
+        const blockedState: AuthState = {
+          status: 'account-blocked',
+          user: currentState.user,
+          restriction: currentState.user.restriction,
+          edgeNetwork: updatedCurrentSession.edgeNetwork,
+          clientProfile,
+        };
+        this.inMemoryState = blockedState;
+        return err({ code: 'ACCOUNT_BLOCKED', restriction: currentState.user.restriction });
+      }
+
+      return ok(nextLocalState);
     }
 
     return ok(currentState);
@@ -303,22 +433,18 @@ export class EdgeAuthGateway implements AuthGatewayPort {
       capturedAt: nowIso,
     };
 
+    const liveDevice = resolveBrowserDeviceProfile(clientProfile);
+    const deterministicSessionId = computeDeterministicDeviceSessionId(
+      user.id,
+      liveDevice,
+      clientProfile
+    );
+
     const currentSession: ActiveDeviceSession = {
-      sessionId: `ses_${Math.random().toString(36).substring(2, 12)}`,
+      sessionId: deterministicSessionId,
       userId: user.id,
       isCurrentDevice: true,
-      device: {
-        deviceCategory: 'desktop',
-        osName: 'macOS',
-        osVersion: '15.1',
-        browserName: 'Chrome',
-        browserVersion: '131.0',
-        browserEngine: 'Blink',
-        cpuArchitecture: 'arm64',
-        isMobileHint: false,
-        preferredLanguage: 'en-US',
-        rawUserAgent: navigator.userAgent,
-      },
+      device: liveDevice,
       edgeNetwork,
       clientTimezone: clientProfile.clientTimezone,
       clientTier: clientProfile.activeTier,
@@ -337,25 +463,18 @@ export class EdgeAuthGateway implements AuthGatewayPort {
       existingSessions: [],
       userRole: user.role,
     });
-    const sessionWithAnomalies = { ...currentSession, anomalyFlags: [...anomalyFlags] };
+    let sessionWithAnomalies: ActiveDeviceSession = {
+      ...currentSession,
+      anomalyFlags: [...anomalyFlags],
+    };
 
     // Execute CRDT Progress Merge from local IndexedDB
     const syncSummary = await this.performProgressMerge();
 
-    const state: AuthState = {
-      status: 'authenticated-active',
-      user,
-      currentSession: sessionWithAnomalies,
-      activeSessions: [sessionWithAnomalies],
-      entitlements: resolveFeatureEntitlements(user.role),
-      clientProfile,
-      syncStatus: 'synced',
-    };
+    let allActiveSessions: ActiveDeviceSession[] = [sessionWithAnomalies];
+    let hydratedUser: UserProfile = user;
 
-    this.persistLocalSession(user, sessionWithAnomalies, [sessionWithAnomalies]);
-    this.inMemoryState = state;
-
-    // Edge dual-write: persist session in Cloudflare D1 / Workers KV
+    // Edge dual-write: persist session & device hardware telemetry in Cloudflare D1 / Workers KV
     if (typeof window !== 'undefined') {
       try {
         const edgeRes = await fetch('/api/auth/oauth/google', {
@@ -363,6 +482,9 @@ export class EdgeAuthGateway implements AuthGatewayPort {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             idToken: credentials.idToken,
+            sessionId: deterministicSessionId,
+            deviceProfile: liveDevice,
+            hardwareProfile: clientProfile,
             claims: {
               sub: user.id,
               email: user.email,
@@ -373,15 +495,56 @@ export class EdgeAuthGateway implements AuthGatewayPort {
         });
 
         if (edgeRes.ok) {
-          const edgeData = (await edgeRes.json()) as { sessionToken?: string };
+          const edgeData = (await edgeRes.json()) as {
+            sessionToken?: string;
+            user?: Partial<UserProfile>;
+            edgeNetwork?: EdgeNetworkTelemetry;
+            activeSessions?: ActiveDeviceSession[];
+          };
           if (edgeData.sessionToken) {
             localStorage.setItem(STORAGE_KEYS.TOKEN, edgeData.sessionToken);
+          }
+          if (edgeData.user?.phoneNumber) {
+            hydratedUser = {
+              ...hydratedUser,
+              phoneNumber: edgeData.user.phoneNumber,
+            };
+          }
+          if (edgeData.edgeNetwork) {
+            sessionWithAnomalies = {
+              ...sessionWithAnomalies,
+              edgeNetwork: edgeData.edgeNetwork,
+            };
+          }
+          if (Array.isArray(edgeData.activeSessions) && edgeData.activeSessions.length > 0) {
+            const remoteOthers = edgeData.activeSessions
+              .filter((s) => s.sessionId !== deterministicSessionId)
+              .map((s) => ({ ...s, isCurrentDevice: false }));
+            allActiveSessions = [sessionWithAnomalies, ...remoteOthers];
+          } else {
+            allActiveSessions = [sessionWithAnomalies];
           }
         }
       } catch {
         // Safe offline simulator fallback
       }
     }
+
+    const state: AuthState = {
+      status: 'authenticated-active',
+      user: hydratedUser,
+      currentSession: sessionWithAnomalies,
+      activeSessions: allActiveSessions,
+      entitlements: resolveFeatureEntitlements(
+        hydratedUser.role,
+        hydratedUser.customFeatureOverrides
+      ),
+      clientProfile,
+      syncStatus: 'synced',
+    };
+
+    this.persistLocalSession(hydratedUser, sessionWithAnomalies, allActiveSessions);
+    this.inMemoryState = state;
 
     return ok({ state, syncSummary });
   }
@@ -455,6 +618,18 @@ export class EdgeAuthGateway implements AuthGatewayPort {
     const updatedSessions = current.activeSessions.filter((s) => s.sessionId !== sessionId);
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.ALL_SESSIONS, JSON.stringify(updatedSessions));
+      try {
+        await fetch('/api/auth/session/revoke', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: current.user.id,
+            sessionId,
+          }),
+        });
+      } catch {
+        // Offline fallback
+      }
     }
 
     this.inMemoryState = {
@@ -590,6 +765,89 @@ export class EdgeAuthGateway implements AuthGatewayPort {
     }
 
     return this.managedUsersCache;
+  }
+
+  public async syncManagedUsersFromEdge(): Promise<readonly ManagedUserRecord[]> {
+    if (typeof window === 'undefined') {
+      return this.getManagedUsers();
+    }
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        headers: { Accept: 'application/json' },
+      });
+      if (res.ok) {
+        const data = (await res.json()) as {
+          users?: Array<{
+            profile: UserProfile;
+            activeSessions: ActiveDeviceSession[];
+          }>;
+        };
+
+        if (Array.isArray(data.users) && data.users.length > 0) {
+          const existingList = [...this.getManagedUsers()];
+          const currentAuth = this.getInitialOptimisticState();
+          const currentSessionId =
+            currentAuth.status === 'authenticated-active'
+              ? currentAuth.currentSession.sessionId
+              : null;
+
+          const mergedRecords: ManagedUserRecord[] = [];
+          for (const remoteUser of data.users) {
+            const existing = existingList.find(
+              (u) =>
+                u.profile.id === remoteUser.profile.id ||
+                u.profile.email.toLowerCase() === remoteUser.profile.email.toLowerCase()
+            );
+
+            const sessionsWithCurrentFlag = remoteUser.activeSessions.map((s) => ({
+              ...s,
+              isCurrentDevice: currentSessionId ? s.sessionId === currentSessionId : false,
+            }));
+
+            // If this is the currently logged-in user, ensure their live current session is included
+            if (
+              currentAuth.status === 'authenticated-active' &&
+              (currentAuth.user.id === remoteUser.profile.id ||
+                currentAuth.user.email.toLowerCase() === remoteUser.profile.email.toLowerCase())
+            ) {
+              const hasCurrent = sessionsWithCurrentFlag.some(
+                (s) => s.sessionId === currentAuth.currentSession.sessionId
+              );
+              if (!hasCurrent) {
+                sessionsWithCurrentFlag.unshift(currentAuth.currentSession);
+              }
+            }
+
+            mergedRecords.push(
+              buildManagedUserRecord({
+                profile: remoteUser.profile,
+                studyTelemetry: existing?.studyTelemetry ?? {
+                  totalAttempts: remoteUser.profile.role === 'admin' ? 1250 : 120,
+                  overallAccuracy: remoteUser.profile.role === 'admin' ? 98 : 84,
+                  masteryPercentage: remoteUser.profile.role === 'admin' ? 99 : 78,
+                  weakTopicsCount: 0,
+                  dueReviewsCount: 2,
+                  dailyAiRequestsUsed: 4,
+                  favoriteSubspecialty: 'Clinical Cardiology & Hemodynamics',
+                },
+                activeSessions:
+                  sessionsWithCurrentFlag.length > 0
+                    ? sessionsWithCurrentFlag
+                    : existing?.activeSessions ?? [],
+              })
+            );
+          }
+
+          this.managedUsersCache = mergedRecords;
+          this.persistManagedDirectory();
+        }
+      }
+    } catch {
+      // Offline fallback preserves local cache
+    }
+
+    return this.getManagedUsers();
   }
 
   public getAuditLogs(): readonly SecurityAuditLogEntry[] {
@@ -884,87 +1142,14 @@ export class EdgeAuthGateway implements AuthGatewayPort {
 }
 
 function createInitialCohortDirectory(): ManagedUserRecord[] {
-  const nowIso = '2026-10-24T17:30:00.000Z';
-
-  const makeSession = (params: {
-    sessionId: string;
-    userId: string;
-    colo: string;
-    city: string;
-    countryCode: string;
-    countryName: string;
-    osName: string;
-    browserName: string;
-    deviceCategory: 'desktop' | 'tablet' | 'mobile';
-    tier: 'ultra' | 'balanced' | 'low-spec';
-    latencyMs: number;
-    anomalyFlags?: ('impossible_travel_geo_shift' | 'excessive_concurrent_devices' | 'high_threat_ip_score')[];
-  }): ActiveDeviceSession => ({
-    sessionId: params.sessionId,
-    userId: params.userId,
-    isCurrentDevice: false,
-    device: {
-      deviceCategory: params.deviceCategory,
-      osName: params.osName,
-      osVersion: '18.1',
-      browserName: params.browserName,
-      browserVersion: '131.0',
-      browserEngine: params.osName === 'iOS' || params.osName === 'macOS' ? 'WebKit' : 'Blink',
-      cpuArchitecture: 'arm64',
-      isMobileHint: params.deviceCategory !== 'desktop',
-      preferredLanguage: 'en-US',
-      rawUserAgent: 'Mozilla/5.0',
-    },
-    edgeNetwork: {
-      ipAddress: '156.208.11.42',
-      countryCode: params.countryCode,
-      countryName: params.countryName,
-      city: params.city,
-      region: params.city,
-      continent: params.countryCode === 'EG' ? 'AF' : 'EU',
-      latitude: 30.0444,
-      longitude: 31.2357,
-      postalCode: '11511',
-      edgeTimezone: 'Africa/Cairo',
-      asn: 8452,
-      ispOrganization: params.countryCode === 'EG' ? 'Telecom Egypt' : 'Cloudflare Warp / Edu',
-      colo: params.colo,
-      httpProtocol: 'HTTP/3',
-      tlsVersion: 'TLSv1.3',
-      ja4Fingerprint: 't13d1516h2_8daaf6152771_0100',
-      threatScore: params.anomalyFlags?.includes('high_threat_ip_score') ? 72 : 0,
-      capturedAt: nowIso,
-    },
-    clientTimezone: 'Africa/Cairo',
-    clientTier: params.tier,
-    anomalyFlags: params.anomalyFlags ?? [],
-    createdAt: nowIso,
-    lastVerifiedAt: nowIso,
-    expiresAt: '2026-11-24T17:30:00.000Z',
-    kvCacheStatus: 'hit',
-    edgeVerificationLatencyMs: params.latencyMs,
-    hardwareProfile: {
-      clientTimezone: 'Africa/Cairo',
-      clientLocale: 'en-US',
-      logicalCpuCores: params.deviceCategory === 'mobile' ? 6 : params.deviceCategory === 'tablet' ? 8 : 10,
-      deviceMemoryGb: params.osName === 'iOS' || params.osName === 'macOS' ? null : 8,
-      devicePixelRatio: params.deviceCategory === 'desktop' ? 2 : 3,
-      screenResolution: {
-        width: params.deviceCategory === 'desktop' ? 1920 : params.deviceCategory === 'tablet' ? 2048 : 393,
-        height: params.deviceCategory === 'desktop' ? 1080 : params.deviceCategory === 'tablet' ? 2732 : 852,
-        colorDepth: 24,
-      },
-      effectiveNetworkType: params.deviceCategory === 'mobile' ? '3g' : '4g',
-      downlinkMbps: params.deviceCategory === 'mobile' ? 4.5 : 10,
-      rttMs: 50,
-      saveDataEnabled: false,
-      prefersReducedMotion: false,
-      isTouchPrimary: params.deviceCategory !== 'desktop',
-      computedTier: params.tier,
-      activeTier: params.tier,
-      probedAt: nowIso,
-    },
-  });
+  const nowIso = new Date().toISOString();
+  const liveProfile = probeClientCapabilities('auto');
+  const liveDevice = resolveBrowserDeviceProfile(liveProfile);
+  const sessionId = computeDeterministicDeviceSessionId(
+    'usr_owner_mostafa',
+    liveDevice,
+    liveProfile
+  );
 
   return [
     buildManagedUserRecord({
@@ -1004,19 +1189,41 @@ function createInitialCohortDirectory(): ManagedUserRecord[] {
         favoriteSubspecialty: 'Clinical Cardiology & Hemodynamics',
       },
       activeSessions: [
-        makeSession({
-          sessionId: 'ses_owner_mac',
+        {
+          sessionId,
           userId: 'usr_owner_mostafa',
-          colo: 'CAI',
-          city: 'Cairo',
-          countryCode: 'EG',
-          countryName: 'Egypt',
-          osName: 'macOS',
-          browserName: 'Chrome',
-          deviceCategory: 'desktop',
-          tier: 'ultra',
-          latencyMs: 1.2,
-        }),
+          isCurrentDevice: true,
+          device: liveDevice,
+          edgeNetwork: {
+            ipAddress: '156.208.11.42',
+            countryCode: 'EG',
+            countryName: 'Egypt',
+            city: 'Cairo',
+            region: 'Cairo',
+            continent: 'AF',
+            latitude: 30.0444,
+            longitude: 31.2357,
+            postalCode: '11511',
+            edgeTimezone: liveProfile.clientTimezone,
+            asn: 8452,
+            ispOrganization: 'Telecom Egypt',
+            colo: 'CAI',
+            httpProtocol: 'HTTP/3',
+            tlsVersion: 'TLSv1.3',
+            ja4Fingerprint: 't13d1516h2_8daaf6152771_0100',
+            threatScore: 0,
+            capturedAt: nowIso,
+          },
+          clientTimezone: liveProfile.clientTimezone,
+          clientTier: liveProfile.activeTier,
+          anomalyFlags: [],
+          createdAt: nowIso,
+          lastVerifiedAt: nowIso,
+          expiresAt: '2026-11-24T17:30:00.000Z',
+          kvCacheStatus: 'hit',
+          edgeVerificationLatencyMs: 1.2,
+          hardwareProfile: liveProfile,
+        },
       ],
     }),
   ];
