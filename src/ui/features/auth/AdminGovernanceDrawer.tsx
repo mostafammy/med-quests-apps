@@ -777,7 +777,9 @@ export const AdminGovernanceDrawer: React.FC = () => {
                             </span>
                           </div>
                           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                            {targetUser.email} • {targetUser.universityName} (Year {targetUser.academicYear})
+                            {targetUser.email}
+                            {targetUser.phoneNumber ? ` • 📞 ${targetUser.phoneNumber}` : ''} •{' '}
+                            {targetUser.universityName} (Year {targetUser.academicYear})
                           </p>
                         </div>
                       </div>
@@ -979,6 +981,7 @@ export const AdminGovernanceDrawer: React.FC = () => {
                       selectedRecord.activeSessions[0];
                     const hwProfile =
                       currentActiveSession?.hardwareProfile ?? authState.clientProfile;
+                    const devProfile = currentActiveSession?.device;
                     const edgeNet = currentActiveSession?.edgeNetwork;
 
                     return (
@@ -987,50 +990,120 @@ export const AdminGovernanceDrawer: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <Cpu className="h-4 w-4 text-indigo-500" />
                             <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
-                              4. Background Hardware Telemetry & Edge Forensics
+                              4. Linked Device Intelligence, Market Tier & Edge Forensics (
+                              {selectedRecord.activeSessions.length} Device
+                              {selectedRecord.activeSessions.length === 1 ? '' : 's'})
                             </h4>
                           </div>
                           <span className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-indigo-700 dark:text-indigo-300">
-                            Cloudflare D1 & KV
+                            Cloudflare D1 & KV Linked
                           </span>
                         </div>
-                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                          Silently captured device and network telemetry. Regular learners are never shown these technical metrics.
-                        </p>
 
-                        {/* Multi-Device Selector if user has multiple sessions */}
-                        {selectedRecord.activeSessions.length > 1 && (
+                        {/* Multi-Device Selector Tabs */}
+                        {selectedRecord.activeSessions.length > 0 && (
                           <div className="flex flex-wrap gap-1.5 border-b border-zinc-200/60 pb-3 dark:border-zinc-800/60">
                             {selectedRecord.activeSessions.map((session, idx) => (
                               <button
                                 key={session.sessionId}
                                 type="button"
                                 onClick={() => setSelectedSessionIdx(idx)}
-                                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
+                                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
                                   selectedSessionIdx === idx
                                     ? 'bg-indigo-600 text-white shadow-xs'
                                     : 'bg-white/80 text-zinc-600 hover:bg-white dark:bg-zinc-800/60 dark:text-zinc-400'
                                 }`}
                               >
                                 {session.device.deviceCategory === 'desktop' ? (
-                                  <Laptop className="h-3 w-3" />
+                                  <Laptop className="h-3.5 w-3.5" />
                                 ) : (
-                                  <Smartphone className="h-3 w-3" />
+                                  <Smartphone className="h-3.5 w-3.5" />
                                 )}
                                 <span>
-                                  {session.device.osName} ({session.edgeNetwork.colo})
+                                  {session.device.deviceName ||
+                                    `${session.device.osName} • ${session.device.browserName}`}
                                 </span>
+                                {session.device.marketTierLabel && (
+                                  <span
+                                    className={`rounded-full px-1.5 py-0.2 text-[9px] font-bold uppercase ${
+                                      selectedSessionIdx === idx
+                                        ? 'bg-white/20 text-white'
+                                        : 'bg-zinc-200/70 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'
+                                    }`}
+                                  >
+                                    {session.device.marketTierLabel}
+                                  </span>
+                                )}
                               </button>
                             ))}
+                          </div>
+                        )}
+
+                        {/* Highlighted Device Name & Economic / Luxury Market Tier Card */}
+                        {devProfile && (
+                          <div className="rounded-xl border border-indigo-500/25 bg-gradient-to-r from-indigo-500/10 via-blue-500/5 to-transparent p-3.5 dark:border-indigo-500/30">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100">
+                                    {devProfile.deviceName ||
+                                      `${devProfile.osName} • ${devProfile.browserName}`}
+                                  </span>
+                                  {devProfile.deviceModelCode && (
+                                    <span className="rounded bg-zinc-200/80 dark:bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] font-bold text-zinc-700 dark:text-zinc-300">
+                                      Model: {devProfile.deviceModelCode}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                                  {devProfile.deviceBrand ? `${devProfile.deviceBrand} • ` : ''}
+                                  {devProfile.osName}
+                                  {devProfile.osVersion ? ` ${devProfile.osVersion}` : ''} •{' '}
+                                  {devProfile.browserName}
+                                  {devProfile.browserVersion ? ` ${devProfile.browserVersion}` : ''}{' '}
+                                  ({devProfile.browserEngine})
+                                </p>
+                              </div>
+
+                              <div className="flex flex-col items-end gap-1">
+                                <span
+                                  className={`rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider ${
+                                    devProfile.marketTier === 'flagship-luxury'
+                                      ? 'border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                                      : devProfile.marketTier === 'upper-midrange'
+                                      ? 'border-indigo-500/40 bg-indigo-500/15 text-indigo-700 dark:text-indigo-300'
+                                      : devProfile.marketTier === 'economical'
+                                      ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                      : 'border-blue-500/40 bg-blue-500/15 text-blue-700 dark:text-blue-300'
+                                  }`}
+                                >
+                                  {devProfile.marketTierLabel || 'Mid-Range Mainstream'}
+                                </span>
+                                {devProfile.estimatedPriceSegment && (
+                                  <span className="font-mono text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">
+                                    {devProfile.estimatedPriceSegment}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         )}
 
                         {/* Hardware Signals Grid */}
                         <div>
                           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                            Client Hardware & Display Metrics
+                            Client Silicon, Memory & Display Metrics
                           </span>
                           <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+                            <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
+                              <span className="text-[10px] text-zinc-400">Silicon / GPU Renderer</span>
+                              <p
+                                className="mt-0.5 text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate"
+                                title={devProfile?.gpuRenderer || hwProfile.gpuRenderer || 'Standard GPU'}
+                              >
+                                {devProfile?.gpuRenderer || hwProfile.gpuRenderer || 'Standard Integrated GPU'}
+                              </p>
+                            </div>
                             <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
                               <span className="text-[10px] text-zinc-400">Logical CPU Cores</span>
                               <p className="mt-0.5 text-xs font-bold text-zinc-900 dark:text-zinc-100">
@@ -1040,25 +1113,21 @@ export const AdminGovernanceDrawer: React.FC = () => {
                             <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
                               <span className="text-[10px] text-zinc-400">Device Memory Tier</span>
                               <p className="mt-0.5 text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                                {hwProfile.deviceMemoryGb !== null ? `${hwProfile.deviceMemoryGb} GB RAM` : 'Apple / Safari Tier'}
+                                {hwProfile.deviceMemoryGb !== null
+                                  ? `${hwProfile.deviceMemoryGb} GB RAM`
+                                  : 'Apple Unified Memory'}
+                              </p>
+                            </div>
+                            <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
+                              <span className="text-[10px] text-zinc-400">Screen & Pixel Ratio</span>
+                              <p className="mt-0.5 text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                                {hwProfile.screenResolution.width}×{hwProfile.screenResolution.height} ({hwProfile.devicePixelRatio}x)
                               </p>
                             </div>
                             <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
                               <span className="text-[10px] text-zinc-400">Effective Network</span>
                               <p className="mt-0.5 text-xs font-bold uppercase text-zinc-900 dark:text-zinc-100">
                                 {hwProfile.effectiveNetworkType}
-                              </p>
-                            </div>
-                            <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
-                              <span className="text-[10px] text-zinc-400">Pixel Ratio (DPR)</span>
-                              <p className="mt-0.5 text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                                {hwProfile.devicePixelRatio}x Retina
-                              </p>
-                            </div>
-                            <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
-                              <span className="text-[10px] text-zinc-400">Reduced Motion</span>
-                              <p className="mt-0.5 text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                                {hwProfile.prefersReducedMotion ? 'Active (0ms)' : 'Off (Full Dynamics)'}
                               </p>
                             </div>
                             <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
