@@ -8,6 +8,7 @@ import { computePerformanceTier } from '../../domain/auth/hardwareTier.ts';
 
 export interface IClientCapabilityProbe {
   probe(overrideMode?: PerformanceOverrideMode): ClientCapabilityProfile;
+  probeAsync(overrideMode?: PerformanceOverrideMode): Promise<ClientCapabilityProfile>;
   bindAdaptiveCompositorAttributes(profile: ClientCapabilityProfile): () => void;
 }
 
@@ -20,9 +21,132 @@ interface NetworkInformationLike {
   removeEventListener?(type: string, listener: () => void): void;
 }
 
+interface NavigatorUADataLike {
+  brands?: ReadonlyArray<{ brand: string; version: string }>;
+  mobile?: boolean;
+  platform?: string;
+  getHighEntropyValues?(
+    hints: readonly string[]
+  ): Promise<{
+    model?: string;
+    platform?: string;
+    platformVersion?: string;
+    architecture?: string;
+    bitness?: string;
+  }>;
+}
+
+interface CachedHardwareHints {
+  model: string | null;
+  platformVersion: string | null;
+  architecture: string | null;
+}
+
+const HINTS_STORAGE_KEY = 'medquests_client_hints_v1';
+
+let cachedGpuInfo: { renderer: string | null; vendor: string | null } | null = null;
+let cachedHighEntropyHints: CachedHardwareHints | null = null;
+let pendingHighEntropyPromise: Promise<CachedHardwareHints> | null = null;
+
+function probeWebGlGpuOnce(): { renderer: string | null; vendor: string | null } {
+  if (cachedGpuInfo) return cachedGpuInfo;
+  if (typeof document === 'undefined') {
+    return { renderer: null, vendor: null };
+  }
+
+  try {
+    const canvas = document.createElement('canvas');
+    const gl =
+      (canvas.getContext('webgl') as WebGLRenderingContext | null) ||
+      (canvas.getContext('experimental-webgl') as WebGLRenderingContext | null);
+    if (!gl) {
+      cachedGpuInfo = { renderer: null, vendor: null };
+      return cachedGpuInfo;
+    }
+
+    const debugExt = gl.getExtension('WEBGL_debug_renderer_info');
+    const renderer = debugExt
+      ? String(gl.getParameter(debugExt.UNMASKED_RENDERER_WEBGL) || '')
+      : String(gl.getParameter(gl.RENDERER) || '');
+    const vendor = debugExt
+      ? String(gl.getParameter(debugExt.UNMASKED_VENDOR_WEBGL) || '')
+      : String(gl.getParameter(gl.VENDOR) || '');
+
+    cachedGpuInfo = {
+      renderer: renderer.trim() || null,
+      vendor: vendor.trim() || null,
+    };
+    return cachedGpuInfo;
+  } catch {
+    cachedGpuInfo = { renderer: null, vendor: null };
+    return cachedGpuInfo;
+  }
+}
+
+function getStoredHighEntropyHints(): CachedHardwareHints {
+  if (cachedHighEntropyHints) return cachedHighEntropyHints;
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(HINTS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as CachedHardwareHints;
+        cachedHighEntropyHints = parsed;
+        return parsed;
+      }
+    } catch {
+      // Ignore storage error
+    }
+  }
+  return { model: null, platformVersion: null, architecture: null };
+}
+
+function triggerHighEntropyProbe(): Promise<CachedHardwareHints> {
+  if (cachedHighEntropyHints?.model) {
+    return Promise.resolve(cachedHighEntropyHints);
+  }
+  if (pendingHighEntropyPromise) {
+    return pendingHighEntropyPromise;
+  }
+
+  if (typeof navigator === 'undefined') {
+    return Promise.resolve({ model: null, platformVersion: null, architecture: null });
+  }
+
+  const uaData = (navigator as unknown as { userAgentData?: NavigatorUADataLike }).userAgentData;
+  if (!uaData?.getHighEntropyValues) {
+    return Promise.resolve(getStoredHighEntropyHints());
+  }
+
+  pendingHighEntropyPromise = uaData
+    .getHighEntropyValues(['model', 'platform', 'platformVersion', 'architecture', 'bitness'])
+    .then((values) => {
+      const cleanModel = values.model?.trim() && values.model.trim() !== 'K' ? values.model.trim() : null;
+      const result: CachedHardwareHints = {
+        model: cleanModel,
+        platformVersion: values.platformVersion?.trim() || null,
+        architecture: values.architecture?.trim() || null,
+      };
+      cachedHighEntropyHints = result;
+      if (typeof window !== 'undefined' && cleanModel) {
+        try {
+          localStorage.setItem(HINTS_STORAGE_KEY, JSON.stringify(result));
+        } catch {
+          // Ignore quota
+        }
+      }
+      return result;
+    })
+    .catch(() => getStoredHighEntropyHints())
+    .finally(() => {
+      pendingHighEntropyPromise = null;
+    });
+
+  return pendingHighEntropyPromise;
+}
+
 /**
- * Infrastructure Service: Probes browser hardware and network signals synchronously in < 0.5ms.
- * Safely guards against missing Web APIs (e.g. Safari, Firefox) and never calls deprecated fingerprinting.
+ * Infrastructure Service: Probes browser hardware, GPU renderer, Client Hints, and network signals.
+ * Safely guards against missing Web APIs (e.g. Safari, Firefox) and never blocks the main thread.
  */
 export class ClientCapabilityProbe implements IClientCapabilityProbe {
   public probe(overrideMode: PerformanceOverrideMode = 'auto'): ClientCapabilityProfile {
@@ -32,10 +156,16 @@ export class ClientCapabilityProbe implements IClientCapabilityProbe {
       : 'UTC';
     const clientLocale = isBrowser ? navigator.language : 'en-US';
 
+    // Kick off async high-entropy hint resolution in background if not yet cached
+    if (isBrowser) {
+      void triggerHighEntropyProbe();
+    }
+
     // Logical CPU cores (fallback 4 if absent or restricted)
-    const logicalCpuCores = isBrowser && typeof navigator.hardwareConcurrency === 'number'
-      ? navigator.hardwareConcurrency
-      : 4;
+    const logicalCpuCores =
+      isBrowser && typeof navigator.hardwareConcurrency === 'number'
+        ? navigator.hardwareConcurrency
+        : 4;
 
     // Device Memory in GB (Chromium/Edge API, null on Safari/Firefox)
     const navAny = isBrowser ? (navigator as unknown as { deviceMemory?: number }) : {};
@@ -75,6 +205,10 @@ export class ClientCapabilityProbe implements IClientCapabilityProbe {
       ? window.matchMedia('(pointer: coarse)').matches
       : false;
 
+    // GPU & High-Entropy Client Hints
+    const gpu = isBrowser ? probeWebGlGpuOnce() : { renderer: null, vendor: null };
+    const hints = getStoredHighEntropyHints();
+
     // Compute deterministic performance tier
     const computedTier = computePerformanceTier({
       logicalCpuCores,
@@ -103,7 +237,19 @@ export class ClientCapabilityProbe implements IClientCapabilityProbe {
       computedTier,
       activeTier,
       probedAt: new Date().toISOString(),
+      gpuRenderer: gpu.renderer,
+      gpuVendor: gpu.vendor,
+      detectedModelCode: hints.model,
+      detectedPlatformVersion: hints.platformVersion,
+      detectedCpuArch: hints.architecture,
     };
+  }
+
+  public async probeAsync(overrideMode: PerformanceOverrideMode = 'auto'): Promise<ClientCapabilityProfile> {
+    if (typeof window !== 'undefined') {
+      await triggerHighEntropyProbe();
+    }
+    return this.probe(overrideMode);
   }
 
   public bindAdaptiveCompositorAttributes(profile: ClientCapabilityProfile): () => void {
@@ -141,5 +287,8 @@ export class ClientCapabilityProbe implements IClientCapabilityProbe {
 export const clientCapabilityProbe = new ClientCapabilityProbe();
 export const probeClientCapabilities = (mode?: PerformanceOverrideMode): ClientCapabilityProfile =>
   clientCapabilityProbe.probe(mode);
+export const probeClientCapabilitiesAsync = (
+  mode?: PerformanceOverrideMode
+): Promise<ClientCapabilityProfile> => clientCapabilityProbe.probeAsync(mode);
 export const bindAdaptiveCompositorAttributes = (profile: ClientCapabilityProfile): () => void =>
   clientCapabilityProbe.bindAdaptiveCompositorAttributes(profile);
