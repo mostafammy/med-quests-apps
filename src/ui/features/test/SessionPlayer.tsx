@@ -39,6 +39,8 @@ export const SessionPlayer: React.FC = () => {
       questionCount?: number | 'all';
       timeLimitMinutes?: number;
       highYieldOnly?: boolean;
+      questionFilter?: 'all' | 'unanswered' | 'incorrect';
+      questionIds?: string[];
     }) || { mode: 'practice', questionCount: 20 };
   }, [location.state]);
 
@@ -61,27 +63,84 @@ export const SessionPlayer: React.FC = () => {
 
   // Initialize session questions
   useEffect(() => {
-    let pool = [...allQuestions];
-    if (sessionConfig.subjectId && sessionConfig.subjectId !== 'all') {
-      pool = pool.filter((q) => q.subjectId === sessionConfig.subjectId);
-    }
-    if (sessionConfig.chapterId && sessionConfig.chapterId !== 'all') {
-      pool = pool.filter((q) => q.chapterId === sessionConfig.chapterId);
-    }
-    if (sessionConfig.highYieldOnly) {
-      const hyPool = pool.filter((q) => q.highYield);
-      if (hyPool.length > 0) {
-        pool = hyPool;
+    let isCancelled = false;
+
+    const initQuestions = async () => {
+      // 1. Explicit question IDs (e.g. from targeted practice or retest)
+      if (sessionConfig.questionIds && sessionConfig.questionIds.length > 0) {
+        const idSet = new Set(sessionConfig.questionIds);
+        const ordered = allQuestions.filter((q) => idSet.has(q.id));
+        if (!isCancelled) {
+          const rawCount = sessionConfig.questionCount;
+          const count =
+            rawCount === 'all'
+              ? ordered.length
+              : typeof rawCount === 'number'
+              ? rawCount
+              : ordered.length;
+          setSessionQuestions(ordered.slice(0, count));
+        }
+        return;
       }
-    }
-    const rawCount = sessionConfig.questionCount;
-    const count =
-      rawCount === 'all'
-        ? pool.length
-        : typeof rawCount === 'number'
-        ? rawCount
-        : 20;
-    setSessionQuestions(pool.slice(0, count));
+
+      // 2. Standard Curriculum Filtering
+      let pool = [...allQuestions];
+      if (sessionConfig.subjectId && sessionConfig.subjectId !== 'all') {
+        pool = pool.filter((q) => q.subjectId === sessionConfig.subjectId);
+      }
+      if (sessionConfig.chapterId && sessionConfig.chapterId !== 'all') {
+        pool = pool.filter((q) => q.chapterId === sessionConfig.chapterId);
+      }
+      if (sessionConfig.highYieldOnly) {
+        const hyPool = pool.filter((q) => q.highYield);
+        if (hyPool.length > 0) {
+          pool = hyPool;
+        }
+      }
+
+      // 3. Question Repetition & Coverage Scope Filter
+      const qFilter = sessionConfig.questionFilter || 'all';
+      if (qFilter !== 'all') {
+        const attempts = await db.attempts.toArray();
+        const attemptsByQ = new Map<string, typeof attempts>();
+        attempts.forEach((a) => {
+          const list = attemptsByQ.get(a.questionId) || [];
+          list.push(a);
+          attemptsByQ.set(a.questionId, list);
+        });
+
+        if (qFilter === 'unanswered') {
+          pool = pool.filter((q) => !attemptsByQ.has(q.id));
+        } else if (qFilter === 'incorrect') {
+          pool = pool.filter((q) => {
+            const atts = attemptsByQ.get(q.id);
+            if (!atts || atts.length === 0) return false;
+            const sorted = [...atts].sort(
+              (a, b) => new Date(b.answeredAt).getTime() - new Date(a.answeredAt).getTime()
+            );
+            return sorted[0]?.isCorrect === false;
+          });
+        }
+      }
+
+      const rawCount = sessionConfig.questionCount;
+      const count =
+        rawCount === 'all'
+          ? pool.length
+          : typeof rawCount === 'number'
+          ? rawCount
+          : 20;
+
+      if (!isCancelled) {
+        setSessionQuestions(pool.slice(0, count));
+      }
+    };
+
+    initQuestions();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [allQuestions, sessionConfig]);
 
   const currentQ = sessionQuestions[currentIndex];
@@ -405,6 +464,13 @@ export const SessionPlayer: React.FC = () => {
           {currentQ.highYield && (
             <span className="hidden md:inline-flex items-center space-x-1 rtl:space-x-reverse text-[10px] font-black px-2.5 py-0.5 bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-400/40 rounded-full shadow-xs">
               <span>⚡ {t.common.highYield}</span>
+            </span>
+          )}
+
+          {sessionConfig.questionFilter === 'unanswered' && (
+            <span className="hidden md:inline-flex items-center space-x-1.5 rtl:space-x-reverse text-[10px] font-black px-2.5 py-0.5 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-400/40 rounded-full shadow-xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{t.test.zeroDuplicatesBadge}</span>
             </span>
           )}
         </div>
