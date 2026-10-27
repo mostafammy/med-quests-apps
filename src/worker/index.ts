@@ -1,4 +1,14 @@
-import { extractEdgeNetworkTelemetry, parseDeviceHeaderProfile } from '../domain/auth/telemetryParser.ts';
+import {
+  extractEdgeNetworkTelemetry,
+  parseDeviceHeaderProfile,
+  computeDeterministicDeviceSessionId,
+} from '../domain/auth/telemetryParser.ts';
+import type {
+  ActiveDeviceSession,
+  ClientCapabilityProfile,
+  EdgeNetworkTelemetry,
+  ParsedDeviceProfile,
+} from '../domain/auth/types.ts';
 import { QuestionCanonicalHasher } from '../domain/questionBank/canonicalHasher.ts';
 import { computeGlobalBankKpis } from '../domain/questionBank/questionSpecifications.ts';
 import { QuestionSchema } from '../domain/model/types.ts';
@@ -9,6 +19,9 @@ import type { GovernedQuestion } from '../../specs/005-global-question-bank-gove
 export interface Env {
   MED_QUESTS_DB?: {
     prepare(query: string): {
+      first<T = unknown>(): Promise<T | null>;
+      all<T = unknown>(): Promise<{ results: T[] }>;
+      run(): Promise<{ success: boolean }>;
       bind(...params: unknown[]): {
         first<T = unknown>(): Promise<T | null>;
         all<T = unknown>(): Promise<{ results: T[] }>;
@@ -120,8 +133,8 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    // 1. Session Revalidation Endpoint (/api/auth/session)
-    if (url.pathname === '/api/auth/session' && request.method === 'GET') {
+    // 1. Session Revalidation & Live Device Telemetry Sync Endpoint (/api/auth/session)
+    if (url.pathname === '/api/auth/session' && (request.method === 'GET' || request.method === 'POST')) {
       const authHeader = request.headers.get('authorization');
       const token = authHeader?.replace(/^Bearer\s+/i, '') ?? null;
 
@@ -129,9 +142,113 @@ export default {
       const edgeTelemetry = extractEdgeNetworkTelemetry(
         request as unknown as { headers: Headers; cf?: Record<string, unknown> }
       );
-      const deviceProfile = parseDeviceHeaderProfile(
+      const headerDeviceProfile = parseDeviceHeaderProfile(
         request as unknown as { headers: Headers }
       );
+
+      if (request.method === 'POST') {
+        try {
+          const body = (await request.json()) as {
+            userId?: string;
+            email?: string;
+            displayName?: string;
+            role?: string;
+            sessionId?: string;
+            deviceProfile?: ParsedDeviceProfile;
+            hardwareProfile?: ClientCapabilityProfile;
+          };
+
+          const mergedDevice: ParsedDeviceProfile = body.deviceProfile
+            ? {
+                ...headerDeviceProfile,
+                ...body.deviceProfile,
+              }
+            : headerDeviceProfile;
+
+          let canonicalUserId = body.userId || 'usr_local_guest';
+          let userRole = body.role || 'student-pro';
+          let phoneNumber: string | null = null;
+          let accountStatus = 'active';
+          let blockedReason: string | null = null;
+
+          if (env.MED_QUESTS_DB && (body.email || body.userId)) {
+            const userRow = await env.MED_QUESTS_DB.prepare(
+              'SELECT id, role, phone_number, account_status, blocked_reason FROM user WHERE email = ? OR id = ? LIMIT 1'
+            )
+              .bind(body.email || '', body.userId || '')
+              .first<{
+                id: string;
+                role: string;
+                phone_number: string | null;
+                account_status: string;
+                blocked_reason: string | null;
+              }>();
+
+            if (userRow) {
+              canonicalUserId = userRow.id;
+              userRole = userRow.role;
+              phoneNumber = userRow.phone_number;
+              accountStatus = userRow.account_status;
+              blockedReason = userRow.blocked_reason;
+            }
+          }
+
+          if (accountStatus === 'blocked') {
+            return new Response(
+              JSON.stringify({
+                code: 'ACCOUNT_BLOCKED',
+                restriction: { status: 'blocked', blockedReason },
+                edgeNetwork: edgeTelemetry,
+              }),
+              { status: 403, headers: { 'Content-Type': 'application/json' } }
+            );
+          }
+
+          const deterministicSessionId =
+            body.sessionId ||
+            computeDeterministicDeviceSessionId(canonicalUserId, mergedDevice, body.hardwareProfile);
+
+          let activeSessions: ActiveDeviceSession[] = [];
+          if (env.MED_QUESTS_DB && canonicalUserId !== 'usr_local_guest') {
+            await upsertD1DeviceSession(env.MED_QUESTS_DB, {
+              sessionId: deterministicSessionId,
+              userId: canonicalUserId,
+              tokenHash: token ? await sha256(token) : `tok_${deterministicSessionId}`,
+              edgeTelemetry,
+              deviceProfile: mergedDevice,
+              hardwareProfile: body.hardwareProfile,
+            });
+            activeSessions = await fetchUserActiveSessionsFromD1(
+              env.MED_QUESTS_DB,
+              canonicalUserId,
+              deterministicSessionId
+            );
+          }
+
+          return new Response(
+            JSON.stringify({
+              status: 'authenticated-active',
+              userId: canonicalUserId,
+              role: userRole,
+              phoneNumber,
+              kvCacheStatus: 'hit',
+              edgeNetwork: edgeTelemetry,
+              device: mergedDevice,
+              activeSessions,
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept-CH':
+                  'Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, Sec-CH-UA-Mobile',
+              },
+            }
+          );
+        } catch {
+          // Fall through to standard GET check if body malformed
+        }
+      }
 
       if (!token) {
         return new Response(
@@ -139,9 +256,16 @@ export default {
             status: 'anonymous-guest',
             user: { id: 'usr_local_guest', displayName: 'Local Scholar', role: 'anonymous' },
             edgePreview: edgeTelemetry,
-            device: deviceProfile,
+            device: headerDeviceProfile,
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
+          {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept-CH':
+                'Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, Sec-CH-UA-Mobile',
+            },
+          }
         );
       }
 
@@ -155,7 +279,6 @@ export default {
         : null;
 
       if (kvCachedSession) {
-        // Check authoritative user block guard
         const userGuard = env.MED_QUESTS_AUTH_KV
           ? await env.MED_QUESTS_AUTH_KV.get<{ status: string; blockedReason?: string }>(
               `usr_guard:${kvCachedSession.userId}`,
@@ -174,6 +297,10 @@ export default {
           );
         }
 
+        const activeSessions = env.MED_QUESTS_DB
+          ? await fetchUserActiveSessionsFromD1(env.MED_QUESTS_DB, kvCachedSession.userId, null)
+          : [];
+
         return new Response(
           JSON.stringify({
             status: 'authenticated-active',
@@ -181,6 +308,7 @@ export default {
             role: kvCachedSession.role,
             kvCacheStatus: 'hit',
             edgeNetwork: edgeTelemetry,
+            activeSessions,
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
@@ -193,6 +321,7 @@ export default {
         )
           .bind(tokenHash)
           .first<{
+            id: string;
             user_id: string;
             role: string;
             account_status: string;
@@ -211,7 +340,6 @@ export default {
             );
           }
 
-          // Hydrate KV Cache for subsequent sub-5ms requests
           if (env.MED_QUESTS_AUTH_KV) {
             await env.MED_QUESTS_AUTH_KV.put(
               `sess:${tokenHash}`,
@@ -220,6 +348,12 @@ export default {
             );
           }
 
+          const activeSessions = await fetchUserActiveSessionsFromD1(
+            env.MED_QUESTS_DB,
+            sessionRecord.user_id,
+            sessionRecord.id
+          );
+
           return new Response(
             JSON.stringify({
               status: 'authenticated-active',
@@ -227,6 +361,7 @@ export default {
               role: sessionRecord.role,
               kvCacheStatus: 'miss-d1-hydrated',
               edgeNetwork: edgeTelemetry,
+              activeSessions,
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } }
           );
@@ -237,6 +372,98 @@ export default {
         JSON.stringify({ code: 'SESSION_EXPIRED_OR_REVOKED' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } }
       );
+    }
+
+    // 1b. Revoke Specific Device Session Endpoint (/api/auth/session/revoke)
+    if (url.pathname === '/api/auth/session/revoke' && request.method === 'POST') {
+      const body = (await request.json()) as { userId?: string; sessionId: string };
+      const nowIso = new Date().toISOString();
+      if (env.MED_QUESTS_DB && body.sessionId) {
+        await env.MED_QUESTS_DB.prepare(
+          'UPDATE session SET revoked_at = ?, updated_at = ? WHERE id = ?'
+        )
+          .bind(nowIso, nowIso, body.sessionId)
+          .run();
+      }
+      return new Response(JSON.stringify({ ok: true, revokedSessionId: body.sessionId }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 1c. Admin User & Linked Devices Directory Endpoint (/api/admin/users)
+    if (url.pathname === '/api/admin/users' && request.method === 'GET') {
+      if (!env.MED_QUESTS_DB) {
+        return new Response(JSON.stringify({ users: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      try {
+        const userRows = await env.MED_QUESTS_DB.prepare(
+          "SELECT * FROM user WHERE email NOT IN ('test@example.com', 'dr.alex.rivera@stanford.edu') ORDER BY last_active_at DESC LIMIT 200"
+        ).all<Record<string, unknown>>();
+
+        const sessionRows = await env.MED_QUESTS_DB.prepare(
+          "SELECT * FROM session WHERE revoked_at IS NULL AND os_name != 'Web' ORDER BY updated_at DESC LIMIT 500"
+        ).all<Record<string, unknown>>();
+
+        const sessionsByUser = new Map<string, ActiveDeviceSession[]>();
+        for (const sRow of sessionRows.results) {
+          const mapped = mapD1SessionRowToActiveSession(sRow, null);
+          const list = sessionsByUser.get(mapped.userId) ?? [];
+          list.push(mapped);
+          sessionsByUser.set(mapped.userId, list);
+        }
+
+        const users = userRows.results.map((uRow) => {
+          const uid = String(uRow.id);
+          let customOverrides: Record<string, boolean> = {};
+          try {
+            if (typeof uRow.custom_features_json === 'string') {
+              customOverrides = JSON.parse(uRow.custom_features_json) as Record<string, boolean>;
+            }
+          } catch {
+            customOverrides = {};
+          }
+
+          return {
+            profile: {
+              id: uid,
+              email: String(uRow.email),
+              displayName: String(uRow.name),
+              avatarUrl: uRow.image ? String(uRow.image) : null,
+              phoneNumber: uRow.phone_number ? String(uRow.phone_number) : null,
+              universityName: uRow.university_name ? String(uRow.university_name) : 'Faculty of Medicine',
+              academicYear: Number(uRow.academic_year ?? 2),
+              role: String(uRow.role || 'student-pro'),
+              customFeatureOverrides: customOverrides,
+              restriction: {
+                status: String(uRow.account_status || 'active'),
+                blockedReason: uRow.blocked_reason ? String(uRow.blocked_reason) : null,
+                blockedUntil: uRow.blocked_until ? String(uRow.blocked_until) : null,
+                blockedByUserId: uRow.blocked_by_user_id ? String(uRow.blocked_by_user_id) : null,
+                updatedAt: String(uRow.updated_at || new Date().toISOString()),
+              },
+              emailVerified: Boolean(uRow.email_verified),
+              createdAt: String(uRow.created_at || new Date().toISOString()),
+              lastActiveAt: String(uRow.last_active_at || new Date().toISOString()),
+            },
+            activeSessions: sessionsByUser.get(uid) ?? [],
+          };
+        });
+
+        return new Response(JSON.stringify({ ok: true, users }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } catch (e: unknown) {
+        return new Response(
+          JSON.stringify({ users: [], error: e instanceof Error ? e.message : 'D1 query failed' }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // 2. Admin Governance: Instant Account Block / Suspend / Unblock with KV Eviction
@@ -348,8 +575,14 @@ export default {
       const edgeTelemetry = extractEdgeNetworkTelemetry(
         request as unknown as { headers: Headers; cf?: Record<string, unknown> }
       );
+      const headerDevice = parseDeviceHeaderProfile(
+        request as unknown as { headers: Headers }
+      );
       const body = (await request.json()) as {
         idToken?: string;
+        sessionId?: string;
+        deviceProfile?: ParsedDeviceProfile;
+        hardwareProfile?: ClientCapabilityProfile;
         claims?: {
           sub: string;
           email: string;
@@ -363,24 +596,99 @@ export default {
       const PLATFORM_OWNER_EMAILS = ['mostafa.yaser.developer@gmail.com'];
       const isPlatformOwner = PLATFORM_OWNER_EMAILS.includes(email.toLowerCase().trim());
 
-      const role = isPlatformOwner ? 'admin' : (email.includes('admin') ? 'admin' : 'student-pro');
+      const role = isPlatformOwner ? 'admin' : email.includes('admin') ? 'admin' : 'student-pro';
       const universityName = isPlatformOwner
         ? 'Med Quests Platform Owner & Principal Architect'
         : 'Google Medical Scholar';
 
-      const name = isPlatformOwner && !body.claims?.name
-        ? 'Mostafa Yaser (Platform Owner)'
-        : (body.claims?.name || 'Dr. Alex Rivera');
+      const name =
+        isPlatformOwner && (!body.claims?.name || body.claims.name === 'Dr. Alex Rivera')
+          ? 'Mostafa Yaser (Platform Owner)'
+          : body.claims?.name || email.split('@')[0];
 
-      const image = body.claims?.picture || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80';
-      const userId = isPlatformOwner
+      const image =
+        body.claims?.picture ||
+        'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80';
+      let userId = isPlatformOwner
         ? 'usr_owner_mostafa'
-        : `usr_g_${body.claims?.sub || Math.random().toString(36).substring(2, 10)}`;
+        : `usr_g_${(body.claims?.sub || email).replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 24)}`;
       const nowIso = new Date().toISOString();
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      const sessionToken = `g_tok_${Math.random().toString(36).substring(2, 15)}`;
+      const sessionToken = `g_tok_${Math.random().toString(36).substring(2, 15)}_${Date.now().toString(36)}`;
       const tokenHash = await sha256(sessionToken);
+
+      const mergedDevice: ParsedDeviceProfile = body.deviceProfile
+        ? {
+            ...headerDevice,
+            ...body.deviceProfile,
+          }
+        : headerDevice;
+
+      // Upsert into Cloudflare D1 & resolve authoritative user ID and active sessions
+      let existingPhoneNumber: string | null = null;
+      let activeSessions: ActiveDeviceSession[] = [];
+
+      if (env.MED_QUESTS_DB) {
+        const existingUserRow = await env.MED_QUESTS_DB.prepare(
+          'SELECT id, phone_number FROM user WHERE email = ?'
+        )
+          .bind(email)
+          .first<{ id: string; phone_number: string | null }>();
+
+        if (existingUserRow?.id) {
+          userId = existingUserRow.id;
+        }
+        existingPhoneNumber = existingUserRow?.phone_number || null;
+
+        await env.MED_QUESTS_DB.prepare(
+          `INSERT INTO user (id, name, email, email_verified, image, role, university_name, account_status, last_country_code, last_colo, last_active_at, created_at, updated_at)
+           VALUES (?, ?, ?, 1, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
+           ON CONFLICT(email) DO UPDATE SET
+             name = excluded.name,
+             image = COALESCE(excluded.image, user.image),
+             role = excluded.role,
+             last_country_code = excluded.last_country_code,
+             last_colo = excluded.last_colo,
+             last_active_at = ?,
+             updated_at = ?`
+        )
+          .bind(
+            userId,
+            name,
+            email,
+            image,
+            role,
+            universityName,
+            edgeTelemetry.countryCode,
+            edgeTelemetry.colo,
+            nowIso,
+            nowIso,
+            nowIso,
+            nowIso,
+            nowIso
+          )
+          .run();
+
+        const deterministicSessionId =
+          body.sessionId ||
+          computeDeterministicDeviceSessionId(userId, mergedDevice, body.hardwareProfile);
+
+        await upsertD1DeviceSession(env.MED_QUESTS_DB, {
+          sessionId: deterministicSessionId,
+          userId,
+          tokenHash,
+          edgeTelemetry,
+          deviceProfile: mergedDevice,
+          hardwareProfile: body.hardwareProfile,
+        });
+
+        activeSessions = await fetchUserActiveSessionsFromD1(
+          env.MED_QUESTS_DB,
+          userId,
+          deterministicSessionId
+        );
+      }
 
       // Hydrate Workers KV cache-aside layer
       if (env.MED_QUESTS_AUTH_KV) {
@@ -389,32 +697,6 @@ export default {
           JSON.stringify({ userId, role, expiresAt }),
           { expirationTtl: 600 }
         );
-      }
-
-      // Upsert into Cloudflare D1
-      let existingPhoneNumber: string | null = null;
-      if (env.MED_QUESTS_DB) {
-        const existingUserRow = await env.MED_QUESTS_DB.prepare(
-          'SELECT phone_number FROM user WHERE email = ?'
-        )
-          .bind(email)
-          .first<{ phone_number: string | null }>();
-        existingPhoneNumber = existingUserRow?.phone_number || null;
-
-        await env.MED_QUESTS_DB.prepare(
-          `INSERT INTO user (id, name, email, email_verified, image, role, university_name, account_status, last_country_code, last_colo, last_active_at, created_at, updated_at)
-           VALUES (?, ?, ?, 1, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
-           ON CONFLICT(email) DO UPDATE SET role = excluded.role, last_active_at = ?, updated_at = ?`
-        )
-          .bind(userId, name, email, image, role, universityName, edgeTelemetry.countryCode, edgeTelemetry.colo, nowIso, nowIso, nowIso, nowIso, nowIso)
-          .run();
-
-        await env.MED_QUESTS_DB.prepare(
-          `INSERT INTO session (id, user_id, token_hash, expires_at, ip_address, country_code, edge_colo, client_timezone, os_name, browser_name, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Web', 'Google Browser', ?, ?)`
-        )
-          .bind(`ses_${Math.random().toString(36).substring(2, 10)}`, userId, tokenHash, expiresAt, edgeTelemetry.ipAddress, edgeTelemetry.countryCode, edgeTelemetry.colo, 'Africa/Cairo', nowIso, nowIso)
-          .run();
       }
 
       return new Response(
@@ -433,8 +715,17 @@ export default {
             emailVerified: true,
           },
           edgeNetwork: edgeTelemetry,
+          device: mergedDevice,
+          activeSessions,
         }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept-CH':
+              'Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, Sec-CH-UA-Mobile',
+          },
+        }
       );
     }
 
@@ -1797,6 +2088,200 @@ async function ensureGlobalBankSeeded(
       )
       .bind(blockId, targetRevision)
       .run();
+  }
+}
+
+async function upsertD1DeviceSession(
+  db: NonNullable<Env['MED_QUESTS_DB']>,
+  params: {
+    sessionId: string;
+    userId: string;
+    tokenHash: string;
+    edgeTelemetry: EdgeNetworkTelemetry;
+    deviceProfile: ParsedDeviceProfile;
+    hardwareProfile?: ClientCapabilityProfile;
+  }
+): Promise<void> {
+  const nowIso = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const clientTimezone =
+    params.hardwareProfile?.clientTimezone ||
+    params.edgeTelemetry.edgeTimezone ||
+    'Africa/Cairo';
+  const clientPerfTier = params.hardwareProfile?.activeTier || 'balanced';
+  const telemetryPayloadJson = JSON.stringify({
+    device: params.deviceProfile,
+    hardwareProfile: params.hardwareProfile ?? null,
+    edgeNetwork: params.edgeTelemetry,
+  });
+
+  await db
+    .prepare(
+      `INSERT INTO session (
+        id, user_id, token_hash, expires_at,
+        ip_address, country_code, city, region, continent, latitude, longitude, postal_code,
+        asn, isp_organization, edge_colo, http_protocol, tls_version, threat_score,
+        device_category, os_name, browser_name, client_timezone, client_perf_tier,
+        anomaly_flags_json, hardware_telemetry_json, revoked_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, NULL, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        token_hash = excluded.token_hash,
+        expires_at = excluded.expires_at,
+        ip_address = excluded.ip_address,
+        country_code = excluded.country_code,
+        city = excluded.city,
+        region = excluded.region,
+        continent = excluded.continent,
+        latitude = excluded.latitude,
+        longitude = excluded.longitude,
+        asn = excluded.asn,
+        isp_organization = excluded.isp_organization,
+        edge_colo = excluded.edge_colo,
+        http_protocol = excluded.http_protocol,
+        tls_version = excluded.tls_version,
+        device_category = excluded.device_category,
+        os_name = excluded.os_name,
+        browser_name = excluded.browser_name,
+        client_timezone = excluded.client_timezone,
+        client_perf_tier = excluded.client_perf_tier,
+        hardware_telemetry_json = excluded.hardware_telemetry_json,
+        revoked_at = NULL,
+        updated_at = excluded.updated_at`
+    )
+    .bind(
+      params.sessionId,
+      params.userId,
+      params.tokenHash,
+      expiresAt,
+      params.edgeTelemetry.ipAddress,
+      params.edgeTelemetry.countryCode,
+      params.edgeTelemetry.city,
+      params.edgeTelemetry.region,
+      params.edgeTelemetry.continent,
+      params.edgeTelemetry.latitude,
+      params.edgeTelemetry.longitude,
+      params.edgeTelemetry.postalCode,
+      params.edgeTelemetry.asn,
+      params.edgeTelemetry.ispOrganization,
+      params.edgeTelemetry.colo,
+      params.edgeTelemetry.httpProtocol,
+      params.edgeTelemetry.tlsVersion,
+      params.edgeTelemetry.threatScore ?? 0,
+      params.deviceProfile.deviceCategory,
+      params.deviceProfile.osName,
+      params.deviceProfile.browserName,
+      clientTimezone,
+      clientPerfTier,
+      telemetryPayloadJson,
+      nowIso,
+      nowIso
+    )
+    .run();
+}
+
+function mapD1SessionRowToActiveSession(
+  row: Record<string, unknown>,
+  currentSessionId: string | null
+): ActiveDeviceSession {
+  const sessionId = String(row.id);
+  const userId = String(row.user_id);
+  const osName = String(row.os_name || 'Unknown OS');
+  const browserName = String(row.browser_name || 'Browser');
+  const deviceCategory = (String(row.device_category || 'desktop') as ParsedDeviceProfile['deviceCategory']);
+  const nowIso = new Date().toISOString();
+
+  let parsedTelemetry: {
+    device?: ParsedDeviceProfile;
+    hardwareProfile?: ClientCapabilityProfile;
+    edgeNetwork?: EdgeNetworkTelemetry;
+  } = {};
+
+  try {
+    if (typeof row.hardware_telemetry_json === 'string' && row.hardware_telemetry_json.trim()) {
+      parsedTelemetry = JSON.parse(row.hardware_telemetry_json);
+    }
+  } catch {
+    parsedTelemetry = {};
+  }
+
+  const device: ParsedDeviceProfile = parsedTelemetry.device ?? {
+    deviceCategory,
+    osName,
+    osVersion: null,
+    browserName,
+    browserVersion: null,
+    browserEngine: osName === 'iOS' || osName === 'macOS' ? 'WebKit' : 'Blink',
+    cpuArchitecture: null,
+    isMobileHint: deviceCategory !== 'desktop',
+    preferredLanguage: 'en-US',
+    rawUserAgent: 'Cloudflare-D1-Session',
+    deviceName: `${osName} (${browserName})`,
+    deviceBrand: osName,
+    deviceModelCode: null,
+    gpuRenderer: null,
+    marketTier: 'mid-range',
+    marketTierLabel: 'Mid-Range Mainstream',
+    estimatedPriceSegment: '$200–$399 Mainstream Tier',
+  };
+
+  const countryCode = String(row.country_code || 'EG');
+  const edgeNetwork: EdgeNetworkTelemetry = parsedTelemetry.edgeNetwork ?? {
+    ipAddress: String(row.ip_address || '127.0.0.1'),
+    countryCode,
+    countryName: countryCode === 'EG' ? 'Egypt' : countryCode,
+    city: row.city ? String(row.city) : null,
+    region: row.region ? String(row.region) : null,
+    continent: row.continent ? String(row.continent) : null,
+    latitude: typeof row.latitude === 'number' ? row.latitude : null,
+    longitude: typeof row.longitude === 'number' ? row.longitude : null,
+    postalCode: row.postal_code ? String(row.postal_code) : null,
+    edgeTimezone: row.client_timezone ? String(row.client_timezone) : 'Africa/Cairo',
+    asn: typeof row.asn === 'number' ? row.asn : null,
+    ispOrganization: row.isp_organization ? String(row.isp_organization) : null,
+    colo: String(row.edge_colo || 'CAI'),
+    httpProtocol: String(row.http_protocol || 'HTTP/3'),
+    tlsVersion: String(row.tls_version || 'TLSv1.3'),
+    ja4Fingerprint: null,
+    threatScore: typeof row.threat_score === 'number' ? row.threat_score : 0,
+    capturedAt: String(row.updated_at || nowIso),
+  };
+
+  const clientTier = (String(row.client_perf_tier || 'balanced') as ActiveDeviceSession['clientTier']);
+
+  return {
+    sessionId,
+    userId,
+    isCurrentDevice: currentSessionId ? sessionId === currentSessionId : false,
+    device,
+    edgeNetwork,
+    clientTimezone: String(row.client_timezone || 'Africa/Cairo'),
+    clientTier,
+    anomalyFlags: [],
+    createdAt: String(row.created_at || nowIso),
+    lastVerifiedAt: String(row.updated_at || nowIso),
+    expiresAt: String(row.expires_at || nowIso),
+    kvCacheStatus: 'hit',
+    edgeVerificationLatencyMs: 1.4,
+    hardwareProfile: parsedTelemetry.hardwareProfile,
+  };
+}
+
+async function fetchUserActiveSessionsFromD1(
+  db: NonNullable<Env['MED_QUESTS_DB']>,
+  userId: string,
+  currentSessionId: string | null
+): Promise<ActiveDeviceSession[]> {
+  try {
+    const res = await db
+      .prepare(
+        "SELECT * FROM session WHERE user_id = ? AND revoked_at IS NULL AND os_name != 'Web' ORDER BY updated_at DESC LIMIT 20"
+      )
+      .bind(userId)
+      .all<Record<string, unknown>>();
+
+    return res.results.map((r) => mapD1SessionRowToActiveSession(r, currentSessionId));
+  } catch {
+    return [];
   }
 }
 
