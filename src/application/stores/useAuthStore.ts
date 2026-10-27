@@ -15,6 +15,7 @@ import { googleOAuthClient } from '../../infrastructure/auth/googleOAuthClient.t
 import { appleOAuthClient } from '../../infrastructure/auth/appleOAuthClient.ts';
 import {
   probeClientCapabilities,
+  probeClientCapabilitiesAsync,
   bindAdaptiveCompositorAttributes,
 } from '../../infrastructure/auth/clientCapabilityProbe.ts';
 import type { ProgressSyncSummary } from '../../../specs/003-edge-auth-adaptive-telemetry/contracts/auth-telemetry-ports.ts';
@@ -98,11 +99,43 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
     const profile = probeClientCapabilities(get().performanceOverride);
     const unbind = bindAdaptiveCompositorAttributes(profile);
 
-    // 2. Non-blocking background revalidation via requestIdleCallback / setTimeout
+    // 2. Non-blocking background revalidation & OAuth redirect hash consumption
     if (typeof window !== 'undefined') {
-      const scheduleRevalidate = window.requestIdleCallback || ((cb) => setTimeout(cb, 50));
-      scheduleRevalidate(() => {
-        void get().revalidate();
+      void googleOAuthClient.loadScript().catch(() => {});
+
+      void googleOAuthClient.consumeRedirectHashToken().then(async (redirectAuth) => {
+        if (redirectAuth) {
+          const clientProfile = await probeClientCapabilitiesAsync(get().performanceOverride);
+          const result = await edgeAuthGateway.signIn({
+            email: redirectAuth.claims.email,
+            displayName: redirectAuth.claims.name,
+            avatarUrl: redirectAuth.claims.picture,
+            idToken: redirectAuth.idToken,
+            claims: redirectAuth.claims as unknown as Record<string, unknown>,
+            provider: 'google',
+            clientProfile,
+          });
+          if (result.ok) {
+            const managedUsers = edgeAuthGateway.getManagedUsers();
+            set({
+              authState: result.value.state,
+              syncSummary: result.value.syncSummary,
+              managedUsers,
+              selectedManagedUserId: result.value.state.user.id,
+              isModalOpen: false,
+              notificationToast: {
+                type: 'success',
+                message: `Signed in with Google as ${result.value.state.user.displayName}! Study history merged.`,
+              },
+            });
+          }
+          return;
+        }
+
+        const scheduleRevalidate = window.requestIdleCallback || ((cb) => setTimeout(cb, 50));
+        scheduleRevalidate(() => {
+          void get().revalidate();
+        });
       });
     }
 
@@ -114,7 +147,16 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
     try {
       const result = await edgeAuthGateway.revalidateEdgeSession();
       if (result.ok) {
-        set({ authState: result.value, isRevalidating: false });
+        const managedUsers = edgeAuthGateway.getManagedUsers();
+        set({ authState: result.value, managedUsers, isRevalidating: false });
+        if (
+          result.value.status === 'authenticated-active' &&
+          result.value.user.role === 'admin'
+        ) {
+          void edgeAuthGateway.syncManagedUsersFromEdge().then((syncedUsers) => {
+            set({ managedUsers: [...syncedUsers] });
+          });
+        }
       } else {
         if (result.error.code === 'ACCOUNT_BLOCKED') {
           const current = get().authState;
@@ -140,6 +182,9 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
   },
 
   openModal: (tab = 'sign-in') => {
+    if (typeof window !== 'undefined') {
+      void googleOAuthClient.loadScript().catch(() => {});
+    }
     set({ isModalOpen: true, activeModalTab: tab });
   },
 
@@ -158,6 +203,13 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
       selectedManagedUserId:
         state.selectedManagedUserId ?? managedUsers[0]?.profile.id ?? null,
     }));
+    void edgeAuthGateway.syncManagedUsersFromEdge().then((syncedUsers) => {
+      set((state) => ({
+        managedUsers: [...syncedUsers],
+        selectedManagedUserId:
+          state.selectedManagedUserId ?? syncedUsers[0]?.profile.id ?? null,
+      }));
+    });
   },
 
   closeGovernanceDrawer: () => {
@@ -257,7 +309,7 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
         googleAuth = await googleOAuthClient.signIn();
       }
 
-      const clientProfile = probeClientCapabilities(get().performanceOverride);
+      const clientProfile = await probeClientCapabilitiesAsync(get().performanceOverride);
       const email = fallbackEmail || googleAuth.claims.email;
 
       const result = await edgeAuthGateway.signIn({
