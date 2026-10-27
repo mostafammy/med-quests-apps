@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CVS_TAXONOMY } from '../../../domain/taxonomy/cvsTaxonomy.ts';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
+import { useStatsStore } from '../../../application/stores/useStatsStore.ts';
 import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 import { 
   Play, 
@@ -16,20 +17,32 @@ import {
   ShieldCheck,
   Compass,
   RotateCcw,
-  Sliders
+  Sliders,
+  Activity,
+  TrendingUp
 } from 'lucide-react';
 import { ResetBankConfirmationModal } from '../questionBank/ResetBankConfirmationModal.tsx';
 
 type TestMode = 'practice' | 'mock' | 'rapid';
+type RepetitionFilter = 'unanswered' | 'all' | 'incorrect';
 
 export const TestHub: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { questions } = useQuestionStore();
+  const { 
+    refreshStats, 
+    getScopeCoverage, 
+    answeredQuestionIds, 
+    correctQuestionIds, 
+    mistakeQuestionIds,
+    resetSubjectStats 
+  } = useStatsStore();
   const { t, isRtl } = useLocaleStore();
 
   // Mode & configuration state
   const [selectedMode, setSelectedMode] = useState<TestMode>('practice');
+  const [repetitionFilter, setRepetitionFilter] = useState<RepetitionFilter>('unanswered');
   const [selectedSubject, setSelectedSubject] = useState<string>(() => {
     const subParam = searchParams.get('subject');
     if (subParam) {
@@ -45,6 +58,11 @@ export const TestHub: React.FC = () => {
   const [highYieldOnly, setHighYieldOnly] = useState<boolean>(false);
   const [timedSprint, setTimedSprint] = useState<boolean>(false);
   const [showResetBankModal, setShowResetBankModal] = useState<boolean>(false);
+
+  // Refresh attempts from IndexedDB on mount & question changes
+  useEffect(() => {
+    refreshStats(questions);
+  }, [questions, refreshStats]);
 
   // Sync with search params if they change
   useEffect(() => {
@@ -67,15 +85,23 @@ export const TestHub: React.FC = () => {
       : CVS_TAXONOMY.chapters.filter((c) => c.subjectId === selectedSubject);
   }, [selectedSubject]);
 
-  // Dynamic question counts based on filter criteria
+  // Curriculum scope coverage metrics (total, answered, fresh remaining, correct, incorrect)
+  const scopeCoverage = useMemo(() => {
+    return getScopeCoverage(questions, {
+      subjectId: selectedSubject,
+      chapterId: selectedChapter,
+      highYieldOnly,
+    });
+  }, [questions, selectedSubject, selectedChapter, highYieldOnly, answeredQuestionIds, correctQuestionIds, mistakeQuestionIds, getScopeCoverage]);
+
+  // Dynamic question counts based on filter criteria & repetition scope
   const matchingQuestionCount = useMemo(() => {
-    return questions.filter((q) => {
-      if (selectedSubject !== 'all' && q.subjectId !== selectedSubject) return false;
-      if (selectedChapter !== 'all' && q.chapterId !== selectedChapter) return false;
-      if (highYieldOnly && !q.highYield) return false;
-      return true;
-    }).length;
-  }, [questions, selectedSubject, selectedChapter, highYieldOnly]);
+    if (selectedMode === 'mock') return 50;
+    if (selectedMode === 'rapid') return Math.min(scopeCoverage.total, 15);
+    if (repetitionFilter === 'unanswered') return scopeCoverage.unanswered;
+    if (repetitionFilter === 'incorrect') return scopeCoverage.incorrect;
+    return scopeCoverage.total;
+  }, [selectedMode, repetitionFilter, scopeCoverage]);
 
   // Effective question count for the active session configuration
   const effectiveQuestionCount = useMemo(() => {
@@ -108,9 +134,14 @@ export const TestHub: React.FC = () => {
   }, [questions]);
 
   // Master launch handler
-  const handleLaunchSession = (overrideCount?: number | 'all', overrideMode?: TestMode) => {
+  const handleLaunchSession = (
+    overrideCount?: number | 'all',
+    overrideMode?: TestMode,
+    overrideFilter?: RepetitionFilter
+  ) => {
     const targetMode = overrideMode || selectedMode;
     const effectiveCountMode = overrideCount !== undefined ? overrideCount : questionCount;
+    const activeFilter = overrideFilter || repetitionFilter;
 
     if (targetMode === 'mock') {
       navigate('/session/mock-exam', {
@@ -131,7 +162,7 @@ export const TestHub: React.FC = () => {
           mode: 'rapid',
           subjectId: selectedSubject,
           chapterId: selectedChapter,
-          questionCount: Math.min(matchingQuestionCount, 15),
+          questionCount: Math.min(scopeCoverage.total, 15),
           timeLimitMinutes: 15,
           highYieldOnly: true,
         },
@@ -140,9 +171,20 @@ export const TestHub: React.FC = () => {
     }
 
     // Practice mode
+    let targetPoolIds: string[] | undefined = undefined;
+    let targetPoolCount = scopeCoverage.total;
+
+    if (activeFilter === 'unanswered') {
+      targetPoolIds = scopeCoverage.unansweredIds;
+      targetPoolCount = scopeCoverage.unanswered;
+    } else if (activeFilter === 'incorrect') {
+      targetPoolIds = scopeCoverage.incorrectIds;
+      targetPoolCount = scopeCoverage.incorrect;
+    }
+
     const count = effectiveCountMode === 'all'
-      ? matchingQuestionCount
-      : Math.min(matchingQuestionCount, effectiveCountMode);
+      ? targetPoolCount
+      : Math.min(targetPoolCount, effectiveCountMode);
 
     navigate('/session/practice-now', {
       state: {
@@ -150,6 +192,8 @@ export const TestHub: React.FC = () => {
         subjectId: selectedSubject,
         chapterId: selectedChapter,
         questionCount: count,
+        questionFilter: activeFilter,
+        questionIds: targetPoolIds ? targetPoolIds.slice(0, count) : undefined,
         highYieldOnly,
         timeLimitMinutes: timedSprint ? Math.ceil(count * 1.5) : undefined,
       },
@@ -425,6 +469,162 @@ export const TestHub: React.FC = () => {
             </div>
           </div>
 
+          {/* Apple Curriculum Continuity & Real-Time Mastery Progress Card */}
+          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-white/95 via-slate-50/80 to-blue-50/40 dark:from-zinc-900/95 dark:via-zinc-900/80 dark:to-blue-950/25 border border-slate-200/90 dark:border-zinc-800 shadow-xs space-y-3.5 relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+              <div className="flex items-center space-x-3 rtl:space-x-reverse min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-blue-600/10 dark:bg-blue-400/15 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20 shadow-2xs">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white tracking-tight">
+                      {selectedCategoryLabel} Bank Continuity
+                    </h3>
+                    {scopeCoverage.unanswered === 0 && scopeCoverage.total > 0 ? (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 uppercase tracking-wider">
+                        100% Mastered 🎉
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30 uppercase tracking-wider">
+                        {scopeCoverage.percentComplete}% Solved
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium">
+                    {scopeCoverage.answered} of {scopeCoverage.total} completed • <strong className="text-blue-600 dark:text-blue-400 font-bold">{scopeCoverage.unanswered} fresh questions remaining</strong>
+                  </p>
+                </div>
+              </div>
+
+              {/* Accuracy Pill & Subject Reset */}
+              <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                <div className="glass-pill-luxury px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-zinc-800 flex items-center space-x-1.5 rtl:space-x-reverse text-xs font-bold text-slate-800 dark:text-zinc-200">
+                  <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>{scopeCoverage.accuracy}% {t.common.accuracy}</span>
+                </div>
+                {selectedSubject !== 'all' && scopeCoverage.answered > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => resetSubjectStats(selectedSubject, questions)}
+                    className="glass-pill-luxury px-2.5 py-1.5 rounded-xl text-[11px] font-semibold text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200/80 dark:border-zinc-800 hover:border-rose-400/50 cursor-pointer apple-tap transition-all"
+                    title={t.test.resetSubjectProgressBtn}
+                  >
+                    <RotateCcw className="w-3 h-3 text-slate-400 hover:text-rose-500 inline mr-1" />
+                    <span>{t.test.resetSubjectProgressBtn}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Tri-Color Glassmorphic Progress Bar */}
+            <div className="space-y-1.5">
+              <div className="h-2.5 sm:h-3 w-full bg-slate-200/70 dark:bg-zinc-800/80 rounded-full overflow-hidden flex p-0.5 gap-0.5 shadow-inner">
+                {scopeCoverage.correct > 0 && (
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                    style={{ width: `${(scopeCoverage.correct / (scopeCoverage.total || 1)) * 100}%` }}
+                    title={`${scopeCoverage.correct} Mastered`}
+                  />
+                )}
+                {scopeCoverage.incorrect > 0 && (
+                  <div
+                    className="h-full bg-rose-500 rounded-full transition-all duration-500"
+                    style={{ width: `${(scopeCoverage.incorrect / (scopeCoverage.total || 1)) * 100}%` }}
+                    title={`${scopeCoverage.incorrect} Missed`}
+                  />
+                )}
+                <div
+                  className="h-full bg-blue-500/20 dark:bg-blue-400/20 rounded-full transition-all duration-500"
+                  style={{ width: `${(scopeCoverage.unanswered / (scopeCoverage.total || 1)) * 100}%` }}
+                  title={`${scopeCoverage.unanswered} Fresh Remaining`}
+                />
+              </div>
+
+              {/* Progress Legend Counters */}
+              <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400 font-semibold px-0.5">
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    {scopeCoverage.correct} Mastered
+                  </span>
+                  <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400">
+                    <span className="w-2 h-2 rounded-full bg-rose-500" />
+                    {scopeCoverage.incorrect} Missed
+                  </span>
+                  <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    {scopeCoverage.unanswered} Fresh Remaining
+                  </span>
+                </div>
+                <span className="text-slate-400 dark:text-zinc-500 font-mono text-[10px]">
+                  Total: {scopeCoverage.total} Qs
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Hero Continuity Action Bar */}
+            <div className="pt-1 flex flex-wrap items-center gap-2">
+              {scopeCoverage.unanswered > 0 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRepetitionFilter('unanswered');
+                      handleLaunchSession(Math.min(20, scopeCoverage.unanswered), 'practice', 'unanswered');
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-xs hover:shadow-md hover:shadow-blue-500/25 flex items-center space-x-2 rtl:space-x-reverse cursor-pointer apple-tap transition-all"
+                  >
+                    <Zap className="w-3.5 h-3.5 fill-current" />
+                    <span>{t.test.continueBankCta} ({scopeCoverage.unanswered} Left)</span>
+                  </button>
+
+                  {scopeCoverage.incorrect > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRepetitionFilter('incorrect');
+                        handleLaunchSession(scopeCoverage.incorrect, 'practice', 'incorrect');
+                      }}
+                      className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 flex items-center space-x-1.5 rtl:space-x-reverse cursor-pointer apple-tap transition-all"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>{t.test.reviewMissedCta.replace('{count}', String(scopeCoverage.incorrect))}</span>
+                    </button>
+                  )}
+                </>
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRepetitionFilter('all');
+                      handleLaunchSession('all', 'practice', 'all');
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-xs hover:shadow-md hover:shadow-emerald-500/25 flex items-center space-x-2 rtl:space-x-reverse cursor-pointer apple-tap transition-all"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>{t.test.restartCategoryBtn} ({scopeCoverage.total} Qs)</span>
+                  </button>
+
+                  {scopeCoverage.incorrect > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRepetitionFilter('incorrect');
+                        handleLaunchSession(scopeCoverage.incorrect, 'practice', 'incorrect');
+                      }}
+                      className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 flex items-center space-x-1.5 rtl:space-x-reverse cursor-pointer apple-tap transition-all"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>{t.test.reviewMissedCta.replace('{count}', String(scopeCoverage.incorrect))}</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Subject Discipline Filter Strip with Refined Hover Feedback */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
@@ -538,6 +738,117 @@ export const TestHub: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Question Repetition & History Scope Strip */}
+          {selectedMode === 'practice' && (
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider block">
+                  {t.test.repetitionFilterTitle}
+                </label>
+                <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">
+                  {repetitionFilter === 'unanswered'
+                    ? t.test.filterUnansweredDesc
+                    : repetitionFilter === 'incorrect'
+                    ? t.test.filterIncorrectOnlyDesc
+                    : t.test.filterAllPoolDesc}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {/* Tab 1: Fresh / Unanswered */}
+                <button
+                  type="button"
+                  onClick={() => setRepetitionFilter('unanswered')}
+                  className={`p-3 rounded-2xl text-left border transition-all duration-150 cursor-pointer apple-tap flex items-center justify-between ${
+                    repetitionFilter === 'unanswered'
+                      ? 'bg-blue-600/10 dark:bg-blue-500/15 border-blue-500/60 text-blue-900 dark:text-blue-100 shadow-xs'
+                      : 'glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400/40'
+                  }`}
+                >
+                  <div className="min-w-0 pr-2">
+                    <div className="text-xs font-black flex items-center gap-1.5">
+                      <span>{t.test.filterUnanswered}</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                        repetitionFilter === 'unanswered'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'
+                      }`}>
+                        {scopeCoverage.unanswered}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 dark:text-zinc-400 truncate mt-0.5">
+                      Zero duplicates guarantee
+                    </div>
+                  </div>
+                  {repetitionFilter === 'unanswered' && (
+                    <CheckCircle2 className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                  )}
+                </button>
+
+                {/* Tab 2: All Questions */}
+                <button
+                  type="button"
+                  onClick={() => setRepetitionFilter('all')}
+                  className={`p-3 rounded-2xl text-left border transition-all duration-150 cursor-pointer apple-tap flex items-center justify-between ${
+                    repetitionFilter === 'all'
+                      ? 'bg-indigo-600/10 dark:bg-indigo-500/15 border-indigo-500/60 text-indigo-900 dark:text-indigo-100 shadow-xs'
+                      : 'glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-400/40'
+                  }`}
+                >
+                  <div className="min-w-0 pr-2">
+                    <div className="text-xs font-black flex items-center gap-1.5">
+                      <span>{t.test.filterAllPool}</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                        repetitionFilter === 'all'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'
+                      }`}>
+                        {scopeCoverage.total}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 dark:text-zinc-400 truncate mt-0.5">
+                      Full bank rotation
+                    </div>
+                  </div>
+                  {repetitionFilter === 'all' && (
+                    <CheckCircle2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                  )}
+                </button>
+
+                {/* Tab 3: Missed Only */}
+                <button
+                  type="button"
+                  onClick={() => setRepetitionFilter('incorrect')}
+                  disabled={scopeCoverage.incorrect === 0}
+                  className={`p-3 rounded-2xl text-left border transition-all duration-150 cursor-pointer apple-tap flex items-center justify-between disabled:opacity-40 disabled:cursor-not-allowed ${
+                    repetitionFilter === 'incorrect'
+                      ? 'bg-rose-600/10 dark:bg-rose-500/15 border-rose-500/60 text-rose-900 dark:text-rose-100 shadow-xs'
+                      : 'glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-400/40'
+                  }`}
+                >
+                  <div className="min-w-0 pr-2">
+                    <div className="text-xs font-black flex items-center gap-1.5">
+                      <span>{t.test.filterIncorrectOnly}</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                        repetitionFilter === 'incorrect'
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'
+                      }`}>
+                        {scopeCoverage.incorrect}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 dark:text-zinc-400 truncate mt-0.5">
+                      Targeted remediation
+                    </div>
+                  </div>
+                  {repetitionFilter === 'incorrect' && (
+                    <CheckCircle2 className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Compact Streamlined Category Test Strip */}
           <div className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-purple-500/10 dark:from-blue-500/15 dark:via-indigo-500/10 dark:to-purple-500/15 border border-blue-500/20 dark:border-blue-400/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors">
@@ -659,8 +970,8 @@ export const TestHub: React.FC = () => {
                 : selectedMode === 'rapid' 
                 ? `${Math.min(matchingQuestionCount, 15)} ${t.test.highYieldOnly}` 
                 : questionCount === 'all'
-                ? `${effectiveQuestionCount} ${t.common.questions} (${t.test.fullCategoryBadge}) • ${t.test.practiceMode}`
-                : `${effectiveQuestionCount} ${t.common.questions} • ${t.test.practiceMode}`}
+                ? `${effectiveQuestionCount} ${t.common.questions} (${repetitionFilter === 'unanswered' ? 'Fresh Only • Zero Duplicates' : t.test.fullCategoryBadge}) • ${t.test.practiceMode}`
+                : `${effectiveQuestionCount} ${t.common.questions} (${repetitionFilter === 'unanswered' ? 'Fresh Only • Zero Duplicates' : 'Standard Pool'}) • ${t.test.practiceMode}`}
             </span>
           </div>
           <p className="text-[11px] text-slate-400 font-normal flex items-center gap-2">
