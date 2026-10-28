@@ -17,6 +17,7 @@ import type { Question } from '../domain/model/types.ts';
 import type { GovernedQuestion } from '../../specs/005-global-question-bank-governance/contracts/question-bank-governance-ports.ts';
 
 export interface Env {
+  ASSETS?: { fetch(request: Request): Promise<Response> };
   MED_QUESTS_DB?: {
     prepare(query: string): {
       first<T = unknown>(): Promise<T | null>;
@@ -1904,6 +1905,14 @@ export default {
           return new Response(JSON.stringify({ error: e.message }), { status: 500 });
         }
       }
+    }
+
+    if (env.ASSETS) {
+      const assetRes = await env.ASSETS.fetch(request);
+      if (assetRes.status === 404 && request.method === 'GET' && !url.pathname.startsWith('/api/')) {
+        return await env.ASSETS.fetch(new Request(new URL('/', request.url), request));
+      }
+      return assetRes;
     }
 
     return new Response('Not Found', { status: 404 });
