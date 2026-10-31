@@ -8,6 +8,7 @@ import type {
   ActiveDeviceSession,
   SecurityAnomalyFlag,
   PerformanceTier,
+  DeviceMarketTier,
 } from './types.ts';
 import { ROLE_ENTITLEMENT_POLICIES, rolePolicyEvaluator } from './entitlements.ts';
 
@@ -23,6 +24,8 @@ export const UserStudyTelemetrySchema = z.object({
   dueReviewsCount: z.number().int().min(0),
   dailyAiRequestsUsed: z.number().int().min(0),
   favoriteSubspecialty: z.string(),
+  avgPaceSeconds: z.number().min(0).optional(),
+  streakDays: z.number().int().min(0).optional(),
 });
 export type UserStudyTelemetry = z.infer<typeof UserStudyTelemetrySchema>;
 
@@ -43,6 +46,7 @@ export const SecurityAuditActionSchema = z.enum([
   'SESSION_REVOKED',
   'ANOMALY_QUARANTINED',
   'KV_CACHE_HYDRATED',
+  'QUESTION_BANK_EXPORTED',
 ]);
 export type SecurityAuditAction = z.infer<typeof SecurityAuditActionSchema>;
 
@@ -199,6 +203,7 @@ export interface PlatformAnalyticsSnapshot {
   // Breakdowns
   readonly roleBreakdown: Readonly<Record<UserRole, number>>;
   readonly tierBreakdown: Readonly<Record<PerformanceTier, number>>;
+  readonly marketTierBreakdown: Readonly<Record<DeviceMarketTier, number>>;
   readonly anomalyBreakdown: Readonly<Record<SecurityAnomalyFlag, number>>;
   readonly coloDistribution: readonly ColoTrafficStat[];
   readonly universityCohorts: readonly UniversityCohortStat[];
@@ -226,6 +231,13 @@ export class PlatformAnalyticsAggregator implements IPlatformAnalyticsAggregator
       ultra: 0,
       balanced: 0,
       'low-spec': 0,
+    };
+
+    const marketTierBreakdown: Record<DeviceMarketTier, number> = {
+      'flagship-luxury': 0,
+      'upper-midrange': 0,
+      'mid-range': 0,
+      economical: 0,
     };
 
     const anomalyBreakdown: Record<SecurityAnomalyFlag, number> = {
@@ -321,6 +333,8 @@ export class PlatformAnalyticsAggregator implements IPlatformAnalyticsAggregator
       for (const session of activeSessions) {
         totalActiveSessions += 1;
         tierBreakdown[session.clientTier] = (tierBreakdown[session.clientTier] ?? 0) + 1;
+        const mTier: DeviceMarketTier = session.device.marketTier ?? 'mid-range';
+        marketTierBreakdown[mTier] = (marketTierBreakdown[mTier] ?? 0) + 1;
         totalLatencyMs += session.edgeVerificationLatencyMs;
 
         const isHit = session.kvCacheStatus === 'hit';
@@ -400,6 +414,7 @@ export class PlatformAnalyticsAggregator implements IPlatformAnalyticsAggregator
       globalKvHitRatePercent: Math.round((kvHitCount / sessionCount) * 100),
       roleBreakdown,
       tierBreakdown,
+      marketTierBreakdown,
       anomalyBreakdown,
       coloDistribution,
       universityCohorts,
