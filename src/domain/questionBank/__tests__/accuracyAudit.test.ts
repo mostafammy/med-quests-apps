@@ -7,7 +7,7 @@
  * - Admin RBAC Authorization Guards (Rejects Unprivileged Non-Admins)
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import type { Question } from '../../model/types.ts';
 import { UniformRandomSamplingStrategy } from '../accuracyAudit/sampling/UniformRandomSamplingStrategy.ts';
 import { StratifiedSamplingStrategy } from '../accuracyAudit/sampling/StratifiedSamplingStrategy.ts';
