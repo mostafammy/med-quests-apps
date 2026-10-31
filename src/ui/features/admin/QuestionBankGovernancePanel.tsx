@@ -53,7 +53,7 @@ export const QuestionBankGovernancePanel: React.FC = () => {
     getFilteredQueue,
   } = useBankGovernanceStore();
 
-  const { authState } = useAuthStore();
+  const { authState, setGovernanceTab } = useAuthStore();
   const { resetLocalBankToGlobal, questions } = useQuestionStore();
   const { t } = useLocaleStore();
 
@@ -343,6 +343,17 @@ export const QuestionBankGovernancePanel: React.FC = () => {
             >
               <Download className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
               <span>Export Master Bank ({catalogQuestions.length || questions.length})</span>
+            </button>
+          )}
+
+          {isAdmin && (
+            <button
+              onClick={() => setGovernanceTab('accuracy-audit')}
+              className="py-2 px-3.5 rounded-xl bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-indigo-500/10 hover:from-pink-500/20 hover:to-indigo-500/20 border border-purple-200/80 dark:border-purple-800 text-xs font-bold text-purple-700 dark:text-purple-300 flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer apple-tap"
+              title="Launch Random Sample Accuracy Audit Lab"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-pink-500" />
+              <span>Accuracy Audit Lab</span>
             </button>
           )}
 
