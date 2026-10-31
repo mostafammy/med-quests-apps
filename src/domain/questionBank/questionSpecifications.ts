@@ -122,33 +122,76 @@ export class HighYieldSpecification extends CompositeSpecification<GovernedQuest
 }
 
 export class SearchQuerySpecification extends CompositeSpecification<GovernedQuestion> {
-  private readonly terms: readonly string[];
+  private readonly rawQuery: string;
+  private readonly normalizedPhrase: string;
+  private readonly cleanTerms: readonly string[];
 
   public constructor(query: string) {
     super();
-    this.terms = query
-      .trim()
-      .toLowerCase()
+    this.rawQuery = query.trim().toLowerCase();
+
+    // Strip surrounding quotes (straight and curly quotes) and normalize line breaks / tabs
+    const unquoted = this.rawQuery
+      .replace(/^["'“‘](.*)["'”’]$/, '$1')
+      .replace(/[\r\n\t]+/g, ' ')
+      .trim();
+
+    this.normalizedPhrase = unquoted.replace(/\s+/g, ' ');
+
+    // Extract individual clean alphanumeric terms (stripping leading/trailing punctuation like commas, parentheses, question marks)
+    this.cleanTerms = this.normalizedPhrase
       .split(/\s+/)
+      .map((t) => t.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ''))
       .filter((t) => t.length > 0);
   }
 
   public isSatisfiedBy(candidate: GovernedQuestion): boolean {
-    if (this.terms.length === 0) return true;
+    if (this.cleanTerms.length === 0) return true;
 
     const searchableBlob = [
       candidate.id,
       candidate.stem,
       candidate.concept,
+      candidate.subjectId,
+      candidate.chapterId,
+      candidate.topicId,
       candidate.explanation,
       candidate.examTip || '',
       candidate.mnemonic || '',
-      ...candidate.choices.map((c) => `${c.text} ${c.rationale}`),
+      ...candidate.choices.map((c) => `${c.id} ${c.text} ${c.rationale}`),
     ]
       .join(' ')
       .toLowerCase();
 
-    return this.terms.every((term) => searchableBlob.includes(term));
+    // 1. Direct phrase or normalized substring match (e.g. pasted multi-line stem or quoted phrase)
+    if (this.normalizedPhrase.length > 0 && searchableBlob.includes(this.normalizedPhrase)) {
+      return true;
+    }
+
+    // Normalized blob without punctuation for resilient token matching
+    const normalizedBlob = searchableBlob.replace(/[^\p{L}\p{N}\s]+/gu, ' ');
+
+    // 2. All clean terms match across either the exact blob or the normalized blob
+    const allTermsMatch = this.cleanTerms.every((term) =>
+      searchableBlob.includes(term) || normalizedBlob.includes(term)
+    );
+    if (allTermsMatch) return true;
+
+    // 3. For longer queries (e.g. pasted full question stems with >= 5 words),
+    // allow high-confidence threshold matching (>= 80% of significant words match)
+    if (this.cleanTerms.length >= 5) {
+      const significantTerms = this.cleanTerms.filter((t) => t.length > 2);
+      if (significantTerms.length >= 4) {
+        const matchCount = significantTerms.filter(
+          (term) => searchableBlob.includes(term) || normalizedBlob.includes(term)
+        ).length;
+        if (matchCount / significantTerms.length >= 0.8) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 }
 
