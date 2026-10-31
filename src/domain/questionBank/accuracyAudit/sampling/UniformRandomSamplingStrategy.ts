@@ -4,7 +4,7 @@
  * Guarantees that every question in the population has an equal, unbiased probability of selection.
  */
 
-import type { Question } from '../../model/types.ts';
+import type { Question } from '../../../model/types.ts';
 import type { ISamplingStrategy } from './ISamplingStrategy.ts';
 import type { SamplingConfiguration, SampleExtractionResult } from '../types.ts';
 import { createRandomGenerator } from './prng.ts';
