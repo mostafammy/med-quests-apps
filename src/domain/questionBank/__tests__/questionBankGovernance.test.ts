@@ -647,4 +647,159 @@ describe('QuestionSpecificationBuilder & computeGlobalBankKpis', () => {
     expect(preview.remoteRevision).toBeGreaterThan(preview.localRevision);
     expect(Number(preview.rawDelta.revision)).toBe(7);
   });
+
+  it('correctly matches multiline stems with quotes, punctuation, and parentheses via enhanced SearchQuerySpecification', () => {
+    const sternalQuestion: GovernedQuestion = {
+      ...SAMPLE_QUESTION,
+      id: 'q-cvs-ana-018',
+      stem: 'The horizontal transverse thoracic plane passing through the sternal angle (angle of Louis) anteriorly intersects which vertebral level posteriorly?',
+      concept: 'Superior Mediastinum Plane (Angle of Louis)',
+      choices: [
+        { id: 'a', text: 'T2-T3 intervertebral disc', isCorrect: false, rationale: 'Too superior' },
+        { id: 'b', text: 'T7-T8 intervertebral disc', isCorrect: false, rationale: 'Too inferior' },
+        { id: 'c', text: 'T4-T5 intervertebral disc', isCorrect: true, rationale: 'Passes through T4-T5 junction' },
+        { id: 'd', text: 'T9-T10 intervertebral disc', isCorrect: false, rationale: 'Level of xiphisternal joint' },
+      ],
+      editorialStatus: 'published',
+      bankVersion: 2,
+      provenanceScope: 'global-canonical',
+      stemHash: QuestionCanonicalHasher.computeStemHashSync(
+        'The horizontal transverse thoracic plane passing through the sternal angle (angle of Louis) anteriorly intersects which vertebral level posteriorly?'
+      ),
+      globalRevision: 2,
+      authorId: 'usr-faculty',
+      authorDisplayName: 'Faculty',
+      reviewedById: 'usr-admin',
+      reviewedByDisplayName: 'Admin',
+      reviewerNotes: null,
+      publishedAt: '2026-10-31T00:00:00Z',
+      createdAt: '2026-10-31T00:00:00Z',
+      updatedAt: '2026-10-31T00:00:00Z',
+    };
+
+    // User prompt's exact multiline query with quotes and line breaks
+    const multilineQueryWithQuotes = `"The horizontal transverse thoracic
+plane passing through the sternal
+angle (angle of Louis) anteriorly
+intersects which vertebral level
+posteriorly?"`;
+
+    const spec1 = QuestionSpecificationBuilder.build({
+      searchQuery: multilineQueryWithQuotes,
+    });
+    expect(spec1.isSatisfiedBy(sternalQuestion)).toBe(true);
+
+    // Searching by answer choice text
+    const specChoice = QuestionSpecificationBuilder.build({
+      searchQuery: 'T4-T5 intervertebral disc',
+    });
+    expect(specChoice.isSatisfiedBy(sternalQuestion)).toBe(true);
+
+    // Searching with parentheses and punctuation
+    const specPunctuation = QuestionSpecificationBuilder.build({
+      searchQuery: '(angle of Louis)?',
+    });
+    expect(specPunctuation.isSatisfiedBy(sternalQuestion)).toBe(true);
+
+    // Non-matching query
+    const specNonMatching = QuestionSpecificationBuilder.build({
+      searchQuery: 'completely unrelated cardiology question',
+    });
+    expect(specNonMatching.isSatisfiedBy(sternalQuestion)).toBe(false);
+  });
+
+  it('permanently deletes canonical questions, bumps revision, records audit log, and honors tombstones', async () => {
+    const { edgeQuestionBankGateway } = await import('../../../infrastructure/questionBank/edgeQuestionBankGateway.ts');
+
+    const testQuestion: Question = {
+      ...SAMPLE_QUESTION,
+      id: 'q-cvs-to-delete-001',
+      stem: 'Temporary test question to delete permanently from the canonical curriculum.',
+      concept: 'Deletion Test Concept',
+    };
+
+    // 1. Create canonical question
+    const createRes = await edgeQuestionBankGateway.createCanonicalQuestions({
+      questions: [testQuestion],
+      actorId: 'usr-admin',
+      actorDisplayName: 'Dr. Apple Admin',
+      actorRole: 'admin',
+    });
+    expect(createRes.ok).toBe(true);
+
+    const beforeBank = edgeQuestionBankGateway.getLocalCanonicalBank('cvs');
+    expect(beforeBank.some((q) => q.id === 'q-cvs-to-delete-001')).toBe(true);
+
+    // 2. Delete canonical question permanently
+    const deleteRes = await edgeQuestionBankGateway.deleteCanonicalQuestion({
+      questionId: 'q-cvs-to-delete-001' as any,
+      actorId: 'usr-admin',
+      actorDisplayName: 'Dr. Apple Admin',
+      actorRole: 'admin',
+      reason: 'Curriculum pruning of outdated clinical item',
+      permanent: true,
+    });
+
+    expect(deleteRes.ok).toBe(true);
+    if (deleteRes.ok) {
+      expect(deleteRes.value.deletedQuestionId).toBe('q-cvs-to-delete-001');
+      expect(deleteRes.value.auditEntry.action).toBe('CANONICAL_QUESTION_DELETED');
+      expect(deleteRes.value.auditEntry.summary).toContain('Curriculum pruning');
+    }
+
+    // 3. Verify removed from canonical bank
+    const afterBank = edgeQuestionBankGateway.getLocalCanonicalBank('cvs');
+    expect(afterBank.some((q) => q.id === 'q-cvs-to-delete-001')).toBe(false);
+  });
+
+  it('updates canonical question choices, changes the correct answer, and bumps bankVersion', async () => {
+    const { edgeQuestionBankGateway } = await import('../../../infrastructure/questionBank/edgeQuestionBankGateway.ts');
+
+    const testQuestion: Question = {
+      ...SAMPLE_QUESTION,
+      id: 'q-cvs-choices-edit-001',
+      stem: 'Question to test changing the correct answer choice in the curriculum.',
+      concept: 'Choices Mutation Concept',
+      choices: [
+        { id: 'a', text: 'Initial correct answer', isCorrect: true, rationale: 'Old rationale for correct choice.' },
+        { id: 'b', text: 'Initial distractor 1', isCorrect: false, rationale: 'Old distractor rationale for choice 1.' },
+        { id: 'c', text: 'Initial distractor 2', isCorrect: false, rationale: 'Old distractor rationale for choice 2.' },
+        { id: 'd', text: 'Initial distractor 3', isCorrect: false, rationale: 'Old distractor rationale for choice 3.' },
+      ],
+    };
+
+    const createRes = await edgeQuestionBankGateway.createCanonicalQuestions({
+      questions: [testQuestion],
+      actorId: 'usr-admin',
+      actorDisplayName: 'Dr. Apple Admin',
+      actorRole: 'admin',
+    });
+    expect(createRes.ok).toBe(true);
+
+    // Mutate choices: switch correct answer from A to B
+    const updateRes = await edgeQuestionBankGateway.updateCanonicalQuestion({
+      questionId: 'q-cvs-choices-edit-001' as any,
+      patch: {
+        choices: [
+          { id: 'a', text: 'New distractor text', isCorrect: false, rationale: 'Now incorrect according to evidence.' },
+          { id: 'b', text: 'New verified correct answer', isCorrect: true, rationale: 'Now correct according to evidence.' },
+          { id: 'c', text: 'Initial distractor 2', isCorrect: false, rationale: 'Old distractor rationale for choice 2.' },
+          { id: 'd', text: 'Initial distractor 3', isCorrect: false, rationale: 'Old distractor rationale for choice 3.' },
+        ],
+      },
+      actorId: 'usr-admin',
+      actorDisplayName: 'Dr. Apple Admin',
+      actorRole: 'admin',
+      changeReason: 'Errata: re-keying correct answer based on 2026 ACC/AHA guidelines',
+    });
+
+    expect(updateRes.ok).toBe(true);
+    if (updateRes.ok) {
+      const updated = updateRes.value.updatedQuestion;
+      expect(updated.choices[0].isCorrect).toBe(false);
+      expect(updated.choices[1].isCorrect).toBe(true);
+      expect(updated.choices[1].text).toBe('New verified correct answer');
+      expect(updated.bankVersion).toBeGreaterThan(1);
+    }
+  });
 });
