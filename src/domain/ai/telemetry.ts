@@ -1,9 +1,9 @@
 /**
- * Real-time Cognitive Telemetry Tracker
- * Captures live hesitation, option toggling, and rereading behavior
- * while the student works through an active question.
+ * Real-time Cognitive Telemetry Tracker (SOLID Single-Responsibility Domain Sensor)
+ * Captures live per-question active reading duration, hesitation/choice switching,
+ * initial gut-instinct choice, distractor elimination, and AI Co-Pilot consultation.
  */
-import type { ChoiceId } from '../model/types.ts';
+import type { ChoiceId, Confidence } from '../model/types.ts';
 
 export interface ChoiceToggleEvent {
   readonly fromChoice: ChoiceId | null;
@@ -16,57 +16,181 @@ export interface ActiveQuestionTelemetry {
   readonly startedAtMs: number;
   readonly choiceToggles: readonly ChoiceToggleEvent[];
   readonly stemRereadCount: number;
+  readonly activeTimeSpentMs?: number;
+  readonly firstSelectedChoiceId?: ChoiceId | null;
+  readonly choiceChangesCount?: number;
+  readonly eliminatedChoiceIds?: ChoiceId[];
+  readonly confidence?: Confidence;
+  readonly aiCopilotConsulted?: boolean;
+}
+
+interface QuestionMutableState {
+  questionId: string;
+  firstOpenedAtMs: number;
+  lastEnteredAtMs: number | null;
+  accumulatedTimeMs: number;
+  choiceToggles: ChoiceToggleEvent[];
+  stemRereadCount: number;
+  lastSelectedChoice: ChoiceId | null;
+  firstSelectedChoice: ChoiceId | null;
+  eliminatedChoices: Set<ChoiceId>;
+  confidence: Confidence;
+  aiCopilotConsulted: boolean;
 }
 
 class TelemetryTracker {
   private currentQuestionId: string | null = null;
   private startedAtMs: number = Date.now();
-  private choiceToggles: ChoiceToggleEvent[] = [];
-  private stemRereadCount: number = 0;
-  private lastSelectedChoice: ChoiceId | null = null;
+  private byQuestion = new Map<string, QuestionMutableState>();
+
+  private ensureState(questionId: string): QuestionMutableState {
+    let state = this.byQuestion.get(questionId);
+    if (!state) {
+      const now = Date.now();
+      state = {
+        questionId,
+        firstOpenedAtMs: now,
+        lastEnteredAtMs: null,
+        accumulatedTimeMs: 0,
+        choiceToggles: [],
+        stemRereadCount: 0,
+        lastSelectedChoice: null,
+        firstSelectedChoice: null,
+        eliminatedChoices: new Set<ChoiceId>(),
+        confidence: 'unsure',
+        aiCopilotConsulted: false,
+      };
+      this.byQuestion.set(questionId, state);
+    }
+    return state;
+  }
+
+  private flushCurrentQuestionTime(): void {
+    if (!this.currentQuestionId) return;
+    const state = this.byQuestion.get(this.currentQuestionId);
+    if (state && state.lastEnteredAtMs !== null) {
+      const delta = Math.max(0, Date.now() - state.lastEnteredAtMs);
+      // Cap single uninterrupted dwell delta at 5 minutes to prevent idle tab inflation
+      state.accumulatedTimeMs += Math.min(delta, 5 * 60 * 1000);
+      state.lastEnteredAtMs = Date.now();
+    }
+  }
 
   startQuestion(questionId: string, force = false) {
     if (!force && this.currentQuestionId === questionId) return;
+    this.flushCurrentQuestionTime();
+
     this.currentQuestionId = questionId;
     this.startedAtMs = Date.now();
-    this.choiceToggles = [];
-    this.stemRereadCount = 0;
-    this.lastSelectedChoice = null;
+
+    if (force) {
+      this.byQuestion.delete(questionId);
+    }
+    const nextState = this.ensureState(questionId);
+    nextState.lastEnteredAtMs = Date.now();
   }
 
   reset() {
     this.currentQuestionId = null;
     this.startedAtMs = Date.now();
-    this.choiceToggles = [];
-    this.stemRereadCount = 0;
-    this.lastSelectedChoice = null;
+    this.byQuestion.clear();
   }
 
-  recordChoiceSelection(toChoice: ChoiceId) {
-    if (this.lastSelectedChoice === toChoice) return;
-    this.choiceToggles.push({
-      fromChoice: this.lastSelectedChoice,
+  recordChoiceSelection(toChoice: ChoiceId, explicitQuestionId?: string) {
+    const qId = explicitQuestionId ?? this.currentQuestionId ?? 'unknown';
+    const state = this.ensureState(qId);
+    if (state.lastSelectedChoice === toChoice) return;
+
+    if (state.firstSelectedChoice === null) {
+      state.firstSelectedChoice = toChoice;
+    }
+
+    state.choiceToggles.push({
+      fromChoice: state.lastSelectedChoice,
       toChoice,
       timestampMs: Date.now(),
     });
-    this.lastSelectedChoice = toChoice;
+    state.lastSelectedChoice = toChoice;
+  }
+
+  toggleChoiceElimination(choiceId: ChoiceId, explicitQuestionId?: string): readonly ChoiceId[] {
+    const qId = explicitQuestionId ?? this.currentQuestionId ?? 'unknown';
+    const state = this.ensureState(qId);
+    if (state.eliminatedChoices.has(choiceId)) {
+      state.eliminatedChoices.delete(choiceId);
+    } else {
+      state.eliminatedChoices.add(choiceId);
+    }
+    return Array.from(state.eliminatedChoices);
+  }
+
+  setConfidence(confidence: Confidence, explicitQuestionId?: string) {
+    const qId = explicitQuestionId ?? this.currentQuestionId ?? 'unknown';
+    const state = this.ensureState(qId);
+    state.confidence = confidence;
+  }
+
+  recordConfidence(confidence: Confidence, explicitQuestionId?: string) {
+    this.setConfidence(confidence, explicitQuestionId);
+  }
+
+  recordAiCopilotConsultation(explicitQuestionId?: string) {
+    const qId = explicitQuestionId ?? this.currentQuestionId ?? 'unknown';
+    const state = this.ensureState(qId);
+    state.aiCopilotConsulted = true;
   }
 
   recordStemReread() {
-    this.stemRereadCount += 1;
+    const qId = this.currentQuestionId ?? 'unknown';
+    const state = this.ensureState(qId);
+    state.stemRereadCount += 1;
   }
 
-  getSnapshot(): ActiveQuestionTelemetry {
+  getQuestionSnapshot(questionId: string): ActiveQuestionTelemetry {
+    if (this.currentQuestionId === questionId) {
+      this.flushCurrentQuestionTime();
+    }
+    const state = this.byQuestion.get(questionId);
+    if (!state) {
+      const elapsed = Math.max(800, Date.now() - this.startedAtMs);
+      return {
+        questionId,
+        startedAtMs: this.startedAtMs,
+        choiceToggles: [],
+        stemRereadCount: 0,
+        activeTimeSpentMs: elapsed,
+        firstSelectedChoiceId: null,
+        choiceChangesCount: 0,
+        eliminatedChoiceIds: [],
+        confidence: 'unsure',
+        aiCopilotConsulted: false,
+      };
+    }
+
+    const activeTimeSpentMs = Math.max(800, state.accumulatedTimeMs);
+    const choiceChangesCount = Math.max(0, state.choiceToggles.length - 1);
+
     return {
-      questionId: this.currentQuestionId ?? 'unknown',
-      startedAtMs: this.startedAtMs,
-      choiceToggles: [...this.choiceToggles],
-      stemRereadCount: this.stemRereadCount,
+      questionId: state.questionId,
+      startedAtMs: state.firstOpenedAtMs,
+      choiceToggles: [...state.choiceToggles],
+      stemRereadCount: state.stemRereadCount,
+      activeTimeSpentMs,
+      firstSelectedChoiceId: state.firstSelectedChoice,
+      choiceChangesCount,
+      eliminatedChoiceIds: Array.from(state.eliminatedChoices),
+      confidence: state.confidence,
+      aiCopilotConsulted: state.aiCopilotConsulted,
     };
   }
 
+  getSnapshot(): ActiveQuestionTelemetry {
+    return this.getQuestionSnapshot(this.currentQuestionId ?? 'unknown');
+  }
+
   getTimeSpentSeconds(): number {
-    return Math.max(1, Math.round((Date.now() - this.startedAtMs) / 1000));
+    const snap = this.getSnapshot();
+    return Math.max(1, Math.round((snap.activeTimeSpentMs ?? 1000) / 1000));
   }
 }
 
