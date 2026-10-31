@@ -302,6 +302,12 @@ export const enDictionary: TranslationDictionary = {
   },
   bank: {
     title: 'Question Bank & Synchronisation',
+    exportMasterBankBtn: 'Export Master Question Bank',
+    exportModalTitle: 'Authoritative Question Bank Export',
+    exportModalSub: 'Encrypted & Watermarked Enterprise Master Archive',
+    exportConfidentialNotice:
+      'Confidential Intellectual Property: Strictly restricted to platform administrators. Every export event is cryptographically sealed and permanently logged in the Cloudflare Edge Security Trail.',
+    exportSuccessToast: 'Authoritative Question Bank exported successfully.',
     resetToGlobalBtn: 'Reset to Global Bank',
     resetConfirmTitle: 'Reset Question Bank to Global Canonical Edition?',
     resetConfirmDialog:
