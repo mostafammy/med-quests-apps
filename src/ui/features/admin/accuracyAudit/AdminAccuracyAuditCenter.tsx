@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertTriangle,
-  XCircle,
   Sliders,
   Download,
   Search,
@@ -21,14 +20,11 @@ import {
   Square,
   Lock,
   ChevronRight,
-  Info,
-  Layers,
   Copy,
   Check,
   Trash2,
   History,
   FileText,
-  HelpCircle,
 } from 'lucide-react';
 import { useAuthStore } from '../../../../application/stores/useAuthStore.ts';
 import {
@@ -37,7 +33,6 @@ import {
 } from '../../../../application/stores/useAdminAccuracyAuditStore.ts';
 import type {
   SamplingStrategyType,
-  QuestionAccuracyAuditResult,
   AuditEvaluationDimension,
 } from '../../../../domain/questionBank/accuracyAudit/types.ts';
 
@@ -101,10 +96,6 @@ export const AdminAccuracyAuditCenter: React.FC = () => {
       </div>
     );
   }
-
-  const selectedQuestion = currentReport?.questionResults.find(
-    (q) => q.questionId === selectedQuestionId
-  );
 
   // Filter questions
   const filteredQuestions = (currentReport?.questionResults || []).filter((q) => {
