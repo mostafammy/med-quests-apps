@@ -3,7 +3,7 @@
  * Adheres to SOLID: Interface Segregation (ISP) & Open/Closed Principle (OCP)
  */
 
-import type { Question } from '../../model/types.ts';
+import type { Question } from '../../../model/types.ts';
 import type { SamplingConfiguration, SampleExtractionResult } from '../types.ts';
 
 export interface ISamplingStrategy {
