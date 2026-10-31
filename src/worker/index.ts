@@ -1907,6 +1907,111 @@ export default {
       }
     }
 
+    // 16. Canonical Curator: Delete Canonical Question (DELETE)
+    const canonicalDeleteMatch = url.pathname.match(/^\/api\/admin\/questions\/canonical\/([^/]+)$/);
+    if (canonicalDeleteMatch && request.method === 'DELETE') {
+      const questionId = decodeURIComponent(canonicalDeleteMatch[1]);
+      let params: any = {};
+      try {
+        params = (await request.json()) as any;
+      } catch {
+        // Fall back to URL search params
+      }
+      const actorId = params.actorId || url.searchParams.get('actorId') || 'usr_admin';
+      const actorDisplayName = params.actorDisplayName || url.searchParams.get('actorDisplayName') || 'Faculty Admin';
+      const actorRole = params.actorRole || url.searchParams.get('actorRole') || 'admin';
+      const reason = params.reason || url.searchParams.get('reason') || 'Administrative curriculum deletion';
+      const permanent = params.permanent !== false;
+
+      const guard = guardCurator(request, url, {
+        id: actorId,
+        displayName: actorDisplayName,
+        role: actorRole,
+      });
+      if (guard) return guard;
+
+      if (env.MED_QUESTS_DB) {
+        try {
+          await ensureGlobalBankSeeded(env.MED_QUESTS_DB, 'cvs');
+          const existingRow = await env.MED_QUESTS_DB.prepare(
+            'SELECT * FROM global_questions WHERE id = ?'
+          )
+            .bind(questionId)
+            .first<any>();
+
+          if (!existingRow) {
+            return new Response(JSON.stringify({ error: 'Question not found' }), { status: 404 });
+          }
+
+          const existing = mapRowToGovernedQuestion(existingRow);
+          const nextRev = await bumpD1BlockRevision(env.MED_QUESTS_DB, existing.blockId);
+          const nowIso = new Date().toISOString();
+
+          if (permanent) {
+            await env.MED_QUESTS_DB.prepare('DELETE FROM global_questions WHERE id = ?')
+              .bind(questionId)
+              .run();
+          } else {
+            await env.MED_QUESTS_DB.prepare(
+              `UPDATE global_questions
+               SET editorial_status = 'archived', status = 'quarantined', global_revision = ?, updated_at = ?
+               WHERE id = ?`
+            )
+              .bind(nextRev, nowIso, questionId)
+              .run();
+          }
+
+          const auditEntry = {
+            id: `audit-${Date.now()}`,
+            questionId,
+            blockId: existing.blockId,
+            action: permanent ? 'CANONICAL_QUESTION_DELETED' : 'CANONICAL_QUESTION_ARCHIVED',
+            actorUserId: actorId,
+            actorDisplayName,
+            actorRole,
+            previousStatus: existing.editorialStatus,
+            nextStatus: permanent ? 'deleted' : 'archived',
+            revisionAfter: nextRev,
+            summary: `${permanent ? 'Permanently deleted' : 'Archived'} question: ${reason}`,
+            occurredAt: nowIso,
+          };
+
+          await env.MED_QUESTS_DB.prepare(
+            `INSERT INTO question_editorial_audit_log (
+              id, question_id, block_id, action, actor_user_id, actor_display_name,
+              actor_role, previous_status, next_status, revision_after, summary, occurred_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+            .bind(
+              auditEntry.id,
+              questionId,
+              existing.blockId,
+              auditEntry.action,
+              actorId,
+              actorDisplayName,
+              actorRole,
+              existing.editorialStatus,
+              auditEntry.nextStatus,
+              nextRev,
+              auditEntry.summary,
+              nowIso
+            )
+            .run();
+
+          return new Response(
+            JSON.stringify({
+              deletedQuestionId: questionId,
+              auditEntry,
+              newBlockRevision: nextRev,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        } catch (e: any) {
+          return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+        }
+      }
+    }
+
     if (env.ASSETS) {
       const assetRes = await env.ASSETS.fetch(request);
       if (assetRes.status === 404 && request.method === 'GET' && !url.pathname.startsWith('/api/')) {
