@@ -6,6 +6,8 @@ import { edgeQuestionBankGateway } from '../../infrastructure/questionBank/edgeQ
 import { NonDestructiveBankMergeStrategy } from '../../domain/questionBank/nonDestructiveMergeStrategy.ts';
 import { BankResetPlanner } from '../../domain/questionBank/bankResetPlanner.ts';
 import { QuestionCanonicalHasher } from '../../domain/questionBank/canonicalHasher.ts';
+import { useAuthStore } from './useAuthStore.ts';
+import { edgeAuthGateway } from '../../infrastructure/auth/edgeAuthGateway.ts';
 import type {
   BankSyncCursor,
   LocalBankMergeReport,
@@ -64,7 +66,7 @@ interface QuestionStoreState {
     authorContext?: { authorId?: string; authorDisplayName?: string; authorRole?: any }
   ) => Promise<{ count: number; errors: string[]; ticketCount: number }>;
   loadMySubmissions: (authorId?: string) => Promise<void>;
-  exportBankJson: () => string;
+  exportBankJson: (blockId?: string) => string;
   clearBank: (blockId?: string) => Promise<void>;
   resetLocalBankToGlobal: (blockId?: string) => Promise<{
     resetCount: number;
@@ -127,6 +129,27 @@ export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
         const enrichedSeed = enrichBundledQuestions(defaultCvsBank as Question[]);
         await db.questions.bulkPut(enrichedSeed as unknown as Question[]);
         stored = enrichedSeed as unknown as Question[];
+      } else if (stored.length > 0 && blockId === 'cvs' && Array.isArray(defaultCvsBank)) {
+        // Non-destructive upgrade: Reconcile unedited seed-bundled questions to bankVersion 2
+        const bundledMap = new Map((defaultCvsBank as Question[]).map((q) => [q.id, q]));
+        const toUpgrade: Question[] = [];
+        for (const q of stored) {
+          const governed = q as GovernedQuestion;
+          if (governed.provenanceScope === 'seed-bundled' && (governed.bankVersion || 1) < 2) {
+            const bundled = bundledMap.get(q.id);
+            if (bundled && (bundled.bankVersion || 1) >= 2) {
+              toUpgrade.push({
+                ...q,
+                choices: bundled.choices,
+                bankVersion: bundled.bankVersion || 2,
+              });
+            }
+          }
+        }
+        if (toUpgrade.length > 0) {
+          await db.questions.bulkPut(toUpgrade);
+          stored = await db.questions.where('blockId').equals(blockId).toArray();
+        }
       }
 
       // 2. Read local sync cursor (or initialize Rev #1 if missing)
@@ -603,8 +626,48 @@ export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
     }
   },
 
-  exportBankJson: () => {
-    const list = get().questions;
+  exportBankJson: (blockId = 'cvs') => {
+    const authState = useAuthStore.getState().authState;
+    const isAdmin = authState.status === 'authenticated-active' && authState.user.role === 'admin';
+    if (!isAdmin) {
+      const actorId = authState.status === 'authenticated-active' ? authState.user.id : 'usr_anonymous';
+      const actorName = authState.status === 'authenticated-active' ? authState.user.displayName : 'Local Scholar';
+      const actorRole = authState.status === 'authenticated-active' ? authState.user.role : 'unauthenticated';
+
+      edgeAuthGateway.logSecurityAudit({
+        actorUserId: actorId,
+        actorDisplayName: `${actorName} (${actorRole})`,
+        targetUserId: actorId,
+        targetDisplayName: `Question Bank [${blockId.toUpperCase()}]`,
+        action: 'QUESTION_BANK_EXPORTED',
+        summary: `BLOCKED unauthorized export attempt of question bank by ${actorName} [Role: ${actorRole}]. Admin privileges strictly required.`,
+        edgeColo: 'CAI',
+        latencyMs: 0.9,
+      });
+
+      useAuthStore.setState({ auditLogs: [...edgeAuthGateway.getAuditLogs()] });
+
+      throw new Error(
+        'Access Denied (403): Exporting the question bank is strictly restricted to Authoritative Platform Administrators within the Admin Governance Dashboard.'
+      );
+    }
+
+    const list = get().questions.filter((q) => !blockId || q.blockId === blockId);
+
+    // Record verified administrative export in immutable security audit trail
+    edgeAuthGateway.logSecurityAudit({
+      actorUserId: authState.user.id,
+      actorDisplayName: authState.user.displayName,
+      targetUserId: authState.user.id,
+      targetDisplayName: `Authoritative Curriculum [${blockId.toUpperCase()}]`,
+      action: 'QUESTION_BANK_EXPORTED',
+      summary: `Exported authoritative question bank for block [${blockId.toUpperCase()}] (${list.length} questions, Rev #${get().syncCursor?.serverRevision ?? 1})`,
+      edgeColo: 'CAI',
+      latencyMs: 1.2,
+    });
+
+    useAuthStore.setState({ auditLogs: [...edgeAuthGateway.getAuditLogs()] });
+
     return JSON.stringify(list, null, 2);
   },
 
