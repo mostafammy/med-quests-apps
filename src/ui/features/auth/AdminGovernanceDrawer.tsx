@@ -23,6 +23,10 @@ import {
   ExternalLink,
   Trash2,
   BookOpen,
+  Zap,
+  Copy,
+  Check,
+  Server,
 } from 'lucide-react';
 import { QuestionBankGovernancePanel } from '../admin/QuestionBankGovernancePanel.tsx';
 import {
@@ -37,6 +41,14 @@ import {
   type AiFeatureFilterMode,
   type RestrictionFilterMode,
 } from '../../../domain/auth/governanceAnalytics.ts';
+
+function getCountryFlag(code?: string | null): string {
+  if (!code || code === 'DEV') return '🌐';
+  const c = code.toUpperCase();
+  if (c.length !== 2) return '🌐';
+  const codePoints = [...c].map((char) => 127397 + char.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
 
 const FEATURE_FLAG_META: ReadonlyArray<{
   readonly key: FeatureFlagKey;
@@ -86,6 +98,7 @@ export const AdminGovernanceDrawer: React.FC = () => {
     performanceOverride,
     setPerformanceOverride,
     signInWithGoogle,
+    elevateToPlatformOwner,
     purgeDemoData,
   } = useAuthStore();
 
@@ -95,6 +108,7 @@ export const AdminGovernanceDrawer: React.FC = () => {
   const [aiFeatureFilter, setAiFeatureFilter] = useState<AiFeatureFilterMode>('all');
   const [blockReasonInput, setBlockReasonInput] = useState('');
   const [selectedSessionIdx, setSelectedSessionIdx] = useState(0);
+  const [copiedIp, setCopiedIp] = useState<string | null>(null);
 
   const analytics = useMemo(
     () => computePlatformAnalytics(managedUsers),
@@ -111,6 +125,42 @@ export const AdminGovernanceDrawer: React.FC = () => {
       }),
     [managedUsers, searchQuery, roleFilter, restrictionFilter, aiFeatureFilter]
   );
+
+  const allSessionsWithUser = useMemo(
+    () =>
+      managedUsers.flatMap((u) =>
+        u.activeSessions.map((sess) => ({
+          ...sess,
+          user: u.profile,
+          userRecord: u,
+        }))
+      ),
+    [managedUsers]
+  );
+
+  const distinctIps = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of allSessionsWithUser) {
+      if (s.edgeNetwork?.ipAddress) set.add(s.edgeNetwork.ipAddress);
+    }
+    return Array.from(set);
+  }, [allSessionsWithUser]);
+
+  const distinctColos = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of allSessionsWithUser) {
+      if (s.edgeNetwork?.colo) set.add(s.edgeNetwork.colo);
+    }
+    return Array.from(set);
+  }, [allSessionsWithUser]);
+
+  const handleCopyIp = (ip: string) => {
+    void navigator.clipboard.writeText(ip);
+    setCopiedIp(ip);
+    setTimeout(() => {
+      setCopiedIp((curr) => (curr === ip ? null : curr));
+    }, 2000);
+  };
 
   if (!isGovernanceDrawerOpen) return null;
 
@@ -140,21 +190,32 @@ export const AdminGovernanceDrawer: React.FC = () => {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={async () => {
-              await signInWithGoogle();
-            }}
-            className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-zinc-900 hover:bg-black dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 py-3 px-4 font-semibold text-xs shadow-md cursor-pointer transition-all apple-tap"
-          >
-            <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-            </svg>
-            <span>{isAuthenticatedNonAdmin ? 'Switch to Administrator Account' : 'Sign in with Google'}</span>
-          </button>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => void elevateToPlatformOwner()}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white py-3 px-4 font-bold text-xs shadow-md shadow-amber-500/20 cursor-pointer transition-all apple-tap"
+            >
+              <Zap className="h-4 w-4" />
+              <span>⚡ One-Click Elevation (Mostafa Yaser)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                await signInWithGoogle();
+              }}
+              className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-zinc-900 hover:bg-black dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 py-2.5 px-4 font-semibold text-xs shadow-sm cursor-pointer transition-all apple-tap"
+            >
+              <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+              </svg>
+              <span>{isAuthenticatedNonAdmin ? 'Switch to Administrator Account' : 'Sign in with Google'}</span>
+            </button>
+          </div>
 
           <button
             type="button"
@@ -288,22 +349,28 @@ export const AdminGovernanceDrawer: React.FC = () => {
           {(
             [
               {
+                id: 'network-telemetry',
+                label: 'Live Edge Network & IPs',
+                icon: Globe,
+                badge: `${distinctIps.length} IPs`,
+              },
+              {
+                id: 'cohort-analytics',
+                label: 'Global Cohort & Telemetry',
+                icon: BarChart3,
+                badge: `${analytics.totalUsers} Scholars`,
+              },
+              {
+                id: 'user-directory',
+                label: 'User Directory & AI Toggles',
+                icon: Users,
+                badge: `${analytics.aiCloudEnabledUsersCount} AI Active`,
+              },
+              {
                 id: 'question-bank',
                 label: 'Question Bank & Review',
                 icon: BookOpen,
                 badge: 'Curriculum',
-              },
-              {
-                id: 'cohort-analytics',
-                label: 'Global Cohort & Telemetry Stats',
-                icon: BarChart3,
-                badge: `${analytics.totalUsers} Users`,
-              },
-              {
-                id: 'user-directory',
-                label: 'User Directory, AI Toggles & Bans',
-                icon: Users,
-                badge: `${analytics.aiCloudEnabledUsersCount} AI Active`,
               },
               {
                 id: 'audit-trail',
@@ -339,7 +406,162 @@ export const AdminGovernanceDrawer: React.FC = () => {
         {/* Body Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {/* ========================================================= */}
-          {/* TAB 0: CURRICULUM QUESTION BANK & REVIEW QUEUE            */}
+          {/* TAB 0: LIVE EDGE NETWORK, IPS & SECURITY FORENSICS         */}
+          {/* ========================================================= */}
+          {activeGovernanceTab === 'network-telemetry' && (
+            <div className="space-y-6">
+              {/* Top 4 Global KPI Cards */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-2xl border border-zinc-200/80 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+                  <div className="flex items-center justify-between text-xs font-semibold text-zinc-500">
+                    <span>Edge Public IPs</span>
+                    <Globe className="h-4 w-4 text-blue-500" />
+                  </div>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span className="text-2xl font-bold font-heading text-blue-600 dark:text-blue-400">
+                      {distinctIps.length}
+                    </span>
+                    <span className="text-[10px] font-semibold text-emerald-600">Active</span>
+                  </div>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">Cloudflare Anycast</p>
+                </div>
+
+                <div className="rounded-2xl border border-zinc-200/80 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+                  <div className="flex items-center justify-between text-xs font-semibold text-zinc-500">
+                    <span>Edge Colocations</span>
+                    <Server className="h-4 w-4 text-amber-500" />
+                  </div>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span className="text-2xl font-bold font-heading text-amber-600 dark:text-amber-400">
+                      {distinctColos.length}
+                    </span>
+                    <span className="text-[10px] font-semibold text-amber-500">PoPs</span>
+                  </div>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">{distinctColos.join(' • ')}</p>
+                </div>
+
+                <div className="rounded-2xl border border-zinc-200/80 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+                  <div className="flex items-center justify-between text-xs font-semibold text-zinc-500">
+                    <span>Hardware Tier</span>
+                    <Cpu className="h-4 w-4 text-indigo-500" />
+                  </div>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span className="text-2xl font-bold font-heading text-indigo-600 dark:text-indigo-400">
+                      {allSessionsWithUser.filter((s) => s.device.marketTier === 'flagship-luxury').length}
+                    </span>
+                    <span className="text-[10px] font-semibold text-indigo-500">Flagship</span>
+                  </div>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">Apple Silicon / Adreno</p>
+                </div>
+
+                <div className="rounded-2xl border border-zinc-200/80 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+                  <div className="flex items-center justify-between text-xs font-semibold text-zinc-500">
+                    <span>Zero-Trust TLS</span>
+                    <Shield className="h-4 w-4 text-emerald-500" />
+                  </div>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span className="text-2xl font-bold font-heading text-emerald-600 dark:text-emerald-400">
+                      HTTP/3
+                    </span>
+                    <span className="text-[10px] font-semibold text-emerald-500">TLSv1.3</span>
+                  </div>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">JA4 Fingerprints active</p>
+                </div>
+              </div>
+
+              {/* Edge IP & Sessions Table */}
+              <div className="rounded-2xl border border-zinc-200/80 bg-white dark:border-zinc-800 dark:bg-zinc-900 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                      Live Connecting Public IP Addresses & Edge Nodes
+                    </h4>
+                    <p className="text-[11px] text-zinc-400">
+                      Every connecting scholar's IPv4/IPv6 address, geolocation, ISP, and hardware telemetry
+                    </p>
+                  </div>
+                  {copiedIp && (
+                    <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                      <Check className="h-3 w-3" /> Copied {copiedIp}
+                    </span>
+                  )}
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-zinc-50 dark:bg-zinc-850/60 text-zinc-500 uppercase text-[10px] font-bold">
+                      <tr>
+                        <th className="py-2.5 px-3">IP Address</th>
+                        <th className="py-2.5 px-3">Location & Flag</th>
+                        <th className="py-2.5 px-3">Colo & ISP</th>
+                        <th className="py-2.5 px-3">Scholar & Role</th>
+                        <th className="py-2.5 px-3">Device & Silicon</th>
+                        <th className="py-2.5 px-3">Study Stats</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800">
+                      {allSessionsWithUser.map((sess) => (
+                        <tr key={sess.sessionId} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-850/40">
+                          <td className="py-2.5 px-3 font-mono font-bold text-zinc-900 dark:text-zinc-100">
+                            <div className="flex items-center gap-1.5">
+                              <span>{sess.edgeNetwork.ipAddress}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyIp(sess.edgeNetwork.ipAddress)}
+                                className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer"
+                                title="Copy IP"
+                              >
+                                {copiedIp === sess.edgeNetwork.ipAddress ? (
+                                  <Check className="h-3 w-3 text-emerald-500" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                              </button>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <div className="flex items-center gap-1 text-[11px]">
+                              <span>{getCountryFlag(sess.edgeNetwork.countryCode)}</span>
+                              <span>{sess.edgeNetwork.city || 'Edge Node'}, {sess.edgeNetwork.countryCode}</span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="rounded bg-amber-500/10 font-mono text-[10px] font-bold text-amber-700 dark:text-amber-300 px-1.5 py-0.2 mr-1">
+                              {sess.edgeNetwork.colo}
+                            </span>
+                            <span className="text-[10px] text-zinc-400 truncate">
+                              {sess.edgeNetwork.ispOrganization || 'Edge'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <div className="font-semibold text-zinc-900 dark:text-zinc-100">{sess.user.displayName}</div>
+                            <div className="text-[10px] text-zinc-400 truncate max-w-[120px]">{sess.user.email}</div>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <div className="font-medium text-zinc-800 dark:text-zinc-200">{sess.device.deviceName}</div>
+                            <div className="text-[10px] text-indigo-500 font-mono truncate max-w-[130px]">
+                              {sess.device.gpuRenderer || 'WebGL'}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <div className="font-bold text-zinc-800 dark:text-zinc-200">
+                              {sess.userRecord.studyTelemetry.totalAttempts} Qs • {sess.userRecord.studyTelemetry.overallAccuracy}%
+                            </div>
+                            <div className="text-[10px] text-zinc-400">
+                              {sess.userRecord.studyTelemetry.masteryPercentage}% CVS Mastery
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 1: CURRICULUM QUESTION BANK & REVIEW QUEUE            */}
           {/* ========================================================= */}
           {activeGovernanceTab === 'question-bank' && (
             <div className="py-2">
@@ -586,7 +808,33 @@ export const AdminGovernanceDrawer: React.FC = () => {
                         {analytics.tierBreakdown['low-spec']} devices
                       </span>
                     </div>
-                    <div className="pt-2 flex flex-wrap gap-1.5">
+                    <div className="pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 grid grid-cols-2 gap-1.5 text-[11px]">
+                      <div className="rounded-lg bg-amber-500/10 px-2.5 py-1 flex items-center justify-between">
+                        <span className="font-semibold text-amber-800 dark:text-amber-300">Flagship / Luxury</span>
+                        <span className="font-mono font-bold text-amber-700 dark:text-amber-300">
+                          {analytics.marketTierBreakdown['flagship-luxury']}
+                        </span>
+                      </div>
+                      <div className="rounded-lg bg-indigo-500/10 px-2.5 py-1 flex items-center justify-between">
+                        <span className="font-semibold text-indigo-800 dark:text-indigo-300">Upper Mid-Range</span>
+                        <span className="font-mono font-bold text-indigo-700 dark:text-indigo-300">
+                          {analytics.marketTierBreakdown['upper-midrange']}
+                        </span>
+                      </div>
+                      <div className="rounded-lg bg-blue-500/10 px-2.5 py-1 flex items-center justify-between">
+                        <span className="font-semibold text-blue-800 dark:text-blue-300">Mid-Range</span>
+                        <span className="font-mono font-bold text-blue-700 dark:text-blue-300">
+                          {analytics.marketTierBreakdown['mid-range']}
+                        </span>
+                      </div>
+                      <div className="rounded-lg bg-emerald-500/10 px-2.5 py-1 flex items-center justify-between">
+                        <span className="font-semibold text-emerald-800 dark:text-emerald-300">Economical</span>
+                        <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300">
+                          {analytics.marketTierBreakdown.economical}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="pt-1 flex flex-wrap gap-1.5">
                       {(['student-free', 'student-pro', 'faculty-reviewer', 'admin'] as UserRole[]).map(
                         (r) => (
                           <span
@@ -795,7 +1043,7 @@ export const AdminGovernanceDrawer: React.FC = () => {
                     </div>
 
                     {/* User's Collected Study & AI Usage Metrics */}
-                    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                       <div className="rounded-xl bg-white/80 p-2.5 dark:bg-zinc-800/60">
                         <span className="text-[10px] uppercase text-zinc-400">Attempts</span>
                         <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
@@ -815,8 +1063,20 @@ export const AdminGovernanceDrawer: React.FC = () => {
                         </p>
                       </div>
                       <div className="rounded-xl bg-white/80 p-2.5 dark:bg-zinc-800/60">
-                        <span className="text-[10px] uppercase text-zinc-400">Daily Cloud AI</span>
+                        <span className="text-[10px] uppercase text-zinc-400">Avg Pace</span>
                         <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                          {targetStats.avgPaceSeconds ? `${targetStats.avgPaceSeconds}s/Q` : '—'}
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-white/80 p-2.5 dark:bg-zinc-800/60">
+                        <span className="text-[10px] uppercase text-zinc-400">Weak / Due</span>
+                        <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                          {targetStats.weakTopicsCount}W / {targetStats.dueReviewsCount}D
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-white/80 p-2.5 dark:bg-zinc-800/60">
+                        <span className="text-[10px] uppercase text-zinc-400">Daily Cloud AI</span>
+                        <p className="text-sm font-bold text-purple-600 dark:text-purple-400">
                           {targetStats.dailyAiRequestsUsed} / {selectedRecord.dailyAiRequestsLimit}
                         </p>
                       </div>
@@ -1157,9 +1417,23 @@ export const AdminGovernanceDrawer: React.FC = () => {
                             <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
                               <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
                                 <span className="text-[10px] text-zinc-400">Connecting IP</span>
-                                <p className="mt-0.5 font-mono text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                                  {edgeNet.ipAddress}
-                                </p>
+                                <div className="mt-0.5 flex items-center justify-between">
+                                  <p className="font-mono text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                                    {edgeNet.ipAddress}
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyIp(edgeNet.ipAddress)}
+                                    className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                                    title="Copy IP"
+                                  >
+                                    {copiedIp === edgeNet.ipAddress ? (
+                                      <Check className="h-3 w-3 text-emerald-500" />
+                                    ) : (
+                                      <Copy className="h-3 w-3" />
+                                    )}
+                                  </button>
+                                </div>
                               </div>
                               <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
                                 <span className="text-[10px] text-zinc-400">Edge Colo</span>
