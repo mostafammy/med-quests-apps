@@ -6,7 +6,6 @@
  * Implements Builder & Strategy Patterns.
  */
 
-import type { Question } from '../../model/types.ts';
 import type { ParsedQuestionItem } from './types.ts';
 
 export class CrossModelVerificationPromptBuilder {
