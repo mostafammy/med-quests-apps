@@ -4,7 +4,7 @@
  * absence of negatively phrased stems, and mnemonic efficacy.
  */
 
-import type { Question } from '../../model/types.ts';
+import type { Question } from '../../../model/types.ts';
 import type { IAccuracyEvaluationAgent } from './IAccuracyEvaluationAgent.ts';
 import type { AgentCritique } from '../types.ts';
 
