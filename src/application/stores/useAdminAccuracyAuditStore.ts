@@ -12,17 +12,14 @@ import type { Question } from '../../domain/model/types.ts';
 import defaultCvsBank from '../../../content/cvs/dist/bank.v1.json';
 import {
   AdminAccuracyAuditService,
-  AdminAuthorizationError,
 } from '../../domain/questionBank/accuracyAudit/AdminAccuracyAuditService.ts';
 import type {
   SamplingConfiguration,
   AccuracyAuditRunReport,
-  QuestionAccuracyAuditResult,
   AuditProgressTelemetry,
   AuditVerdict,
 } from '../../domain/questionBank/accuracyAudit/types.ts';
 import { useAuthStore } from './useAuthStore.ts';
-import { useBankGovernanceStore } from './useBankGovernanceStore.ts';
 import { useQuestionStore } from './useQuestionStore.ts';
 
 export type AuditFilterVerdict = 'all' | AuditVerdict;
@@ -244,8 +241,6 @@ export const useAdminAccuracyAuditStore = create<AdminAccuracyAuditStoreState>((
     if (!item) return { success: false, message: 'Question not found in current report.' };
 
     try {
-      // Forward directly to the Governance store or review queue
-      const { submitReviewDecision } = useBankGovernanceStore.getState();
       const reason = actionNotes || item.criticalFlags.join('; ') || 'Flagged by AI Accuracy Audit Lab';
 
       // Log action feedback
