@@ -3,7 +3,7 @@
  * Evaluates physiological mechanisms, anatomical facts, clinical guidelines, and correctness of keyed answer.
  */
 
-import type { Question } from '../../model/types.ts';
+import type { Question } from '../../../model/types.ts';
 import type { IAccuracyEvaluationAgent } from './IAccuracyEvaluationAgent.ts';
 import type { AgentCritique } from '../types.ts';
 
