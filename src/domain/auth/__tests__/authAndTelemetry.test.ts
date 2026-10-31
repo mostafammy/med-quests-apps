@@ -27,6 +27,7 @@ import {
 } from '../governanceAnalytics.ts';
 import { resolveAiEngine } from '../../../infrastructure/ai/engineRegistry.ts';
 import { edgeAuthGateway } from '../../../infrastructure/auth/edgeAuthGateway.ts';
+import { questionTelemetryTracker } from '../../ai/telemetry.ts';
 import type { Attempt, ReviewCard } from '../../model/types.ts';
 import type { ActiveDeviceSession } from '../types.ts';
 
@@ -607,5 +608,31 @@ describe('Device Intelligence & Economic vs. Luxury Market Tier Classification',
     expect(androidSessionId).not.toBe(macSessionId);
     expect(androidSessionId.startsWith('ses_android_')).toBe(true);
     expect(macSessionId.startsWith('ses_macos_')).toBe(true);
+  });
+
+  it('tracks per-question cognitive telemetry (first instinct, answer switches, confidence, and marketTierBreakdown)', () => {
+    questionTelemetryTracker.reset();
+    questionTelemetryTracker.startQuestion('q-cvs-001');
+    questionTelemetryTracker.recordChoiceSelection('b', 'q-cvs-001');
+    questionTelemetryTracker.recordChoiceSelection('d', 'q-cvs-001');
+    questionTelemetryTracker.recordConfidence('sure', 'q-cvs-001');
+    questionTelemetryTracker.toggleChoiceElimination('a', 'q-cvs-001');
+
+    const snap = questionTelemetryTracker.getQuestionSnapshot('q-cvs-001');
+    expect(snap.firstSelectedChoiceId).toBe('b');
+    expect(snap.choiceChangesCount).toBe(1);
+    expect(snap.confidence).toBe('sure');
+    expect(snap.eliminatedChoiceIds).toContain('a');
+    expect(snap.activeTimeSpentMs).toBeGreaterThanOrEqual(800);
+
+    const cohort = edgeAuthGateway.getManagedUsers();
+    const analytics = computePlatformAnalytics(cohort);
+    expect(analytics.marketTierBreakdown).toBeDefined();
+    expect(
+      analytics.marketTierBreakdown['flagship-luxury'] +
+        analytics.marketTierBreakdown['upper-midrange'] +
+        analytics.marketTierBreakdown['mid-range'] +
+        analytics.marketTierBreakdown.economical
+    ).toBeGreaterThanOrEqual(1);
   });
 });
