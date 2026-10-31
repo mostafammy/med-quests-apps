@@ -132,6 +132,12 @@ export interface Attempt {
   confidence: Confidence;
   responseTimeMs: Millis;
   answeredAt: IsoDateTime;
+  // Enriched Cognitive & Behavioral Micro-Telemetry (Optional for backward compatibility)
+  firstSelectedChoiceId?: ChoiceId | null;
+  choiceChangesCount?: number;
+  eliminatedChoiceIds?: ChoiceId[];
+  aiCopilotConsulted?: boolean;
+  stemRereadCount?: number;
 }
 
 export interface ReviewCard {
