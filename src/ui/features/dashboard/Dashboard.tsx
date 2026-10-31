@@ -29,6 +29,13 @@ export const Dashboard: React.FC = () => {
     masteryPercentage, 
     weakTopicsCount, 
     dueReviewsCount,
+    subjectReadiness,
+    avgPaceSeconds,
+    streakDays,
+    todayAttempts,
+    dailyGoalTarget,
+    pacingQuadrants,
+    confidenceCalibration,
     refreshStats,
     resetStats
   } = useStatsStore();
@@ -206,6 +213,196 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Apple Fitness-Style Triple Mastery Rings & Live Cognitive Telemetry Cockpit */}
+      <div className="p-5 sm:p-6 md:p-7 rounded-3xl glass-surface border border-white/80 dark:border-zinc-800/80 shadow-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+          {/* Left 5 Cols: Concentric Apple Activity Rings + Legend */}
+          <div className="lg:col-span-5 flex flex-col sm:flex-row items-center gap-5 sm:gap-6">
+            <div className="relative w-36 h-36 shrink-0 flex items-center justify-center">
+              <svg className="w-36 h-36 -rotate-90" viewBox="0 0 140 140">
+                {/* Outer Ring Track (Mastery %) */}
+                <circle
+                  cx="70"
+                  cy="70"
+                  r="58"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="10"
+                  className="text-emerald-500/15 dark:text-emerald-500/20"
+                />
+                <circle
+                  cx="70"
+                  cy="70"
+                  r="58"
+                  fill="none"
+                  stroke="#10b981"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 58}
+                  strokeDashoffset={
+                    2 * Math.PI * 58 * (1 - Math.min(100, Math.max(2, masteryPercentage)) / 100)
+                  }
+                  className="transition-all duration-700"
+                />
+
+                {/* Middle Ring Track (Accuracy %) */}
+                <circle
+                  cx="70"
+                  cy="70"
+                  r="44"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="10"
+                  className="text-blue-500/15 dark:text-blue-500/20"
+                />
+                <circle
+                  cx="70"
+                  cy="70"
+                  r="44"
+                  fill="none"
+                  stroke="#3b82f6"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 44}
+                  strokeDashoffset={
+                    2 * Math.PI * 44 * (1 - Math.min(100, Math.max(2, overallAccuracy)) / 100)
+                  }
+                  className="transition-all duration-700"
+                />
+
+                {/* Inner Ring Track (Daily Goal) */}
+                <circle
+                  cx="70"
+                  cy="70"
+                  r="30"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="10"
+                  className="text-amber-500/15 dark:text-amber-500/20"
+                />
+                <circle
+                  cx="70"
+                  cy="70"
+                  r="30"
+                  fill="none"
+                  stroke="#f59e0b"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 30}
+                  strokeDashoffset={
+                    2 *
+                    Math.PI *
+                    30 *
+                    (1 - Math.min(1, Math.max(0.03, todayAttempts / Math.max(1, dailyGoalTarget))))
+                  }
+                  className="transition-all duration-700"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+                  Streak
+                </span>
+                <span className="text-lg font-black text-slate-900 dark:text-zinc-100 leading-none mt-0.5">
+                  {streakDays}d
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 flex-1 w-full">
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                  Apple Cognitive Telemetry Rings
+                </span>
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-zinc-100">
+                  Daily Readiness & Pacing Pulse
+                </h3>
+              </div>
+
+              <div className="space-y-1.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center space-x-2 text-slate-600 dark:text-zinc-300 font-semibold">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                    <span>Block Mastery Ring</span>
+                  </span>
+                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    {masteryPercentage}%
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center space-x-2 text-slate-600 dark:text-zinc-300 font-semibold">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                    <span>Diagnostic Accuracy</span>
+                  </span>
+                  <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                    {overallAccuracy}%
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center space-x-2 text-slate-600 dark:text-zinc-300 font-semibold">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                    <span>Daily Study Target</span>
+                  </span>
+                  <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                    {todayAttempts} / {dailyGoalTarget} Qs
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right 7 Cols: 4-Quadrant Pacing & Confidence Calibration */}
+          <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 lg:pt-0 border-t lg:border-t-0 lg:border-l border-slate-200/60 dark:border-zinc-800/60 lg:pl-6">
+            <div className="p-3 rounded-2xl bg-emerald-500/8 dark:bg-emerald-950/25 border border-emerald-500/20 space-y-1">
+              <div className="text-[10px] font-extrabold uppercase text-emerald-700 dark:text-emerald-400">
+                Fast & Accurate
+              </div>
+              <div className="text-xl font-black text-emerald-900 dark:text-emerald-200">
+                {pacingQuadrants.fastAccurate}
+              </div>
+              <div className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80">
+                ≤45s Automatic Recall
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-blue-500/8 dark:bg-blue-950/25 border border-blue-500/20 space-y-1">
+              <div className="text-[10px] font-extrabold uppercase text-blue-700 dark:text-blue-400">
+                Avg Pacing Speed
+              </div>
+              <div className="text-xl font-black text-blue-900 dark:text-blue-200">
+                {avgPaceSeconds > 0 ? `${avgPaceSeconds}s` : '—'}
+              </div>
+              <div className="text-[10px] text-blue-700/80 dark:text-blue-300/80">
+                {pacingQuadrants.slowAccurate} Deliberate Correct
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-amber-500/8 dark:bg-amber-950/25 border border-amber-500/20 space-y-1">
+              <div className="text-[10px] font-extrabold uppercase text-amber-700 dark:text-amber-400">
+                Rushed Mistakes
+              </div>
+              <div className="text-xl font-black text-amber-900 dark:text-amber-200">
+                {pacingQuadrants.fastWrong}
+              </div>
+              <div className="text-[10px] text-amber-700/80 dark:text-amber-300/80">
+                Premature Closure (≤45s)
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-rose-500/8 dark:bg-rose-950/25 border border-rose-500/20 space-y-1">
+              <div className="text-[10px] font-extrabold uppercase text-rose-700 dark:text-rose-400">
+                Danger Zone
+              </div>
+              <div className="text-xl font-black text-rose-900 dark:text-rose-200">
+                {confidenceCalibration.sureWrong}
+              </div>
+              <div className="text-[10px] text-rose-700/80 dark:text-rose-300/80">
+                Confident Mistakes • {confidenceCalibration.sureCorrect} Sure✓
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Dynamic Recommendation Banner: Electric Indigo to Cobalt Blue Gradient */}
       <div className="relative rounded-3xl p-5 sm:p-8 text-white shadow-xl overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 border border-white/20">
         <div className="absolute right-0 top-0 bottom-0 w-2/5 bg-gradient-to-l from-white/10 to-transparent pointer-events-none" />
@@ -341,97 +538,119 @@ export const Dashboard: React.FC = () => {
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Anatomy Card - Royal Blue Glow */}
-          <div className="p-6 rounded-3xl glass-card-interactive space-y-3 border-blue-400/25 dark:border-blue-700/30">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50" />
-                <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-sm">{t.dashboard.subjects.anatomy}</h3>
-              </div>
-              <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md">3 Chapters</span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-              Heart chambers, valves, coronaries, pericardium, cardiac looping, atrial & ventricular septation.
-            </p>
-            <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-100 dark:border-zinc-800">
-              <span className="font-bold text-slate-700 dark:text-zinc-300">56 {t.common.questions}</span>
-              <button
-                onClick={() => navigate('/test?subject=anatomy')}
-                className="text-blue-600 dark:text-blue-400 font-bold hover:underline cursor-pointer flex items-center space-x-1"
-              >
-                <span>{t.dashboard.startPractice} →</span>
-              </button>
-            </div>
-          </div>
+          {(
+            [
+              {
+                id: 'anatomy' as const,
+                title: t.dashboard.subjects.anatomy,
+                chaptersLabel: '3 Chapters',
+                desc: 'Heart chambers, valves, coronaries, pericardium, cardiac looping, atrial & ventricular septation.',
+                dotClass: 'bg-blue-500 shadow-blue-500/50',
+                borderClass: 'border-blue-400/25 dark:border-blue-700/30',
+                badgeClass: 'text-blue-600 dark:text-blue-400 bg-blue-500/10',
+                btnClass: 'text-blue-600 dark:text-blue-400',
+              },
+              {
+                id: 'histology' as const,
+                title: t.dashboard.subjects.histology,
+                chaptersLabel: '2 Chapters',
+                desc: 'Heart wall layers, intercalated discs, Purkinje fibers, elastic/muscular arteries, and capillary beds.',
+                dotClass: 'bg-purple-500 shadow-purple-500/50',
+                borderClass: 'border-purple-400/25 dark:border-purple-700/30',
+                badgeClass: 'text-purple-600 dark:text-purple-400 bg-purple-500/10',
+                btnClass: 'text-purple-600 dark:text-purple-400',
+              },
+              {
+                id: 'microbiology' as const,
+                title: t.dashboard.subjects.microbiology,
+                chaptersLabel: '3 Chapters',
+                desc: 'Rheumatic fever (JONES criteria & M protein mimicry), infective endocarditis, and viral myocarditis.',
+                dotClass: 'bg-emerald-500 shadow-emerald-500/50',
+                borderClass: 'border-emerald-400/25 dark:border-emerald-700/30',
+                badgeClass: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10',
+                btnClass: 'text-emerald-600 dark:text-emerald-400',
+              },
+              {
+                id: 'physiology' as const,
+                title: t.dashboard.subjects.physiology,
+                chaptersLabel: '3 Chapters',
+                desc: 'Cardiac electrophysiology, AP phases (0–4), cardiac cycle phases, heart sounds, and hemodynamics / BP regulation.',
+                dotClass: 'bg-amber-500 shadow-amber-500/50',
+                borderClass: 'border-amber-400/25 dark:border-amber-700/30',
+                badgeClass: 'text-amber-600 dark:text-amber-400 bg-amber-500/10',
+                btnClass: 'text-amber-600 dark:text-amber-400',
+              },
+            ]
+          ).map((subj) => {
+            const stat = subjectReadiness[subj.id];
+            const totalQs =
+              stat?.totalQuestions ||
+              questions.filter((q) => q.subjectId === subj.id).length;
+            const correctPct =
+              totalQs > 0 ? Math.round(((stat?.correctCount ?? 0) / totalQs) * 100) : 0;
+            const mistakePct =
+              totalQs > 0 ? Math.round(((stat?.incorrectCount ?? 0) / totalQs) * 100) : 0;
 
-          {/* Histology Card - Violet / Purple Glow */}
-          <div className="p-6 rounded-3xl glass-card-interactive space-y-3 border-purple-400/25 dark:border-purple-700/30">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shadow-sm shadow-purple-500/50" />
-                <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-sm">{t.dashboard.subjects.histology}</h3>
-              </div>
-              <span className="text-[11px] font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-md">2 Chapters</span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-              Heart wall layers, intercalated discs, Purkinje fibers, elastic/muscular arteries, and capillary beds.
-            </p>
-            <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-100 dark:border-zinc-800">
-              <span className="font-bold text-slate-700 dark:text-zinc-300">26 {t.common.questions}</span>
-              <button
-                onClick={() => navigate('/test?subject=histology')}
-                className="text-purple-600 dark:text-purple-400 font-bold hover:underline cursor-pointer flex items-center space-x-1"
+            return (
+              <div
+                key={subj.id}
+                className={`p-6 rounded-3xl glass-card-interactive space-y-3 ${subj.borderClass}`}
               >
-                <span>{t.dashboard.startPractice} →</span>
-              </button>
-            </div>
-          </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className={`w-2.5 h-2.5 rounded-full shadow-sm ${subj.dotClass}`} />
+                    <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-sm">
+                      {subj.title}
+                    </h3>
+                  </div>
+                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${subj.badgeClass}`}>
+                    {stat && stat.answeredCount > 0
+                      ? `${stat.accuracy}% Acc • ${stat.coveragePercent}% Seen`
+                      : subj.chaptersLabel}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
+                  {subj.desc}
+                </p>
 
-          {/* Microbiology Card - Emerald Green Glow */}
-          <div className="p-6 rounded-3xl glass-card-interactive space-y-3 border-emerald-400/25 dark:border-emerald-700/30">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" />
-                <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-sm">{t.dashboard.subjects.microbiology}</h3>
-              </div>
-              <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">3 Chapters</span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-              Rheumatic fever (JONES criteria & M protein mimicry), infective endocarditis, and viral myocarditis.
-            </p>
-            <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-100 dark:border-zinc-800">
-              <span className="font-bold text-slate-700 dark:text-zinc-300">24 {t.common.questions}</span>
-              <button
-                onClick={() => navigate('/test?subject=microbiology')}
-                className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer flex items-center space-x-1"
-              >
-                <span>{t.dashboard.startPractice} →</span>
-              </button>
-            </div>
-          </div>
+                {/* Live Multi-Segment Mastery Bar (Correct / Mistake / Unseen) */}
+                <div className="space-y-1 pt-1">
+                  <div className="h-2 w-full rounded-full bg-slate-200/70 dark:bg-zinc-800 overflow-hidden flex">
+                    {correctPct > 0 && (
+                      <div
+                        className="h-full bg-emerald-500 transition-all duration-500"
+                        style={{ width: `${correctPct}%` }}
+                        title={`Mastered: ${stat?.correctCount ?? 0}`}
+                      />
+                    )}
+                    {mistakePct > 0 && (
+                      <div
+                        className="h-full bg-rose-500 transition-all duration-500"
+                        style={{ width: `${mistakePct}%` }}
+                        title={`Needs Review: ${stat?.incorrectCount ?? 0}`}
+                      />
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-zinc-500 font-mono">
+                    <span>{stat?.correctCount ?? 0}✓ / {stat?.incorrectCount ?? 0}✗</span>
+                    <span>{stat?.answeredCount ?? 0}/{totalQs} Attempted</span>
+                  </div>
+                </div>
 
-          {/* Physiology Card - Amber / Gold Glow */}
-          <div className="p-6 rounded-3xl glass-card-interactive space-y-3 border-amber-400/25 dark:border-amber-700/30">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50" />
-                <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-sm">{t.dashboard.subjects.physiology}</h3>
+                <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-100 dark:border-zinc-800">
+                  <span className="font-bold text-slate-700 dark:text-zinc-300">
+                    {totalQs} {t.common.questions}
+                  </span>
+                  <button
+                    onClick={() => navigate(`/test?subject=${subj.id}`)}
+                    className={`${subj.btnClass} font-bold hover:underline cursor-pointer flex items-center space-x-1`}
+                  >
+                    <span>{t.dashboard.startPractice} →</span>
+                  </button>
+                </div>
               </div>
-              <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md">3 Chapters</span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-              Cardiac electrophysiology, AP phases (0–4), cardiac cycle phases, heart sounds, and hemodynamics / BP regulation.
-            </p>
-            <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-100 dark:border-zinc-800">
-              <span className="font-bold text-slate-700 dark:text-zinc-300">106 {t.common.questions}</span>
-              <button
-                onClick={() => navigate('/test?subject=physiology')}
-                className="text-amber-600 dark:text-amber-400 font-bold hover:underline cursor-pointer flex items-center space-x-1"
-              >
-                <span>{t.dashboard.startPractice} →</span>
-              </button>
-            </div>
-          </div>
+            );
+          })}
         </div>
       </div>
 
