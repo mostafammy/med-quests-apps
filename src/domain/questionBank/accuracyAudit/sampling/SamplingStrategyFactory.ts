@@ -10,7 +10,7 @@ import { UniformRandomSamplingStrategy } from './UniformRandomSamplingStrategy.t
 import { StratifiedSamplingStrategy } from './StratifiedSamplingStrategy.ts';
 
 export class SamplingStrategyFactory {
-  private static registry: Map<SamplingStrategyType, () => ISamplingStrategy> = new Map([
+  private static registry = new Map<SamplingStrategyType, () => ISamplingStrategy>([
     ['uniform_random', () => new UniformRandomSamplingStrategy()],
     ['stratified_by_subject', () => new StratifiedSamplingStrategy('stratified_by_subject')],
     ['stratified_by_difficulty', () => new StratifiedSamplingStrategy('stratified_by_difficulty')],
