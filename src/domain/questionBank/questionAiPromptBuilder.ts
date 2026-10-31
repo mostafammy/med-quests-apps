@@ -36,21 +36,21 @@ export const GOLD_STANDARD_EXAMPLE_QUESTION = {
   choices: [
     {
       id: 'a',
-      text: 'Excessive resorption of the septum primum or inadequate development of the septum secundum',
-      isCorrect: true,
-      rationale: 'Correct. An ostium secundum atrial septal defect (ASD) occurs in the region of the fossa ovalis and accounts for >75% of all ASDs. It results from either excessive fenestration/resorption of the septum primum, deficient development of the septum secundum, or both.'
-    },
-    {
-      id: 'b',
       text: 'Failure of superior and inferior endocardial cushions to fuse',
       isCorrect: false,
       rationale: 'Incorrect. Failure of endocardial cushion fusion causes an ostium primum ASD (often part of an atrioventricular canal defect), typically located low in the interatrial septum and associated with Trisomy 21.'
     },
     {
-      id: 'c',
+      id: 'b',
       text: 'Abnormal spiraling and septation of the bulbus cordis and truncus arteriosus',
       isCorrect: false,
       rationale: 'Incorrect. Defective neural crest cell migration leading to absent spiraling of the aorticopulmonary septum produces Transposition of the Great Arteries (TGA).'
+    },
+    {
+      id: 'c',
+      text: 'Excessive resorption of the septum primum or inadequate development of the septum secundum',
+      isCorrect: true,
+      rationale: 'Correct. An ostium secundum atrial septal defect (ASD) occurs in the region of the fossa ovalis and accounts for >75% of all ASDs. It results from either excessive fenestration/resorption of the septum primum, deficient development of the septum secundum, or both.'
     },
     {
       id: 'd',
@@ -123,10 +123,12 @@ PSYCHOMETRIC & CLINICAL QUALITY STANDARDS:
 1. CLINICAL STEM: Frame questions as authentic patient vignettes (age, sex, clinical setting, chief complaint, vital signs, physical exam findings, and lab/imaging investigations) leading to a clear clinical question.
 2. EXACTLY 4 CHOICES: Every question MUST have exactly four choices labeled 'a', 'b', 'c', and 'd'.
 3. SINGLE BEST ANSWER: Exactly ONE choice must have "isCorrect": true, and the other three must have "isCorrect": false.
-4. DISTRACTOR RATIONALES: Every single choice (both the correct answer AND the 3 distractors) MUST include an in-depth "rationale" (at least 2-3 sentences) explaining the precise physiological, anatomical, or clinical reason why it is correct or incorrect.
-5. EXPLANATION: Provide an authoritative, high-yield teaching pearl explaining the underlying mechanism and clinical pearls.
-6. EVIDENCE CITATION: Include at least 1 authoritative citation in "evidence" citing standard medical literature (e.g., Moore's Clinically Oriented Anatomy, Robbins Basic Pathology, Langman's Medical Embryology, or First Aid for the USMLE Step 1) with a verbatim quote of at least 10 characters.
-7. NO META TALK: Output ONLY a valid JSON array matching the schema below. Do not include introductory conversational text or concluding remarks.
+4. PSYCHOMETRIC CHOICE ENTROPY (CRITICAL): Distribute the correct answer uniformly across options ('a', 'b', 'c', 'd') so that each option is correct approximately 25% of the time across the batch. Do NOT default to making 'a' or 'b' correct for all questions.
+5. NO POSITIONAL REFERENCES: Never use phrases like 'All of the above', 'None of the above', 'Both A and B', or reference letters like 'as noted in Option A', as choices are dynamically shuffled.
+6. DISTRACTOR RATIONALES: Every single choice (both the correct answer AND the 3 distractors) MUST include an in-depth "rationale" (at least 2-3 sentences) explaining the precise physiological, anatomical, or clinical reason why it is correct or incorrect.
+7. EXPLANATION: Provide an authoritative, high-yield teaching pearl explaining the underlying mechanism and clinical pearls.
+8. EVIDENCE CITATION: Include at least 1 authoritative citation in "evidence" citing standard medical literature (e.g., Moore's Clinically Oriented Anatomy, Robbins Basic Pathology, Langman's Medical Embryology, or First Aid for the USMLE Step 1) with a verbatim quote of at least 10 characters.
+9. NO META TALK: Output ONLY a valid JSON array matching the schema below. Do not include introductory conversational text or concluding remarks.
 
 ----------------------------------------------------------------------
 EXACT JSON SCHEMA DEFINITION (TypeScript Equivalent):
@@ -197,9 +199,11 @@ AUTHORING INVARIANTS:
 1. Patient Presentation: Each question stem MUST be a realistic vignette with age, gender, vital signs, relevant physical exam findings, and diagnostic clues.
 2. Homogeneity of Options: All 4 options must belong to the same diagnostic or conceptual category (e.g., all 4 are embryological structures, or all 4 are microbial agents, or all 4 are vessel branches).
 3. Distractor Quality: Distractors must be plausible clinical mimics. Avoid trivial or "joke" distractors.
-4. In-depth Rationales: For every option (A, B, C, D), provide a meticulous rationale explaining why it is correct or why it is incorrect.
-5. Verifiable Evidence: Every question must include an "evidence" array with at least 1 textbook citation and verbatim quote (>= 10 chars).
-6. Strict Output: Return ONLY the JSON array inside a standard JSON code block. No extraneous conversation.
+4. Psychometric Option Balance: Ensure the correct answer is evenly distributed across options 'a', 'b', 'c', and 'd' across all generated questions (~25% each). Never bias toward 'a' or 'b'.
+5. No Positional References: Do not use 'All of the above', 'None of the above', 'Both A and B', or reference option letters in text.
+6. In-depth Rationales: For every option (A, B, C, D), provide a meticulous rationale explaining why it is correct or why it is incorrect.
+7. Verifiable Evidence: Every question must include an "evidence" array with at least 1 textbook citation and verbatim quote (>= 10 chars).
+8. Strict Output: Return ONLY the JSON array inside a standard JSON code block. No extraneous conversation.
 
 ----------------------------------------------------------------------
 REFERENCE JSON FORMAT (1-SHOT EXAMPLE):
