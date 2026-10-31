@@ -9,16 +9,16 @@
  * - Dependency Inversion: Accepts question population providers and audit engines.
  */
 
-import type { Question } from '../model/types.ts';
-import type { UserRole, UserId } from '../auth/types.ts';
-import { RolePolicyEvaluator } from '../auth/entitlements.ts';
+import type { Question } from '../../model/types.ts';
+import type { UserRole, UserId } from '../../auth/types.ts';
+import { RolePolicyEvaluator } from '../../auth/entitlements.ts';
 import { AccuracyAuditEngine } from './AccuracyAuditEngine.ts';
 import type {
   SamplingConfiguration,
   AccuracyAuditRunReport,
   AuditProgressCallback,
 } from './types.ts';
-import { edgeAuthGateway } from '../../infrastructure/auth/edgeAuthGateway.ts';
+import { edgeAuthGateway } from '../../../infrastructure/auth/edgeAuthGateway.ts';
 
 export class AdminAuthorizationError extends Error {
   constructor(message = 'Access Denied: Only administrators have privilege to perform Question Bank Accuracy Audits.') {
@@ -36,6 +36,7 @@ export interface AdminActorContext {
 export class AdminAccuracyAuditService {
   private readonly policyEvaluator = new RolePolicyEvaluator();
   private readonly auditEngine: AccuracyAuditEngine;
+  private inMemoryHistory: AccuracyAuditRunReport[] = [];
   private static readonly STORAGE_KEY = 'medquests_accuracy_audit_history_v1';
 
   constructor(auditEngine?: AccuracyAuditEngine) {
@@ -88,7 +89,7 @@ export class AdminAccuracyAuditService {
 
     // 4. Record security audit log entry
     try {
-      edgeAuthGateway.appendAuditLog({
+      edgeAuthGateway.logSecurityAudit({
         actorUserId: actor.userId,
         actorDisplayName: actor.displayName,
         targetUserId: actor.userId,
@@ -110,16 +111,23 @@ export class AdminAccuracyAuditService {
 
   public getHistoricalAuditReports(): AccuracyAuditRunReport[] {
     try {
-      if (typeof localStorage === 'undefined') return [];
-      const raw = localStorage.getItem(AdminAccuracyAuditService.STORAGE_KEY);
-      if (!raw) return [];
-      return JSON.parse(raw) as AccuracyAuditRunReport[];
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(AdminAccuracyAuditService.STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as AccuracyAuditRunReport[];
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      }
     } catch {
-      return [];
+      // Fall through to in-memory history
     }
+    return [...this.inMemoryHistory];
   }
 
   public clearAuditHistory(): void {
+    this.inMemoryHistory = [];
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem(AdminAccuracyAuditService.STORAGE_KEY);
@@ -130,12 +138,13 @@ export class AdminAccuracyAuditService {
   }
 
   private persistReportToHistory(report: AccuracyAuditRunReport): void {
+    const existing = this.inMemoryHistory.filter((r) => r.runId !== report.runId);
+    this.inMemoryHistory = [report, ...existing].slice(0, 25);
+
     try {
-      if (typeof localStorage === 'undefined') return;
-      const history = this.getHistoricalAuditReports();
-      // Keep most recent 25 audit runs
-      const updated = [report, ...history.filter((r) => r.runId !== report.runId)].slice(0, 25);
-      localStorage.setItem(AdminAccuracyAuditService.STORAGE_KEY, JSON.stringify(updated));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(AdminAccuracyAuditService.STORAGE_KEY, JSON.stringify(this.inMemoryHistory));
+      }
     } catch {
       // Ignore storage quota limits gracefully
     }
