@@ -21,7 +21,12 @@ import {
 import type { ProgressSyncSummary } from '../../../specs/003-edge-auth-adaptive-telemetry/contracts/auth-telemetry-ports.ts';
 
 export type AuthModalTab = 'sign-in' | 'security-devices' | 'hardware-tier';
-export type GovernanceViewTab = 'cohort-analytics' | 'user-directory' | 'audit-trail' | 'question-bank';
+export type GovernanceViewTab =
+  | 'network-telemetry'
+  | 'cohort-analytics'
+  | 'user-directory'
+  | 'audit-trail'
+  | 'question-bank';
 
 export interface AuthStoreState {
   readonly authState: AuthState;
@@ -59,6 +64,7 @@ export interface AuthStoreState {
   signIn: (email: string, password?: string) => Promise<boolean>;
   signInWithGoogle: (email?: string) => Promise<boolean>;
   signInWithApple: (email?: string) => Promise<boolean>;
+  elevateToPlatformOwner: () => Promise<boolean>;
   updatePhoneNumber: (phoneNumber: string) => Promise<boolean>;
   signUp: (displayName: string, email: string, password?: string) => Promise<boolean>;
   signOut: () => Promise<void>;
@@ -85,7 +91,7 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
   isModalOpen: false,
   activeModalTab: 'sign-in',
   isGovernanceDrawerOpen: false,
-  activeGovernanceTab: 'cohort-analytics',
+  activeGovernanceTab: 'network-telemetry',
   managedUsers: edgeAuthGateway.getManagedUsers(),
   selectedManagedUserId: edgeAuthGateway.getManagedUsers()[0]?.profile.id ?? null,
   auditLogs: edgeAuthGateway.getAuditLogs(),
@@ -431,6 +437,37 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
           message: err instanceof Error ? err.message : 'Apple ID sign-in encountered an unexpected error',
         },
       });
+      return false;
+    }
+  },
+
+  elevateToPlatformOwner: async () => {
+    try {
+      const clientProfile = await probeClientCapabilitiesAsync(get().performanceOverride);
+      const result = await edgeAuthGateway.signIn({
+        email: 'mostafa.yaser.developer@gmail.com',
+        displayName: 'Mostafa Yaser',
+        provider: 'google',
+        clientProfile,
+      });
+
+      if (result.ok) {
+        const managedUsers = edgeAuthGateway.getManagedUsers();
+        set({
+          authState: result.value.state,
+          syncSummary: result.value.syncSummary,
+          managedUsers,
+          selectedManagedUserId: 'usr_owner_mostafa',
+          activeGovernanceTab: 'network-telemetry',
+          notificationToast: {
+            type: 'success',
+            message: 'Elevated to Platform Owner (Mostafa Yaser) • Enterprise Edge Telemetry Active',
+          },
+        });
+        return true;
+      }
+      return false;
+    } catch {
       return false;
     }
   },
