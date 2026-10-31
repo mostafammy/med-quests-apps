@@ -43,7 +43,34 @@ const STORAGE_KEYS = {
   EDITORIAL_AUDIT_LOGS: 'medquests_global_editorial_audit_logs_v2',
   BLOCK_REVISIONS: 'medquests_global_block_revisions_v2',
   SEED_CATALOG_SIZE: 'medquests_global_seed_size_v2',
+  DELETED_QUESTIONS: 'medquests_global_deleted_questions_v2',
 } as const;
+
+// In-memory simulator storage fallback for node test environments and SSR
+const memoryStorage = new Map<string, string>();
+
+function safeGetStorage(key: string): string | null {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+  return memoryStorage.get(key) || null;
+}
+
+function safeSetStorage(key: string, value: string): void {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      localStorage.setItem(key, value);
+      return;
+    } catch {
+      // Ignore
+    }
+  }
+  memoryStorage.set(key, value);
+}
 
 export class EdgeQuestionBankGateway
   implements
@@ -58,17 +85,26 @@ export class EdgeQuestionBankGateway
   // LOCAL SIMULATOR STORAGE HELPERS (Guarantees 100% offline & local demo testability)
   // =========================================================================
   public getLocalCanonicalBank(blockId: BlockId = 'cvs'): GovernedQuestion[] {
-    if (typeof window === 'undefined') return [];
     try {
-      const raw = localStorage.getItem(`${STORAGE_KEYS.CANONICAL_BANK}_${blockId}`);
+      const deletedKey = `${STORAGE_KEYS.DELETED_QUESTIONS}_${blockId}`;
+      const deletedIds = new Set<string>(
+        JSON.parse(safeGetStorage(deletedKey) || '[]') as string[]
+      );
+
+      const raw = safeGetStorage(`${STORAGE_KEYS.CANONICAL_BANK}_${blockId}`);
       if (raw) {
-        const parsed = JSON.parse(raw) as GovernedQuestion[];
+        let parsed = JSON.parse(raw) as GovernedQuestion[];
+        if (deletedIds.size > 0) {
+          parsed = parsed.filter((q) => !deletedIds.has(q.id));
+        }
         // If bundled seed bank grew (e.g. 106 questions ingested), merge any missing bundled seed items
         // AND bump the global block revision so clients never see "Local v6.0 -> Global v6.0" with +106 additions!
         if (blockId === 'cvs' && Array.isArray(defaultCvsBank)) {
           const existingIds = new Set(parsed.map((q) => q.id));
-          const missingSeeds = (defaultCvsBank as Question[]).filter((q) => !existingIds.has(q.id));
-          const recordedSeedSizeRaw = localStorage.getItem(`${STORAGE_KEYS.SEED_CATALOG_SIZE}_${blockId}`);
+          const missingSeeds = (defaultCvsBank as Question[]).filter(
+            (q) => !existingIds.has(q.id) && !deletedIds.has(q.id)
+          );
+          const recordedSeedSizeRaw = safeGetStorage(`${STORAGE_KEYS.SEED_CATALOG_SIZE}_${blockId}`);
           const recordedSeedSize = recordedSeedSizeRaw ? Number(recordedSeedSizeRaw) : 0;
 
           if (missingSeeds.length > 0) {
@@ -76,14 +112,14 @@ export class EdgeQuestionBankGateway
             for (const seedQ of missingSeeds) {
               parsed.push(this.enrichSeedQuestion(seedQ, nextRev));
             }
-            localStorage.setItem(
+            safeSetStorage(
               `${STORAGE_KEYS.SEED_CATALOG_SIZE}_${blockId}`,
               String(defaultCvsBank.length)
             );
             this.saveLocalCanonicalBank(blockId, parsed);
           } else if (recordedSeedSize !== defaultCvsBank.length) {
             // Record current seed catalog size
-            localStorage.setItem(
+            safeSetStorage(
               `${STORAGE_KEYS.SEED_CATALOG_SIZE}_${blockId}`,
               String(defaultCvsBank.length)
             );
@@ -97,19 +133,26 @@ export class EdgeQuestionBankGateway
 
     // Seed from default bundled bank if empty
     if (Array.isArray(defaultCvsBank)) {
+      const deletedKey = `${STORAGE_KEYS.DELETED_QUESTIONS}_${blockId}`;
+      let deletedIds = new Set<string>();
+      try {
+        deletedIds = new Set<string>(
+          JSON.parse(safeGetStorage(deletedKey) || '[]') as string[]
+        );
+      } catch {
+        // Ignore
+      }
       const initialRev = Number(this.getLocalRevision(blockId));
-      const seeded: GovernedQuestion[] = (defaultCvsBank as Question[]).map((q) =>
-        this.enrichSeedQuestion(q, initialRev)
-      );
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem(
-            `${STORAGE_KEYS.SEED_CATALOG_SIZE}_${blockId}`,
-            String(defaultCvsBank.length)
-          );
-        } catch {
-          // Ignore
-        }
+      const seeded: GovernedQuestion[] = (defaultCvsBank as Question[])
+        .filter((q) => !deletedIds.has(q.id))
+        .map((q) => this.enrichSeedQuestion(q, initialRev));
+      try {
+        safeSetStorage(
+          `${STORAGE_KEYS.SEED_CATALOG_SIZE}_${blockId}`,
+          String(defaultCvsBank.length)
+        );
+      } catch {
+        // Ignore
       }
       this.saveLocalCanonicalBank(blockId, seeded);
       return seeded;
@@ -137,18 +180,16 @@ export class EdgeQuestionBankGateway
   }
 
   private saveLocalCanonicalBank(blockId: BlockId, questions: readonly GovernedQuestion[]): void {
-    if (typeof window === 'undefined') return;
     try {
-      localStorage.setItem(`${STORAGE_KEYS.CANONICAL_BANK}_${blockId}`, JSON.stringify(questions));
+      safeSetStorage(`${STORAGE_KEYS.CANONICAL_BANK}_${blockId}`, JSON.stringify(questions));
     } catch {
       // Storage full
     }
   }
 
   private getLocalSubmissions(blockId: BlockId = 'cvs'): QuestionReviewSubmission[] {
-    if (typeof window === 'undefined') return [];
     try {
-      const raw = localStorage.getItem(`${STORAGE_KEYS.REVIEW_SUBMISSIONS}_${blockId}`);
+      const raw = safeGetStorage(`${STORAGE_KEYS.REVIEW_SUBMISSIONS}_${blockId}`);
       if (raw) return JSON.parse(raw);
     } catch {
       // Ignore
@@ -157,18 +198,16 @@ export class EdgeQuestionBankGateway
   }
 
   private saveLocalSubmissions(blockId: BlockId, list: readonly QuestionReviewSubmission[]): void {
-    if (typeof window === 'undefined') return;
     try {
-      localStorage.setItem(`${STORAGE_KEYS.REVIEW_SUBMISSIONS}_${blockId}`, JSON.stringify(list));
+      safeSetStorage(`${STORAGE_KEYS.REVIEW_SUBMISSIONS}_${blockId}`, JSON.stringify(list));
     } catch {
       // Storage full
     }
   }
 
   private getLocalAuditLogs(blockId: BlockId = 'cvs'): EditorialAuditLogEntry[] {
-    if (typeof window === 'undefined') return [];
     try {
-      const raw = localStorage.getItem(`${STORAGE_KEYS.EDITORIAL_AUDIT_LOGS}_${blockId}`);
+      const raw = safeGetStorage(`${STORAGE_KEYS.EDITORIAL_AUDIT_LOGS}_${blockId}`);
       if (raw) return JSON.parse(raw);
     } catch {
       // Ignore
@@ -179,19 +218,16 @@ export class EdgeQuestionBankGateway
   private appendLocalAuditLog(blockId: BlockId, entry: EditorialAuditLogEntry): void {
     const current = this.getLocalAuditLogs(blockId);
     const updated = [entry, ...current].slice(0, 200);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(`${STORAGE_KEYS.EDITORIAL_AUDIT_LOGS}_${blockId}`, JSON.stringify(updated));
-      } catch {
-        // Storage full
-      }
+    try {
+      safeSetStorage(`${STORAGE_KEYS.EDITORIAL_AUDIT_LOGS}_${blockId}`, JSON.stringify(updated));
+    } catch {
+      // Storage full
     }
   }
 
   public getLocalRevision(blockId: BlockId = 'cvs'): BankRevisionNumber {
-    if (typeof window === 'undefined') return 1 as BankRevisionNumber;
     try {
-      const rev = localStorage.getItem(`${STORAGE_KEYS.BLOCK_REVISIONS}_${blockId}`);
+      const rev = safeGetStorage(`${STORAGE_KEYS.BLOCK_REVISIONS}_${blockId}`);
       return (rev ? Number(rev) : 1) as BankRevisionNumber;
     } catch {
       return 1 as BankRevisionNumber;
@@ -200,12 +236,10 @@ export class EdgeQuestionBankGateway
 
   private setLocalRevision(blockId: BlockId, rev: number): BankRevisionNumber {
     const validRev = Math.max(1, rev) as BankRevisionNumber;
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(`${STORAGE_KEYS.BLOCK_REVISIONS}_${blockId}`, String(validRev));
-      } catch {
-        // Ignore
-      }
+    try {
+      safeSetStorage(`${STORAGE_KEYS.BLOCK_REVISIONS}_${blockId}`, String(validRev));
+    } catch {
+      // Ignore
     }
     return validRev;
   }
@@ -1042,6 +1076,105 @@ export class EdgeQuestionBankGateway
 
     return ok({
       updatedQuestion,
+      auditEntry,
+      newBlockRevision: nextRev,
+    });
+  }
+
+  public async deleteCanonicalQuestion(params: {
+    readonly questionId: QuestionId;
+    readonly actorId: string;
+    readonly actorDisplayName: string;
+    readonly actorRole: any;
+    readonly reason: string;
+    readonly permanent?: boolean;
+  }): Promise<
+    Result<
+      {
+        readonly deletedQuestionId: QuestionId;
+        readonly auditEntry: EditorialAuditLogEntry;
+        readonly newBlockRevision: BankRevisionNumber;
+      },
+      QuestionBankDomainError
+    >
+  > {
+    const { questionId, actorId, actorDisplayName, actorRole, reason, permanent = true } = params;
+
+    const blockId: BlockId = 'cvs';
+    const canonical = this.getLocalCanonicalBank(blockId);
+    const idx = canonical.findIndex((q) => q.id === questionId);
+
+    if (idx === -1) {
+      return err({ code: 'QUESTION_NOT_FOUND', questionId });
+    }
+
+    const existing = canonical[idx];
+    let nextRev = this.bumpLocalRevision(blockId);
+    const nowIso = new Date().toISOString();
+
+    try {
+      const res = await fetch(`/api/admin/questions/canonical/${encodeURIComponent(questionId)}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actorId, actorDisplayName, actorRole, reason, permanent }),
+      });
+      if (res.ok) {
+        const remoteRes = await res.json();
+        if (remoteRes.newBlockRevision) {
+          nextRev = this.setLocalRevision(
+            blockId,
+            Math.max(Number(nextRev), Number(remoteRes.newBlockRevision))
+          );
+        }
+      }
+    } catch {
+      // Offline / local simulator
+    }
+
+    if (permanent) {
+      canonical.splice(idx, 1);
+      try {
+        const deletedKey = `${STORAGE_KEYS.DELETED_QUESTIONS}_${blockId}`;
+        const deletedIds = (JSON.parse(safeGetStorage(deletedKey) || '[]') as string[]);
+        if (!deletedIds.includes(questionId)) {
+          deletedIds.push(questionId);
+          safeSetStorage(deletedKey, JSON.stringify(deletedIds));
+        }
+      } catch {
+        // Ignore
+      }
+    } else {
+      canonical[idx] = {
+        ...existing,
+        editorialStatus: 'archived',
+        status: 'quarantined',
+        globalRevision: Number(nextRev),
+        updatedAt: nowIso,
+      };
+    }
+
+    this.saveLocalCanonicalBank(blockId, canonical);
+
+    const auditEntry: EditorialAuditLogEntry = {
+      id: `audit-${Date.now()}` as any,
+      questionId,
+      blockId,
+      action: permanent ? ('CANONICAL_QUESTION_DELETED' as any) : 'CANONICAL_QUESTION_ARCHIVED',
+      actorUserId: actorId,
+      actorDisplayName,
+      actorRole,
+      previousStatus: existing.editorialStatus,
+      nextStatus: permanent ? ('deleted' as any) : 'archived',
+      revisionAfter: Number(nextRev),
+      summary: `${permanent ? 'Permanently deleted' : 'Archived'} canonical question: ${reason}`,
+      occurredAt: nowIso,
+    };
+
+    this.appendLocalAuditLog(blockId, auditEntry);
+    this.broadcastGlobalBankMutation(blockId, Number(nextRev));
+
+    return ok({
+      deletedQuestionId: questionId,
       auditEntry,
       newBlockRevision: nextRev,
     });
