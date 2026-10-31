@@ -5,9 +5,9 @@
  * and samples proportionally to eliminate representation bias in clinical audits.
  */
 
-import type { Question } from '../../model/types.ts';
+import type { Question } from '../../../model/types.ts';
 import type { ISamplingStrategy } from './ISamplingStrategy.ts';
-import type { SamplingConfiguration, SampleExtractionResult, SamplingStrategyType } from '../types.ts';
+import type { SamplingConfiguration, SampleExtractionResult } from '../types.ts';
 import { createRandomGenerator } from './prng.ts';
 
 export class StratifiedSamplingStrategy implements ISamplingStrategy {
