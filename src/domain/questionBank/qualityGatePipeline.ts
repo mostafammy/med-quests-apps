@@ -10,7 +10,12 @@ import type {
   QuestionBankDomainError,
   StemSha256Hash,
 } from '../../../specs/005-global-question-bank-governance/contracts/question-bank-governance-ports.ts';
+import type { ChoiceDistributionMetrics } from '../../../specs/006-psychometric-choice-entropy-and-spatial-presentation/contracts/choice-entropy-ports.ts';
 import { QuestionCanonicalHasher } from './canonicalHasher.ts';
+import {
+  ChoiceDistributionAnalyzer,
+  ChoicePermutationSafetySpecification,
+} from './choiceEntropyEngine.ts';
 
 /**
  * Rule 1: Structural Schema Validation (Zod)
@@ -106,10 +111,37 @@ export class ClinicalEvidenceGroundingRule implements IQuestionQualityRule {
   }
 }
 
+/**
+ * Rule 4: No Hardcoded Choice Letter References Rule
+ * Guards against text referencing "Option A", "Choice B", "all of the above"
+ * which would break spatial permutation and psychometric shuffling.
+ */
+export class NoHardcodedChoiceLetterReferenceRule implements IQuestionQualityRule {
+  public readonly ruleId = 'NO_HARDCODED_CHOICE_LETTER_REFERENCE';
+  public readonly description = 'Ensures questions do not reference option letters or position-dependent phrases in stems, explanations, or rationales';
+
+  private readonly safetySpec = new ChoicePermutationSafetySpecification();
+
+  public validate(question: Question, index: number): Result<void, QuestionBankDomainError> {
+    const violations = this.safetySpec.inspectViolations(question);
+    if (violations.length > 0) {
+      const v = violations[0]!;
+      return err({
+        code: 'SCHEMA_VALIDATION_FAILED',
+        itemIndex: index,
+        fieldPath: 'fieldPath' in v ? v.fieldPath : 'stem',
+        message: 'message' in v ? (v as any).message : 'Validation failed',
+      });
+    }
+    return ok(undefined);
+  }
+}
+
 export interface BatchQualityGateResult {
   readonly validQuestions: readonly Question[];
   readonly errors: readonly QuestionBankDomainError[];
   readonly stemHashes: ReadonlyMap<string, StemSha256Hash>;
+  readonly choiceMetrics: ChoiceDistributionMetrics;
 }
 
 /**
@@ -123,12 +155,14 @@ export class QuestionQualityGatePipeline {
       new ZodStructureQualityRule(),
       new SingleCorrectChoiceRule(),
       new ClinicalEvidenceGroundingRule(),
+      new NoHardcodedChoiceLetterReferenceRule(),
     ];
   }
 
   /**
    * Validates a batch of questions, checks for intra-batch duplicate stems,
-   * and computes stem fingerprints for each valid item.
+   * computes stem fingerprints for each valid item, and generates psychometric
+   * choice distribution metrics.
    */
   public validateBatch(rawQuestions: readonly Question[]): BatchQualityGateResult {
     const validQuestions: Question[] = [];
@@ -168,10 +202,13 @@ export class QuestionQualityGatePipeline {
       }
     });
 
+    const choiceMetrics = ChoiceDistributionAnalyzer.analyze(validQuestions);
+
     return {
       validQuestions,
       errors,
       stemHashes,
+      choiceMetrics,
     };
   }
 }
