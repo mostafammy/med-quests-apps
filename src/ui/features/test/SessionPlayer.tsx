@@ -1,17 +1,20 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
-import { Question, ChoiceId } from '../../../domain/model/types.ts';
+import { Question, ChoiceId, Confidence, ReviewCard } from '../../../domain/model/types.ts';
 import { db } from '../../../infrastructure/storage/db.ts';
-import { PostTestReport } from './PostTestReport.tsx';
+import { PostTestReport, QuestionAttemptTelemetry } from './PostTestReport.tsx';
 import { QuestionNavigatorStrip } from './QuestionNavigatorStrip.tsx';
 import { QuestionMatrixModal } from './QuestionMatrixModal.tsx';
 import { useCopilotStore } from '../../../application/stores/useCopilotStore.ts';
 import { questionTelemetryTracker } from '../../../domain/ai/telemetry.ts';
+import { edgeAuthGateway } from '../../../infrastructure/auth/edgeAuthGateway.ts';
 import { CopilotTriggerButton } from '../copilot/CopilotTriggerButton.tsx';
 import { AiCopilotDrawer } from '../copilot/AiCopilotDrawer.tsx';
 import { ThemeToggle } from '../../app/ThemeToggle.tsx';
 import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
+import { SessionSeededSpatialPresentationStrategy } from '../../../domain/questionBank/spatialChoicePresenter.ts';
+import type { VisualSlotIndex } from '../../../../specs/006-psychometric-choice-entropy-and-spatial-presentation/contracts/choice-entropy-ports.ts';
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -22,8 +25,61 @@ import {
   CheckCircle2, 
   XCircle, 
   AlertCircle,
-  LayoutGrid
+  LayoutGrid,
+  Sparkles
 } from 'lucide-react';
+
+async function upsertSm2ReviewCard(
+  questionId: string,
+  blockId: string,
+  isCorrect: boolean,
+  confidence: Confidence
+): Promise<void> {
+  try {
+    const existing = await db.reviewCards.get(questionId);
+    const now = new Date();
+    let easeFactor = existing?.easeFactor ?? 2.5;
+    let repetitions = existing?.repetitions ?? 0;
+    let lapses = existing?.lapses ?? 0;
+    let intervalDays = existing?.intervalDays ?? 0;
+
+    if (isCorrect) {
+      const quality = confidence === 'sure' ? 5 : confidence === 'unsure' ? 4 : 3;
+      if (repetitions === 0) {
+        intervalDays = confidence === 'sure' ? 3 : 1;
+      } else if (repetitions === 1) {
+        intervalDays = confidence === 'sure' ? 6 : 3;
+      } else {
+        intervalDays = Math.max(1, Math.round(intervalDays * easeFactor));
+      }
+      repetitions += 1;
+      easeFactor = Math.max(
+        1.3,
+        easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
+      );
+    } else {
+      repetitions = 0;
+      lapses += 1;
+      intervalDays = 0; // Due immediately for spaced repetition review
+      easeFactor = Math.max(1.3, easeFactor - 0.2);
+    }
+
+    const dueAt = new Date(now.getTime() + intervalDays * 86_400_000).toISOString();
+    const updatedCard: ReviewCard = {
+      questionId,
+      blockId,
+      easeFactor: Number(easeFactor.toFixed(2)),
+      intervalDays,
+      repetitions,
+      lapses,
+      dueAt,
+      lastReviewedAt: now.toISOString(),
+    };
+    await db.reviewCards.put(updatedCard);
+  } catch (err) {
+    console.warn('SM-2 review card update skipped:', err);
+  }
+}
 
 export const SessionPlayer: React.FC = () => {
   const location = useLocation();
@@ -51,6 +107,8 @@ export const SessionPlayer: React.FC = () => {
   const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, { choiceId: ChoiceId; isCorrect: boolean }>>({});
+  const [confidences, setConfidences] = useState<Record<string, Confidence>>({});
+  const [questionTelemetryMap, setQuestionTelemetryMap] = useState<Record<string, QuestionAttemptTelemetry>>({});
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
   const [showExplanation, setShowExplanation] = useState(true);
@@ -60,6 +118,25 @@ export const SessionPlayer: React.FC = () => {
     (sessionConfig.timeLimitMinutes || 120) * 60
   );
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [activeSessionId] = useState<string>(
+    () => `sess-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  );
+
+  // Load persisted bookmarks on mount
+  useEffect(() => {
+    let mounted = true;
+    db.bookmarks.toArray().then((rows) => {
+      if (!mounted) return;
+      const map: Record<string, boolean> = {};
+      rows.forEach((r) => {
+        map[r.questionId] = true;
+      });
+      setBookmarks(map);
+    }).catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Initialize session questions
   useEffect(() => {
@@ -144,9 +221,21 @@ export const SessionPlayer: React.FC = () => {
   }, [allQuestions, sessionConfig]);
 
   const currentQ = sessionQuestions[currentIndex];
+  const spatialPresenter = useMemo(() => new SessionSeededSpatialPresentationStrategy(), []);
+  const presentedChoices = useMemo(() => {
+    if (!currentQ) return [];
+    return spatialPresenter.projectChoices(currentQ, activeSessionId);
+  }, [currentQ, activeSessionId, spatialPresenter]);
   const currentAnswer = currentQ ? answers[currentQ.id] : undefined;
+  const currentConfidence: Confidence = currentQ ? confidences[currentQ.id] ?? 'unsure' : 'unsure';
   const isAnswered = !!currentAnswer;
   const isLastQuestion = sessionQuestions.length > 0 && currentIndex === sessionQuestions.length - 1;
+
+  // Start / resume telemetry stopwatch whenever active question changes
+  useEffect(() => {
+    if (!currentQ || isSubmitted) return;
+    questionTelemetryTracker.startQuestion(currentQ.id);
+  }, [currentQ?.id, isSubmitted]);
 
   // AI Co-Pilot Viewport Integration
   const { setSurface } = useCopilotStore();
@@ -188,30 +277,77 @@ export const SessionPlayer: React.FC = () => {
     setSurface,
   ]);
 
+  const handleSelectConfidence = useCallback(
+    (level: Confidence) => {
+      if (!currentQ) return;
+      questionTelemetryTracker.recordConfidence(level, currentQ.id);
+      setConfidences((prev) => ({ ...prev, [currentQ.id]: level }));
+      setQuestionTelemetryMap((prev) => ({
+        ...prev,
+        [currentQ.id]: {
+          ...(prev[currentQ.id] ?? { responseTimeMs: 0 }),
+          confidence: level,
+        },
+      }));
+    },
+    [currentQ]
+  );
+
   const handleSubmitExam = useCallback(async () => {
     try {
-      // Record attempts in IndexedDB
-      const records = Object.entries(answers).map(([qId, ans]) => ({
-        id: `att-${Date.now()}-${qId}`,
-        questionId: qId,
-        blockId: 'cvs',
-        sessionId: `sess-${Date.now()}`,
-        mode,
-        selectedChoiceId: ans.choiceId,
-        isCorrect: ans.isCorrect,
-        confidence: 'unsure' as const,
-        responseTimeMs: 30000,
-        answeredAt: new Date().toISOString(),
-      }));
-      if (records.length > 0) {
-        await db.attempts.bulkPut(records);
+      if (isExamMode) {
+        const nowIso = new Date().toISOString();
+        const sessId = `sess-${Date.now()}`;
+        const nextTelemetryMap: Record<string, QuestionAttemptTelemetry> = { ...questionTelemetryMap };
+
+        const records = Object.entries(answers).map(([qId, ans]) => {
+          const snap = questionTelemetryTracker.getQuestionSnapshot(qId);
+          const conf = confidences[qId] ?? snap.confidence ?? 'unsure';
+          const responseTimeMs = Math.max(1000, snap.activeTimeSpentMs ?? 15000);
+          nextTelemetryMap[qId] = {
+            responseTimeMs,
+            firstSelectedChoiceId: snap.firstSelectedChoiceId,
+            choiceChangesCount: snap.choiceChangesCount,
+            confidence: conf,
+          };
+          return {
+            id: `att-${Date.now()}-${qId}`,
+            questionId: qId,
+            blockId: 'cvs',
+            sessionId: sessId,
+            mode,
+            selectedChoiceId: ans.choiceId,
+            isCorrect: ans.isCorrect,
+            confidence: conf,
+            responseTimeMs,
+            answeredAt: nowIso,
+            firstSelectedChoiceId: snap.firstSelectedChoiceId ?? null,
+            choiceChangesCount: snap.choiceChangesCount ?? 0,
+            eliminatedChoiceIds: [...(snap.eliminatedChoiceIds ?? [])],
+            aiCopilotConsulted: Boolean(snap.aiCopilotConsulted),
+          };
+        });
+
+        setQuestionTelemetryMap(nextTelemetryMap);
+        if (records.length > 0) {
+          await db.attempts.bulkPut(records);
+          for (const rec of records) {
+            await upsertSm2ReviewCard(
+              rec.questionId,
+              rec.blockId,
+              Boolean(rec.isCorrect),
+              rec.confidence
+            );
+          }
+        }
       }
+      void edgeAuthGateway.syncLocalStudyTelemetryToEdge();
     } catch (err) {
       console.error('Failed to save exam attempts in DB:', err);
     } finally {
       setIsSubmitted(true);
     }
-  }, [answers, mode]);
+  }, [answers, confidences, isExamMode, mode, questionTelemetryMap]);
 
   // Countdown timer for Exam Mode
   useEffect(() => {
@@ -232,10 +368,14 @@ export const SessionPlayer: React.FC = () => {
   // Immediate Commit Answer handler
   const handleSelectAnswer = useCallback((choiceId: ChoiceId) => {
     if (!currentQ) return;
-    questionTelemetryTracker.recordChoiceSelection(choiceId);
 
     // In practice mode, once committed, cannot change
     if (!isExamMode && isAnswered) return;
+
+    questionTelemetryTracker.recordChoiceSelection(choiceId);
+    const snap = questionTelemetryTracker.getQuestionSnapshot(currentQ.id);
+    const selectedConf = confidences[currentQ.id] ?? snap.confidence ?? 'unsure';
+    const responseTimeMs = Math.max(500, snap.activeTimeSpentMs ?? 1500);
 
     const correctChoice = currentQ.choices.find((c) => c.isCorrect);
     const isCorrect = correctChoice?.id === choiceId;
@@ -245,22 +385,42 @@ export const SessionPlayer: React.FC = () => {
       [currentQ.id]: { choiceId, isCorrect },
     }));
 
+    setQuestionTelemetryMap((prev) => ({
+      ...prev,
+      [currentQ.id]: {
+        responseTimeMs,
+        firstSelectedChoiceId: snap.firstSelectedChoiceId,
+        choiceChangesCount: snap.choiceChangesCount,
+        confidence: selectedConf,
+      },
+    }));
+
     if (!isExamMode) {
       setShowExplanation(true);
-      db.attempts.put({
-        id: `att-${Date.now()}-${currentQ.id}`,
-        questionId: currentQ.id,
-        blockId: currentQ.blockId || 'cvs',
-        sessionId: `practice-session`,
-        mode: 'practice',
-        selectedChoiceId: choiceId,
-        isCorrect,
-        confidence: 'unsure',
-        responseTimeMs: 0,
-        answeredAt: new Date().toISOString(),
-      });
+      const blockId = currentQ.blockId || 'cvs';
+      void db.attempts
+        .put({
+          id: `att-${Date.now()}-${currentQ.id}`,
+          questionId: currentQ.id,
+          blockId,
+          sessionId: `practice-session`,
+          mode: 'practice',
+          selectedChoiceId: choiceId,
+          isCorrect,
+          confidence: selectedConf,
+          responseTimeMs,
+          answeredAt: new Date().toISOString(),
+          firstSelectedChoiceId: snap.firstSelectedChoiceId ?? null,
+          choiceChangesCount: snap.choiceChangesCount ?? 0,
+          eliminatedChoiceIds: [...(snap.eliminatedChoiceIds ?? [])],
+          aiCopilotConsulted: Boolean(snap.aiCopilotConsulted),
+        })
+        .then(async () => {
+          await upsertSm2ReviewCard(currentQ.id, blockId, isCorrect, selectedConf);
+          void edgeAuthGateway.syncLocalStudyTelemetryToEdge();
+        });
     }
-  }, [currentQ, isExamMode, isAnswered]);
+  }, [currentQ, isExamMode, isAnswered, confidences]);
 
   const handleNext = useCallback(() => {
     if (currentIndex < sessionQuestions.length - 1) {
@@ -289,7 +449,19 @@ export const SessionPlayer: React.FC = () => {
 
   const handleToggleBookmark = useCallback(() => {
     if (!currentQ) return;
-    setBookmarks((prev) => ({ ...prev, [currentQ.id]: !prev[currentQ.id] }));
+    setBookmarks((prev) => {
+      const nextState = !prev[currentQ.id];
+      if (nextState) {
+        void db.bookmarks.put({
+          questionId: currentQ.id,
+          blockId: currentQ.blockId || 'cvs',
+          bookmarkedAt: new Date().toISOString(),
+        });
+      } else {
+        void db.bookmarks.delete(currentQ.id);
+      }
+      return { ...prev, [currentQ.id]: nextState };
+    });
   }, [currentQ]);
 
   // Keyboard Navigation: Spatial Model (1-4 for choices, arrows, F, B, E, Enter)
@@ -298,10 +470,16 @@ export const SessionPlayer: React.FC = () => {
       // Ignore if typing in input
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
 
-      if (e.key === '1') handleSelectAnswer('a');
-      else if (e.key === '2') handleSelectAnswer('b');
-      else if (e.key === '3') handleSelectAnswer('c');
-      else if (e.key === '4') handleSelectAnswer('d');
+      if (['1', '2', '3', '4'].includes(e.key)) {
+        const slotIdx = (parseInt(e.key, 10) - 1) as VisualSlotIndex;
+        const targetCanonicalId = spatialPresenter.resolveCanonicalChoiceIdBySlot(
+          presentedChoices,
+          slotIdx
+        );
+        if (targetCanonicalId) {
+          handleSelectAnswer(targetCanonicalId);
+        }
+      }
       else if (e.key === 'ArrowRight') {
         if (isLastQuestion) {
           if (!isExamMode && isAnswered) {
@@ -347,6 +525,8 @@ export const SessionPlayer: React.FC = () => {
     isExamMode,
     isAnswered,
     isLastQuestion,
+    presentedChoices,
+    spatialPresenter,
   ]);
 
   if (sessionQuestions.length === 0) {
@@ -380,6 +560,7 @@ export const SessionPlayer: React.FC = () => {
               ? (sessionConfig.timeLimitMinutes || 120) * 60 - timeLeftSeconds
               : Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000)),
             mode,
+            questionTelemetry: questionTelemetryMap,
           }}
           onRetestMistakes={(mistakes) => {
             setSessionQuestions(mistakes);
@@ -585,14 +766,51 @@ export const SessionPlayer: React.FC = () => {
             }`}>
               {currentQ.stem}
             </h1>
+
+            {/* Apple Confidence Calibration Pill Bar */}
+            <div className="pt-2 border-t border-slate-200/50 dark:border-zinc-800/50 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center space-x-1.5 text-[11px] font-semibold text-slate-500 dark:text-zinc-400">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Confidence Calibration:</span>
+              </div>
+              <div className="inline-flex items-center p-1 rounded-full bg-slate-100/80 dark:bg-zinc-800/80 border border-slate-200/70 dark:border-zinc-700/70 space-x-1">
+                {(
+                  [
+                    { id: 'guess' as const, label: 'Guess' },
+                    { id: 'unsure' as const, label: 'Unsure' },
+                    { id: 'sure' as const, label: 'Confident' },
+                  ]
+                ).map((item) => {
+                  const active = currentConfidence === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleSelectConfidence(item.id)}
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer apple-tap ${
+                        active
+                          ? item.id === 'sure'
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : item.id === 'guess'
+                            ? 'bg-amber-500 text-white shadow-xs'
+                            : 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* Choices (A, B, C, D) - Apple Glassmorphism with High Contrast Answer Differentiation */}
           <div className="space-y-3.5 pt-1" role="radiogroup" aria-label="Question choices">
-            {currentQ.choices.map((choice, idx) => {
-              const isSelected = currentAnswer?.choiceId === choice.id;
+            {presentedChoices.map((choice, idx) => {
+              const isSelected = currentAnswer?.choiceId === choice.canonicalChoiceId;
               const isCorrect = choice.isCorrect;
-              const choiceLetter = ['A', 'B', 'C', 'D'][idx] || String.fromCharCode(65 + idx);
+              const choiceLetter = choice.visualBadgeLetter;
 
               // Apple Glassmorphism and High Contrast State Engine
               let containerStyle = '';
@@ -677,8 +895,8 @@ export const SessionPlayer: React.FC = () => {
 
               return (
                 <button
-                  key={choice.id}
-                  onClick={() => handleSelectAnswer(choice.id)}
+                  key={choice.canonicalChoiceId}
+                  onClick={() => handleSelectAnswer(choice.canonicalChoiceId)}
                   disabled={!isExamMode && isAnswered}
                   className={`w-full text-left p-3.5 sm:p-4 rounded-2xl flex items-center justify-between gap-3 transition-all text-sm sm:text-base select-none apple-tap ${
                     !isExamMode && isAnswered ? '' : 'cursor-pointer'
@@ -715,7 +933,12 @@ export const SessionPlayer: React.FC = () => {
                   ) : (
                     <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-rose-500/15 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 font-extrabold text-xs sm:text-sm border border-rose-500/30 shadow-xs">
                       <XCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 stroke-[2.5]" />
-                      <span>{t.test.player.incorrectChoice.replace('{key}', currentQ.choices.find((c) => c.isCorrect)?.id.toUpperCase() || '')}</span>
+                      <span>
+                        {t.test.player.incorrectChoice.replace(
+                          '{key}',
+                          presentedChoices.find((c) => c.isCorrect)?.visualBadgeLetter || ''
+                        )}
+                      </span>
                     </div>
                   )}
                 </div>
