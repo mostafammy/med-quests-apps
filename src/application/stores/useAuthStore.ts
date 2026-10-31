@@ -26,7 +26,8 @@ export type GovernanceViewTab =
   | 'cohort-analytics'
   | 'user-directory'
   | 'audit-trail'
-  | 'question-bank';
+  | 'question-bank'
+  | 'accuracy-audit';
 
 export interface AuthStoreState {
   readonly authState: AuthState;
