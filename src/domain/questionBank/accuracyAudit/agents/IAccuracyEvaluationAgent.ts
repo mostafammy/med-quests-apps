@@ -3,7 +3,7 @@
  * Contract for specialized AI audit agents inspecting a specific clinical quality dimension.
  */
 
-import type { Question } from '../../model/types.ts';
+import type { Question } from '../../../model/types.ts';
 import type { AgentCritique, AuditEvaluationDimension } from '../types.ts';
 
 export interface IAccuracyEvaluationAgent {
