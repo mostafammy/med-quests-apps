@@ -29,6 +29,7 @@ import {
   Server,
 } from 'lucide-react';
 import { QuestionBankGovernancePanel } from '../admin/QuestionBankGovernancePanel.tsx';
+import { AdminAccuracyAuditCenter } from '../admin/accuracyAudit/AdminAccuracyAuditCenter.tsx';
 import {
   useAuthStore,
   type GovernanceViewTab,
@@ -373,6 +374,12 @@ export const AdminGovernanceDrawer: React.FC = () => {
                 badge: 'Curriculum',
               },
               {
+                id: 'accuracy-audit',
+                label: 'Accuracy Audit Lab',
+                icon: Sparkles,
+                badge: 'Apple QA',
+              },
+              {
                 id: 'audit-trail',
                 label: 'Security Audit Log',
                 icon: History,
@@ -566,6 +573,15 @@ export const AdminGovernanceDrawer: React.FC = () => {
           {activeGovernanceTab === 'question-bank' && (
             <div className="py-2">
               <QuestionBankGovernancePanel />
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB: ACCURACY AUDIT LAB                                   */}
+          {/* ========================================================= */}
+          {activeGovernanceTab === 'accuracy-audit' && (
+            <div className="py-2">
+              <AdminAccuracyAuditCenter />
             </div>
           )}
 
