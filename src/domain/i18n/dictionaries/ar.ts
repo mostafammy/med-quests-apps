@@ -302,6 +302,12 @@ export const arDictionary: TranslationDictionary = {
   },
   bank: {
     title: 'بنك الأسئلة والمزامنة العالمية',
+    exportMasterBankBtn: 'تصدير بنك الأسئلة الرئيسي المعتمد',
+    exportModalTitle: 'تصدير بنك الأسئلة المعتمد',
+    exportModalSub: 'الأرشيف الرئيسي المشفر للمؤسسة',
+    exportConfidentialNotice:
+      'ملكية فكرية سرية: مقتصرة حصرياً على مديري المنصة المعتمدين. يتم توثيق وختم كل عملية تصدير تشفيرياً في سجل الأمان الدائم لـ Cloudflare Edge.',
+    exportSuccessToast: 'تم تصدير بنك الأسئلة المعتمد بنجاح وتوثيقه في سجل الأمان.',
     resetToGlobalBtn: 'إعادة ضبط لبنك الأسئلة العام',
     resetConfirmTitle: 'إعادة ضبط بنك الأسئلة للنسخة العامة المعتمدة؟',
     resetConfirmDialog:
