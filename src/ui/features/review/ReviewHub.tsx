@@ -9,7 +9,10 @@ import {
   RotateCcw, 
   Play, 
   CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  Clock,
+  Brain,
+  Sparkles
 } from 'lucide-react';
 
 export const ReviewHub: React.FC = () => {
@@ -20,6 +23,8 @@ export const ReviewHub: React.FC = () => {
     topicStats, 
     totalAttempts, 
     mistakeQuestionIds,
+    retentionForecast,
+    instinctStats,
     refreshStats,
     resetStats
   } = useStatsStore();
@@ -45,6 +50,7 @@ export const ReviewHub: React.FC = () => {
       state: {
         mode: 'retest',
         questionCount: mistakeQuestions.length,
+        questionIds: mistakeQuestionIds,
       },
     });
   };
@@ -76,6 +82,91 @@ export const ReviewHub: React.FC = () => {
               <span>{t.common.reset}</span>
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Apple SM-2 Spaced Repetition Forecast & Decision Forensics Card */}
+      <div className="p-5 sm:p-6 rounded-3xl bg-white/65 dark:bg-zinc-900/65 backdrop-blur-xl border border-white/80 dark:border-zinc-800/80 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <div className="inline-flex items-center space-x-1.5 text-[11px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+              <Brain className="w-3.5 h-3.5" />
+              <span>SM-2 Memory Retention & Spaced Repetition Schedule</span>
+            </div>
+            <h2 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-zinc-100 mt-0.5">
+              14-Day Forgetting Curve & Review Queue Forecast
+            </h2>
+          </div>
+          <span className="text-xs font-mono font-semibold text-slate-500 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800 px-3 py-1 rounded-full self-start sm:self-auto">
+            {retentionForecast.totalTrackedCards} Active SM-2 Cards
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="p-3.5 rounded-2xl bg-rose-500/10 dark:bg-rose-950/30 border border-rose-500/25 space-y-1">
+            <div className="flex items-center justify-between text-xs font-bold text-rose-700 dark:text-rose-400">
+              <span>Due Now</span>
+              <Clock className="w-3.5 h-3.5" />
+            </div>
+            <div className="text-2xl font-black text-rose-900 dark:text-rose-200">
+              {retentionForecast.dueNow}
+            </div>
+            <div className="text-[10px] text-rose-700/80 dark:text-rose-300/80">
+              Immediate Recall Priority
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/25 space-y-1">
+            <div className="text-xs font-bold text-amber-700 dark:text-amber-400">Tomorrow (+24h)</div>
+            <div className="text-2xl font-black text-amber-900 dark:text-amber-200">
+              {retentionForecast.dueTomorrow}
+            </div>
+            <div className="text-[10px] text-amber-700/80 dark:text-amber-300/80">
+              Short-Interval Consolidation
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-blue-500/10 dark:bg-blue-950/30 border border-blue-500/25 space-y-1">
+            <div className="text-xs font-bold text-blue-700 dark:text-blue-400">Days 2–3</div>
+            <div className="text-2xl font-black text-blue-900 dark:text-blue-200">
+              {retentionForecast.dueIn3Days}
+            </div>
+            <div className="text-[10px] text-blue-700/80 dark:text-blue-300/80">
+              Mid-Cycle Reinforcement
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-indigo-500/10 dark:bg-indigo-950/30 border border-indigo-500/25 space-y-1">
+            <div className="text-xs font-bold text-indigo-700 dark:text-indigo-400">Days 4–7</div>
+            <div className="text-2xl font-black text-indigo-900 dark:text-indigo-200">
+              {retentionForecast.dueIn7Days}
+            </div>
+            <div className="text-[10px] text-indigo-700/80 dark:text-indigo-300/80">
+              Weekly Spacing Horizon
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-emerald-500/10 dark:bg-emerald-950/30 border border-emerald-500/25 col-span-2 sm:col-span-1 space-y-1">
+            <div className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Stabilized (7d+)</div>
+            <div className="text-2xl font-black text-emerald-900 dark:text-emerald-200">
+              {retentionForecast.stabilizedCards}
+            </div>
+            <div className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80">
+              Long-Term Memory Locked
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-slate-200/60 dark:border-zinc-800/60 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 dark:text-zinc-300">
+          <div className="flex items-center space-x-2">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+            <span>
+              <strong>Answer-Switching Telemetry:</strong>{' '}
+              {instinctStats.totalChanges === 0
+                ? 'Zero answer switches recorded across sessions.'
+                : `${instinctStats.totalChanges} total switches (${instinctStats.changedToCorrect} Wrong → Right, ${instinctStats.changedToWrong} Right → Wrong).`}
+            </span>
+          </div>
         </div>
       </div>
 
