@@ -4,7 +4,7 @@
  * ensuring questions are anchored in official curriculum without hallucination.
  */
 
-import type { Question } from '../../model/types.ts';
+import type { Question } from '../../../model/types.ts';
 import type { IAccuracyEvaluationAgent } from './IAccuracyEvaluationAgent.ts';
 import type { AgentCritique } from '../types.ts';
 
