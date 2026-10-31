@@ -362,6 +362,11 @@ export interface TranslationDictionary {
   };
   readonly bank: {
     readonly title: string;
+    readonly exportMasterBankBtn: string;
+    readonly exportModalTitle: string;
+    readonly exportModalSub: string;
+    readonly exportConfidentialNotice: string;
+    readonly exportSuccessToast: string;
     readonly resetToGlobalBtn: string;
     readonly resetConfirmTitle: string;
     readonly resetConfirmDialog: string;
