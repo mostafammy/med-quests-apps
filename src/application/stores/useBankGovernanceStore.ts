@@ -50,6 +50,12 @@ interface BankGovernanceStoreState {
     reason: string,
     actor: { id: string; displayName: string; role: any }
   ) => Promise<boolean>;
+  deleteCanonicalQuestion: (
+    questionId: string,
+    reason: string,
+    actor: { id: string; displayName: string; role: any },
+    permanent?: boolean
+  ) => Promise<boolean>;
 
   // Selectors
   getFilteredCatalog: () => GovernedQuestion[];
@@ -195,6 +201,31 @@ export const useBankGovernanceStore = create<BankGovernanceStoreState>((set, get
         actorId: actor.id,
         actorDisplayName: actor.displayName,
         actorRole: actor.role,
+      });
+      if (res.ok) {
+        await get().loadGovernanceData('cvs');
+        set({ isActionInProgress: false });
+        return true;
+      } else {
+        set({ error: res.error.code, isActionInProgress: false });
+        return false;
+      }
+    } catch (err) {
+      set({ error: (err as Error).message, isActionInProgress: false });
+      return false;
+    }
+  },
+
+  deleteCanonicalQuestion: async (questionId, reason, actor, permanent = true) => {
+    set({ isActionInProgress: true, error: null });
+    try {
+      const res = await edgeQuestionBankGateway.deleteCanonicalQuestion({
+        questionId: questionId as any,
+        actorId: actor.id,
+        actorDisplayName: actor.displayName,
+        actorRole: actor.role,
+        reason,
+        permanent,
       });
       if (res.ok) {
         await get().loadGovernanceData('cvs');
