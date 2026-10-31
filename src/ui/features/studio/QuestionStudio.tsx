@@ -7,7 +7,6 @@ import {
   Copy,
   Check,
   Upload,
-  Download,
   Sparkles,
   AlertCircle,
   CheckCircle2,
@@ -21,12 +20,10 @@ import { ResetBankConfirmationModal } from '../questionBank/ResetBankConfirmatio
 
 export const QuestionStudio: React.FC = () => {
   const {
-    questions,
     mySubmissions,
     ingestQuestions,
     submitQuestionsForGlobalReview,
     loadMySubmissions,
-    exportBankJson,
     clearBank,
   } = useQuestionStore();
 
@@ -71,8 +68,10 @@ ${chapterTopics.map((t) => `- "${t.id}": ${t.name}`).join('\n')}
 INSTRUCTIONS:
 1. Grounding Rule: Every single question must be 100% grounded in the uploaded materials. You MUST cite the verbatim evidence quote from the text or slides that proves the correct answer.
 2. Choices Rule: Provide EXACTLY 4 choices ("a", "b", "c", "d"). Exactly ONE choice must be "isCorrect: true".
-3. Distractors: Distractors must be plausible medical distractors from the curriculum and have clear rationales explaining why they are incorrect.
-4. Output Format: Output ONLY a valid JSON array of question objects (NO markdown code fences, NO intro text, pure JSON).
+3. Psychometric Choice Entropy: Distribute the correct answer evenly across options 'a', 'b', 'c', and 'd' (approximately 25% each across the generated batch). Do NOT make 'a' or 'b' always correct.
+4. No Positional Language: Avoid "All of the above", "None of the above", "Both A & B", or referring to option letters in text, as options are dynamically permuted.
+5. Distractors: Distractors must be plausible medical distractors from the curriculum and have clear rationales explaining why they are incorrect.
+6. Output Format: Output ONLY a valid JSON array of question objects (NO markdown code fences, NO intro text, pure JSON).
 
 JSON SCHEMA TO PRODUCE:
 [
@@ -86,10 +85,10 @@ JSON SCHEMA TO PRODUCE:
     "type": "single-best-answer",
     "stem": "Clinical vignette or direct assessment question stem...",
     "choices": [
-      { "id": "a", "text": "Option A text", "isCorrect": false, "rationale": "Why A is incorrect" },
-      { "id": "b", "text": "Option B text", "isCorrect": true,  "rationale": "Why B is correct based on the text" },
-      { "id": "c", "text": "Option C text", "isCorrect": false, "rationale": "Why C is incorrect" },
-      { "id": "d", "text": "Option D text", "isCorrect": false, "rationale": "Why D is incorrect" }
+      { "id": "a", "text": "Clinical distractor description A", "isCorrect": false, "rationale": "Why A is incorrect" },
+      { "id": "b", "text": "Clinical distractor description B", "isCorrect": false, "rationale": "Why B is incorrect" },
+      { "id": "c", "text": "Correct medical diagnosis or mechanism C", "isCorrect": true,  "rationale": "Why C is correct based on the text" },
+      { "id": "d", "text": "Clinical distractor description D", "isCorrect": false, "rationale": "Why D is incorrect" }
     ],
     "explanation": "Comprehensive clinical and anatomical explanation of the correct mechanism.",
     "examTip": "High-yield board trap or key takeaway (optional)",
@@ -107,11 +106,11 @@ JSON SCHEMA TO PRODUCE:
       }
     ],
     "status": "active",
-    "bankVersion": 1
+    "bankVersion": 2
   }
 ]
 
-Please generate 10-20 high-yield, challenging, board-style MCQs covering all the topics in this chapter.`;
+Please generate 10-20 high-yield, challenging, board-style MCQs covering all the topics in this chapter, ensuring equal distribution of correct choices across A, B, C, and D.`;
   };
 
   const handleCopyPrompt = () => {
@@ -161,17 +160,6 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
     }
   };
 
-  const handleExport = () => {
-    const jsonStr = exportBankJson();
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `cvs-bank-v1-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <div className="relative min-h-[calc(100vh-4rem)] py-6 sm:py-8 px-3 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 animate-apple-entrance">
       {/* 1. Interactive Global Bank Sync & Version Diff Glassmorphism Center */}
@@ -212,16 +200,6 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
           <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl leading-relaxed">
             {t.studio.subtitle}
           </p>
-        </div>
-
-        <div className="flex items-center space-x-2 self-start md:self-auto">
-          <button
-            onClick={handleExport}
-            className="py-2.5 px-4 rounded-2xl bg-white/60 dark:bg-zinc-800/60 hover:bg-white/80 dark:hover:bg-zinc-800 border border-white/80 dark:border-zinc-700/80 text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center space-x-2 shadow-xs transition-all duration-200 cursor-pointer apple-tap"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>{t.studio.exportBtn} ({questions.length})</span>
-          </button>
         </div>
       </div>
 
