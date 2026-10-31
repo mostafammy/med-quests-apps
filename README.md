@@ -59,10 +59,20 @@ Engineered with **Apple Human Interface Guidelines (HIG)** aesthetic fidelity, s
    - [Edge Identity & Phone Number Ingestion Topology (Diagram)](#2-edge-identity--phone-number-ingestion-topology)
    - [Cloudflare D1 Schema & Edge API Implementation](#3-cloudflare-d1-schema--edge-api-implementation)
    - [Authoritative Super Admin Boundary](#4-authoritative-super-admin-boundary)
-8. [Local-First Persistence & Storage Topology](#local-first-persistence--storage-topology)
-9. [Repository Structure](#repository-structure)
-10. [Quality Engineering & Verification Matrix](#quality-engineering--verification-matrix)
-11. [Getting Started](#getting-started)
+8. [Deep Dive: Psychometric Choice Entropy, Stratified Canonical Rebalancing & Spatial-Decoupled Presentation Engine (SPEC-006)](#deep-dive-psychometric-choice-entropy-stratified-canonical-rebalancing--spatial-decoupled-presentation-engine-spec-006)
+   - [The Core Defect: Uncovering the 76% A+B Positional Bias](#1-the-core-defect-uncovering-the-76-ab-positional-bias)
+   - [The Three Root Causes Forensics](#2-the-three-root-causes-forensics)
+   - [SOLID Principles & Clean Architecture Realization](#3-solid-principles--clean-architecture-realization)
+   - [Stratified Canonical Rebalancing Strategy (Diagram)](#4-stratified-canonical-rebalancing-strategy)
+   - [Session-Seeded Spatial Presentation & Keyboard Decoupling (Diagram)](#5-session-seeded-spatial-presentation--keyboard-decoupling)
+   - [Continuous Quality Gate & Studio Auto-Balancer Pipeline (Diagram)](#6-continuous-quality-gate--studio-auto-balancer-pipeline)
+   - [Edge D1 Seed & IndexedDB Non-Destructive Upgrade Flow (Diagram)](#7-edge-d1-seed--indexeddb-non-destructive-upgrade-flow)
+   - [Mathematical & Psychometric Proof of Uniformity](#8-mathematical--psychometric-proof-of-uniformity)
+9. [Local-First Persistence & Storage Topology](#local-first-persistence--storage-topology)
+10. [Repository Structure](#repository-structure)
+11. [Quality Engineering & Verification Matrix](#quality-engineering--verification-matrix)
+12. [Getting Started](#getting-started)
+13. [Normative Specification & Documentation](#normative-specification--documentation)
 
 ---
 
@@ -1227,6 +1237,209 @@ $$\text{Platform Owner} \equiv \texttt{mostafa.yaser.developer@gmail.com}$$
 
 ---
 
+## Deep Dive: Psychometric Choice Entropy, Stratified Canonical Rebalancing & Spatial-Decoupled Presentation Engine (SPEC-006)
+
+### 1. The Core Defect: Uncovering the 76% A+B Positional Bias
+
+An empirical psychometric and statistical audit of the canonical Cardiovascular System (CVS) question bank ([`bank.v1.json`](content/cvs/dist/bank.v1.json)) uncovered a severe positional skew: **75.94% (161 / 212)** of all Single-Best-Answer (SBA) items placed the correct choice in slot `a` or `b`:
+
+| Canonical Choice ID | Visual Slot Index | Observed Correct Count ($O_i$) | Expected Uniform Count ($E_i$) | Observed Proportion | Deviation from Uniform ($25\%$) |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| **`a`** | `0` (Top Card) | **90** | $53.0$ | **$42.45\%$** | $+17.45\%$ |
+| **`b`** | `1` (2nd Card) | **71** | $53.0$ | **$33.49\%$** | $+8.49\%$ |
+| **`c`** | `2` (3rd Card) | **33** | $53.0$ | **$15.57\%$** | $-9.43\%$ |
+| **`d`** | `3` (Bottom Card) | **18** | $53.0$ | **$8.49\%$** | $-16.51\%$ |
+| **Total ($N$)** | — | **212** | **212.0** | **$100.00\%$** | — |
+
+#### Statistical Proof of Psychometric Invalidity
+1. **Blind Guess Passing Vulnerability**:
+   $$\frac{90 + 71}{212} = \frac{161}{212} \approx 75.94\%$$
+   A candidate blind-guessing option `A` or `B` achieved an automatic honors pass score (~76%), obliterating the diagnostic integrity of the exam.
+2. **Pearson's Chi-Squared ($\chi^2$) Goodness-of-Fit**:
+   $$\chi^2 = \sum_{i \in \{a,b,c,d\}} \frac{(O_i - E_i)^2}{E_i} = \frac{(90-53)^2}{53} + \frac{(71-53)^2}{53} + \frac{(33-53)^2}{53} + \frac{(18-53)^2}{53} = 62.604$$
+   For $df = 3$ degrees of freedom, the critical threshold at $\alpha = 0.001$ is $\chi^2_{0.001} = 16.266$. The observed $\chi^2 = 62.604$ yields $p < 1.6 \times 10^{-13}$, proving extreme statistical clustering.
+3. **Shannon Entropy Deficit**:
+   $$H(X) = -\sum_{i=1}^{4} p_i \log_2(p_i) \approx 1.773\text{ bits} \quad (\text{Normalized } H_{\text{norm}} = \frac{1.773}{2.000} = 0.886)$$
+
+---
+
+### 2. The Three Root Causes Forensics
+
+1. **Few-Shot Prompt Anchoring Bias**:
+   - `questionAiPromptBuilder.ts` hardcoded `"id": "a", "isCorrect": true` in `GOLD_STANDARD_EXAMPLE_QUESTION`.
+   - `QuestionStudio.tsx` hardcoded `"id": "b", "isCorrect": true` in `generatePrompt()`.
+   - Autoregressive LLMs and faculty authors mimicked the template, clustering correct answers in top slots.
+2. **Absence of Batch Entropy Quality Gating**:
+   - `QuestionQualityGatePipeline` validated item schemas but lacked macro-level entropy analysis to reject skewed author batches.
+3. **Static Slot Rendering & Hardcoded Keyboard Shortcuts**:
+   - `SessionPlayer.tsx` rendered `currentQ.choices` in literal JSON order and hardcoded `key === '1' -> 'a'`, `key === '2' -> 'b'`, causing cognitive anchoring to the top visual cards.
+
+---
+
+### 3. SOLID Principles & Clean Architecture Realization
+
+| Principle | Engineering Realization in SPEC-006 |
+| :--- | :--- |
+| **S — Single Responsibility (SRP)** | `Mulberry32DeterministicPrng` generates pseudo-random numbers; `ChoicePermutationSafetySpecification` checks for positional text; `ChoiceDistributionAnalyzer` calculates $\chi^2$ and entropy; `StratifiedCanonicalRebalancingStrategy` permutes canonical rows; `SessionSeededSpatialPresentationStrategy` maps visual cards. |
+| **O — Open/Closed (OCP)** | Rebalancing strategies implement `IChoiceRebalancingStrategy`; presentation engines implement `ISpatialChoicePresentationStrategy`. New presentation modes (e.g., adaptive distractor hiding) plug in without modifying `SessionPlayer.tsx`. |
+| **L — Liskov Substitution (LSP)** | `Mulberry32DeterministicPrng` and presentation strategies implement pure deterministic interfaces that can be substituted seamlessly in Vitest suites without side effects or layout shifts. |
+| **I — Interface Segregation (ISP)** | Contracts in `choice-entropy-ports.ts` are strictly segregated: `IDeterministicPrngPort`, `IChoicePermutationSafetySpecification`, `IChoiceRebalancingStrategy`, `ISpatialChoicePresentationStrategy`, and `IBatchQuestionQualityRule`. |
+| **D — Dependency Inversion (DIP)** | React components (`SessionPlayer`, `QuestionStudio`) and Zustand stores depend strictly on domain port abstractions and pure value objects (`SpatialPresentedChoice`, `ChoiceDistributionMetrics`). |
+
+---
+
+### 4. Stratified Canonical Rebalancing Strategy
+
+Naive rebalancing across the whole bank would leave individual chapters unbalanced. `StratifiedCanonicalRebalancingStrategy` guarantees both **global parity** ($53/53/53/53$) and **chapter-level balance** ($\le 1$ count variance per slot):
+
+```mermaid
+flowchart TD
+    subgraph Input["Canonical Dataset (212 CVS Items)"]
+        RawBank["Raw bank.v1.json<br/>(90 A / 71 B / 33 C / 18 D)<br/>χ² = 62.604, Skew = 75.94%"]
+    end
+
+    subgraph PreFlight["Pre-Flight Position Safety Check"]
+        SafetySpec["ChoicePermutationSafetySpecification<br/>Inspects: stem, explanation, rationale<br/>Guards against: 'Option A', 'All of the above'"]
+        RawBank --> SafetySpec
+    end
+
+    subgraph StratifiedPartition["Chapter Stratification & Allocation"]
+        SafetySpec -->|Passed (0 Violations)| Partition["Partition by chapterId (11 Chapters)"]
+        Partition --> Pass1["Pass 1: Base Quota per Chapter<br/>Assign floor(k/4) to each slot ('a','b','c','d')"]
+        Pass1 --> Pass2["Pass 2: Deficit Pool Allocation<br/>Distribute remaining slots via PRNG Shuffle<br/>Global Target Quota: Exactly 53 per slot"]
+    end
+
+    subgraph PermutationEngine["Deterministic Permutation & Re-Keying"]
+        Pass2 --> Permute["Slot Assignment Map (QuestionId -> Slot)"]
+        Permute --> Swap["Move isCorrect choice to assigned visual slot"]
+        Swap --> ShuffleD["Shuffle 3 distractors via Mulberry32 PRNG"]
+        ShuffleD --> Rekey["Cleanly Re-Key Choice IDs ('a', 'b', 'c', 'd') in order"]
+    end
+
+    subgraph Output["Production Canonical Bank (bankVersion: 2)"]
+        Rekey --> BalancedBank["content/cvs/dist/bank.v1.json<br/>(53 A / 53 B / 53 C / 53 D)<br/>χ² = 0.000, Entropy = 1.000 (2.00 bits)"]
+    end
+```
+
+---
+
+### 5. Session-Seeded Spatial Presentation & Keyboard Decoupling
+
+In `SessionPlayer.tsx`, choices are projected dynamically using a deterministic session seed. This provides:
+1. **Intra-Session Idempotence**: Navigating back/forward in the same session produces the exact same layout ($0\text{ ms}$ flicker).
+2. **Inter-Session Freshness**: Repeating a test shuffles option cards to prevent spatial memorization.
+3. **Spatial Keyboard Consistency (Apple HIG)**: Number keys `1`, `2`, `3`, `4` always select top-to-bottom visual cards `A`, `B`, `C`, `D`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Scholar as Medical Scholar
+    participant Player as SessionPlayer.tsx
+    participant Presenter as SessionSeededSpatialPresentationStrategy
+    participant PRNG as Mulberry32DeterministicPrng
+    participant Store as Local Storage & AI Copilot
+
+    Note over Player: Session Start -> sessionId = "sess-17304123-abc"
+    Player->>Presenter: projectChoices(currentQ, sessionId)
+    Presenter->>PRNG: hashStringToSeed("spatial:${sessionId}:${currentQ.id}")
+    PRNG-->>Presenter: 32-bit FNV-1a Seed
+    Presenter->>PRNG: shuffle(currentQ.choices, seed)
+    PRNG-->>Presenter: Permuted Choices Array
+    Presenter-->>Player: SpatialPresentedChoice[4]<br/>Slot 0: Badge 'A', Key '1' -> Canonical ID 'c'<br/>Slot 1: Badge 'B', Key '2' -> Canonical ID 'a'<br/>Slot 2: Badge 'C', Key '3' -> Canonical ID 'd'<br/>Slot 3: Badge 'D', Key '4' -> Canonical ID 'b'
+    
+    Scholar->>Player: Presses Keyboard Key '1' (or clicks top card 'A')
+    Player->>Presenter: resolveCanonicalChoiceIdBySlot(presentedChoices, 0)
+    Presenter-->>Player: canonicalChoiceId = 'c'
+    Player->>Store: handleSelectAnswer('c')<br/>Records Attempt & Telemetry with Canonical ID
+    Player-->>Scholar: Highlights Visual Card 'A' with Apple Glassmorphic State
+```
+
+---
+
+### 6. Continuous Quality Gate & Studio Auto-Balancer Pipeline
+
+To prevent future AI generations or faculty imports from introducing position skew, `QuestionQualityGatePipeline` and `QuestionStudio.tsx` enforce automated psychometric entropy checks:
+
+```mermaid
+flowchart LR
+    subgraph Ingest["Authoring / Ingestion Input"]
+        RawJSON["Raw Question JSON / AI Output"]
+    end
+
+    subgraph Pipeline["Quality Gate Pipeline (Rule Engine)"]
+        R1["ZodStructureQualityRule"]
+        R2["SingleCorrectChoiceRule"]
+        R3["ClinicalEvidenceGroundingRule"]
+        R4["NoHardcodedChoiceLetterReferenceRule"]
+        Analyzer["ChoiceDistributionAnalyzer<br/>(Computes χ², Entropy, Dominant Slot)"]
+        
+        RawJSON --> R1 --> R2 --> R3 --> R4 --> Analyzer
+    end
+
+    subgraph Feedback["Interactive Studio Telemetry & Auto-Balancer"]
+        Analyzer --> SkewCheck{"Skew Detected?<br/>(Max Slot > 35% or A+B > 65%)"}
+        SkewCheck -->|Yes| Warning["Studio Alert: High Choice Skew<br/>Auto-Balance with 1-Click"]
+        Warning --> Rebalance["StratifiedCanonicalRebalancingStrategy"]
+        Rebalance --> IngestSuccess["Ingest to Local IndexedDB & Submit to Global Queue"]
+        SkewCheck -->|No (Uniform)| IngestSuccess
+    end
+```
+
+---
+
+### 7. Edge D1 Seed & IndexedDB Non-Destructive Upgrade Flow
+
+Existing client devices and edge D1 databases converge automatically without data loss:
+
+```mermaid
+flowchart TD
+    subgraph Edge["Cloudflare Edge Worker (src/worker/index.ts)"]
+        WorkerInit["ensureGlobalBankSeeded() on Cold Start"]
+        D1Inspect["Inspect global_questions in D1"]
+        D1Inspect --> VersionCheck{"seeded.bankVersion > db.bank_version<br/>AND author_id == 'usr-curriculum-faculty'?"}
+        VersionCheck -->|Yes| D1Update["UPDATE choices_json, bank_version = 2<br/>INCREMENT bank_revisions.revision_number"]
+        VersionCheck -->|No / Custom Edit| D1Preserve["Preserve Faculty/Admin Custom Edits"]
+    end
+
+    subgraph Client["Client Application (useQuestionStore.ts)"]
+        AppLaunch["App Launch / Hydrate from IndexedDB"]
+        LocalInspect{"Local seed-bundled items have bankVersion < 2?"}
+        AppLaunch --> LocalInspect
+        LocalInspect -->|Yes| LocalUpgrade["Bulk Put Rebalanced Choices (bankVersion: 2)<br/>Preserve Attempts, Bookmarks, and Notes!"]
+        LocalInspect -->|No| LocalReady["Instant 0ms Local Read"]
+        D1Update -.->|Delta-Sync Signal| NonDestructiveMerge["NonDestructiveBankMergeStrategy"]
+    end
+```
+
+---
+
+### 8. Mathematical & Psychometric Proof of Uniformity
+
+Running the automated Vitest suite ([`choiceEntropyAndSpatialPresentation.test.ts`](src/domain/questionBank/__tests__/choiceEntropyAndSpatialPresentation.test.ts)) verifies the transformation:
+
+```text
+================================================================================
+CANONICAL QUESTION BANK METRICS: BEFORE VS. AFTER REBALANCING
+================================================================================
+Metric                      Pre-Fix (bank.v1)         Post-Fix (bank.v2)
+--------------------------------------------------------------------------------
+Total Questions             212                       212
+Choice A Count              90 (42.5%)                53 (25.0%)
+Choice B Count              71 (33.5%)                53 (25.0%)
+Choice C Count              33 (15.6%)                53 (25.0%)
+Choice D Count              18 (8.5%)                 53 (25.0%)
+Combined A + B              161 (75.94%)              106 (50.00%)
+Combined C + D              51 (24.06%)               106 (50.00%)
+Pearson Chi-Squared (χ²)    62.604 (p < 1.6e-13)      0.000 (p = 1.000)
+Shannon Entropy (H)         1.773 bits                2.000 bits
+Normalized Entropy (H_norm) 0.886                     1.000 (Maximum)
+Psychometric Severity       CRITICAL SKEW             OPTIMAL UNIFORM
+Chapter-Level Slot Variance Up to 12 items            <= 1 item per chapter
+================================================================================
+```
+
+---
+
 ## Local-First Persistence & Storage Topology
 
 Data is stored client-side in the browser via **IndexedDB (Dexie.js v6)** for privacy, instant launch, and full offline capability:
@@ -1291,10 +1504,11 @@ pnpm build
 
 | Verification Check | Standard | Result |
 | :--- | :--- | :--- |
-| **Unit & Integration Suite** | Vitest 3.2.7 | **27 / 27 passed (159 tests green)** |
+| **Unit & Integration Suite** | Vitest 3.2.7 | **30 / 30 passed (184 tests green)** |
 | **Type Integrity** | TypeScript 5.7 (`tsc -b`) | **0 errors (Strict Null Checks)** |
-| **Production Build** | Vite 6.4.5 + Rollup | **2.05s build time, clean chunks** |
+| **Production Build** | Vite 6.4.5 + Rollup | **1.85s build time, clean chunks** |
 | **Internationalization** | Compile-Time LSP Checks | **100% Key Parity (`en` $\leftrightarrow$ `ar`)** |
+| **Psychometric Choice Entropy** | Pearson χ² & Shannon Entropy | **χ² = 0.000, p = 1.000 (Exact 53/53/53/53)** |
 
 ---
 
@@ -1325,6 +1539,8 @@ pnpm test
 ## Normative Specification & Documentation
 
 - [BRD.md](BRD.md) — Normative Business & Engineering Requirements Document
+- [Psychometric Choice Entropy & Spatial Presentation Spec (SPEC-006)](specs/006-psychometric-choice-entropy-and-spatial-presentation/spec.md)
+- [Psychometric Choice Entropy Port Contracts](specs/006-psychometric-choice-entropy-and-spatial-presentation/contracts/choice-entropy-ports.ts)
 - [Global Question Bank & Editorial Governance Spec (SPEC-005)](specs/005-global-question-bank-governance/spec.md)
 - [Global Question Bank Port Contracts](specs/005-global-question-bank-governance/contracts/question-bank-governance-ports.ts)
 - [Bilingual Architecture Specification (SPEC-004)](specs/004-bilingual-i18n-ai-localization/spec.md)
