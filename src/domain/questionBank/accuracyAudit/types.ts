@@ -5,8 +5,8 @@
  */
 
 import { z } from 'zod';
-import type { Question, QuestionId, BlockId, SubjectId } from '../model/types.ts';
-import type { UserId } from '../auth/types.ts';
+import type { Question, QuestionId, BlockId, SubjectId } from '../../model/types.ts';
+import type { UserId } from '../../auth/types.ts';
 
 // ==========================================
 // 1. EVALUATION DIMENSIONS & CRITIQUE
