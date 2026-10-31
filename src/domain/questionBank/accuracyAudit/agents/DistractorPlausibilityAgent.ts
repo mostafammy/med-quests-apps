@@ -4,7 +4,7 @@
  * high-yield clinical pitfalls rather than trivial throwaways.
  */
 
-import type { Question } from '../../model/types.ts';
+import type { Question } from '../../../model/types.ts';
 import type { IAccuracyEvaluationAgent } from './IAccuracyEvaluationAgent.ts';
 import type { AgentCritique } from '../types.ts';
 
