@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Question, ChoiceId } from '../../../domain/model/types.ts';
+import { Question, ChoiceId, Confidence } from '../../../domain/model/types.ts';
 import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 import { 
   Trophy, 
@@ -10,14 +10,27 @@ import {
   BookOpen, 
   ChevronDown, 
   ChevronUp,
-  LayoutDashboard
+  LayoutDashboard,
+  Zap,
+  Clock,
+  AlertTriangle,
+  Brain,
+  Sparkles
 } from 'lucide-react';
+
+export interface QuestionAttemptTelemetry {
+  responseTimeMs: number;
+  firstSelectedChoiceId?: ChoiceId | null;
+  choiceChangesCount?: number;
+  confidence?: Confidence;
+}
 
 export interface TestSessionResult {
   sessionQuestions: Question[];
   answers: Record<string, { choiceId: ChoiceId; isCorrect: boolean }>;
   timeSpentSeconds: number;
   mode: string;
+  questionTelemetry?: Record<string, QuestionAttemptTelemetry>;
 }
 
 export const PostTestReport: React.FC<{
@@ -28,7 +41,7 @@ export const PostTestReport: React.FC<{
   const { t } = useLocaleStore();
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
 
-  const { sessionQuestions, answers, timeSpentSeconds, mode } = result;
+  const { sessionQuestions, answers, timeSpentSeconds, mode, questionTelemetry = {} } = result;
 
   const totalQuestions = sessionQuestions.length;
   const answeredCount = Object.keys(answers).length;
@@ -39,7 +52,51 @@ export const PostTestReport: React.FC<{
   });
   const unansweredCount = totalQuestions - answeredCount;
   const scorePercent = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
-  const avgTimePerQuestion = answeredCount > 0 ? Math.round(timeSpentSeconds / answeredCount) : 0;
+
+  const totalActiveResponseMs = Object.entries(answers).reduce((acc, [qId]) => {
+    return acc + (questionTelemetry[qId]?.responseTimeMs || 0);
+  }, 0);
+  const avgTimePerQuestion =
+    answeredCount > 0
+      ? totalActiveResponseMs > 0
+        ? Math.max(1, Math.round(totalActiveResponseMs / 1000 / answeredCount))
+        : Math.max(1, Math.round(timeSpentSeconds / answeredCount))
+      : 0;
+
+  // 4-Quadrant Pacing vs. Accuracy Diagnostic Matrix & Gut Instinct Analysis
+  let fastAccurate = 0;
+  let slowAccurate = 0;
+  let fastWrong = 0;
+  let slowWrong = 0;
+  let totalChoiceChanges = 0;
+  let changedToCorrect = 0;
+  let changedToWrong = 0;
+
+  sessionQuestions.forEach((q) => {
+    const ans = answers[q.id];
+    if (!ans) return;
+    const qTel = questionTelemetry[q.id];
+    const paceMs = qTel?.responseTimeMs && qTel.responseTimeMs > 0
+      ? qTel.responseTimeMs
+      : avgTimePerQuestion * 1000;
+    const isFast = paceMs <= 45000;
+
+    if (ans.isCorrect) {
+      if (isFast) fastAccurate += 1;
+      else slowAccurate += 1;
+    } else {
+      if (isFast) fastWrong += 1;
+      else slowWrong += 1;
+    }
+
+    if (qTel && (qTel.choiceChangesCount ?? 0) > 0) {
+      totalChoiceChanges += qTel.choiceChangesCount ?? 0;
+      if (qTel.firstSelectedChoiceId && qTel.firstSelectedChoiceId !== ans.choiceId) {
+        if (ans.isCorrect) changedToCorrect += 1;
+        else changedToWrong += 1;
+      }
+    }
+  });
 
   // Group performance by subject/chapter
   const chapterStats: Record<string, { total: number; correct: number }> = {};
@@ -139,6 +196,83 @@ export const PostTestReport: React.FC<{
         </div>
       </div>
 
+      {/* Apple 4-Quadrant Cognitive Pacing & Gut Instinct Diagnostics */}
+      <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl rounded-3xl border border-slate-200/80 dark:border-zinc-800/80 p-5 sm:p-6 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <div className="inline-flex items-center space-x-1.5 text-[11px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+              <Brain className="w-3.5 h-3.5" />
+              <span>Cognitive Pacing & Decision Forensics</span>
+            </div>
+            <h3 className="font-bold text-slate-900 dark:text-zinc-100 text-base mt-0.5">
+              4-Quadrant Response Time vs. Accuracy Matrix
+            </h3>
+          </div>
+          <span className="text-[11px] font-mono text-slate-500 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800 px-2.5 py-1 rounded-full self-start sm:self-auto">
+            Target Pacing Threshold: ≤ 45s / Q
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="p-3.5 rounded-2xl bg-emerald-500/10 dark:bg-emerald-950/30 border border-emerald-500/25 space-y-1">
+            <div className="flex items-center justify-between text-xs font-bold text-emerald-700 dark:text-emerald-400">
+              <span>Automatic Mastery</span>
+              <Zap className="w-3.5 h-3.5" />
+            </div>
+            <div className="text-2xl font-black text-emerald-900 dark:text-emerald-200">{fastAccurate}</div>
+            <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80">
+              Fast (≤45s) & Correct — fluent pattern recognition
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-blue-500/10 dark:bg-blue-950/30 border border-blue-500/25 space-y-1">
+            <div className="flex items-center justify-between text-xs font-bold text-blue-700 dark:text-blue-400">
+              <span>Effortful Reasoning</span>
+              <Clock className="w-3.5 h-3.5" />
+            </div>
+            <div className="text-2xl font-black text-blue-900 dark:text-blue-200">{slowAccurate}</div>
+            <p className="text-[11px] text-blue-700/80 dark:text-blue-300/80">
+              Deliberate (&gt;45s) & Correct — careful deduction
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/25 space-y-1">
+            <div className="flex items-center justify-between text-xs font-bold text-amber-700 dark:text-amber-400">
+              <span>Premature Closure</span>
+              <AlertTriangle className="w-3.5 h-3.5" />
+            </div>
+            <div className="text-2xl font-black text-amber-900 dark:text-amber-200">{fastWrong}</div>
+            <p className="text-[11px] text-amber-700/80 dark:text-amber-300/80">
+              Fast (≤45s) & Wrong — rushed stem or distractor trap
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-rose-500/10 dark:bg-rose-950/30 border border-rose-500/25 space-y-1">
+            <div className="flex items-center justify-between text-xs font-bold text-rose-700 dark:text-rose-400">
+              <span>Core Knowledge Gap</span>
+              <XCircle className="w-3.5 h-3.5" />
+            </div>
+            <div className="text-2xl font-black text-rose-900 dark:text-rose-200">{slowWrong}</div>
+            <p className="text-[11px] text-rose-700/80 dark:text-rose-300/80">
+              Slow (&gt;45s) & Wrong — needs targeted curriculum review
+            </p>
+          </div>
+        </div>
+
+        {/* First-Instinct vs. Second-Guessing Telemetry */}
+        <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center space-x-2 text-slate-600 dark:text-zinc-300">
+            <Sparkles className="w-4 h-4 text-indigo-500 shrink-0" />
+            <span>
+              <strong>Gut Instinct vs. Answer Switching:</strong>{' '}
+              {totalChoiceChanges === 0
+                ? 'Zero answer switches recorded — decisive first-instinct execution.'
+                : `${totalChoiceChanges} answer switch(es): ${changedToCorrect} improved (Wrong → Right), ${changedToWrong} hurt score (Right → Wrong).`}
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Chapter Breakdown */}
       <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl rounded-3xl border border-slate-200/80 dark:border-zinc-800/80 p-5 sm:p-6 shadow-sm space-y-4">
         <h3 className="font-bold text-slate-900 dark:text-zinc-100 text-base">{t.postTest.breakdownTitle}</h3>
@@ -209,6 +343,20 @@ export const PostTestReport: React.FC<{
                           </span>
                         )}
                         <span className="text-[11px] text-slate-400 dark:text-zinc-500 uppercase font-mono">{q.chapterId}</span>
+                        {questionTelemetry[q.id]?.responseTimeMs ? (
+                          <span className="text-[10px] font-mono font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
+                            {Math.max(1, Math.round(questionTelemetry[q.id].responseTimeMs / 1000))}s
+                          </span>
+                        ) : null}
+                        {questionTelemetry[q.id]?.confidence ? (
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                            {questionTelemetry[q.id].confidence === 'sure'
+                              ? 'Confident'
+                              : questionTelemetry[q.id].confidence === 'guess'
+                              ? 'Guess'
+                              : 'Unsure'}
+                          </span>
+                        ) : null}
                       </div>
                       <p className="text-sm font-medium text-slate-800 dark:text-zinc-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2">
                         {q.stem}
