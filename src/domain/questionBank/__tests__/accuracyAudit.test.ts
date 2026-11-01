@@ -329,4 +329,28 @@ describe('AdminAccuracyAuditService (RBAC Defense-in-Depth)', () => {
       )
     ).rejects.toThrow(AdminAuthorizationError);
   });
+
+  it('records auditingModel metadata in report when model selector is configured', async () => {
+    const adminActor = {
+      userId: 'usr_admin_001',
+      role: 'admin' as const,
+      displayName: 'Apple Lead Admin',
+    };
+
+    const report = await service.executeAdminAudit(
+      adminActor,
+      [mockFlawlessQuestion],
+      {
+        strategyType: 'uniform_random',
+        sampleSize: 1,
+        providerId: 'gemini',
+        modelId: 'gemini-2.5-pro',
+      }
+    );
+
+    expect(report.auditingModel).toBeDefined();
+    expect(report.auditingModel?.providerId).toBe('gemini');
+    expect(report.auditingModel?.modelId).toBe('gemini-2.5-pro');
+    expect(report.auditingModel?.modelName).toBe('Google Gemini 2.5 Pro');
+  });
 });

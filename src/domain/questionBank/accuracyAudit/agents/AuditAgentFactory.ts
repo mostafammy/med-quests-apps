@@ -5,7 +5,7 @@
  */
 
 import type { IAccuracyEvaluationAgent } from './IAccuracyEvaluationAgent.ts';
-import { MedicalFactualAccuracyAgent } from './MedicalFactualAccuracyAgent.ts';
+import { MedicalFactualAccuracyAgent, type MedicalAccuracyAgentOptions } from './MedicalFactualAccuracyAgent.ts';
 import { SingleBestAnswerInvariantAgent } from './SingleBestAnswerInvariantAgent.ts';
 import { DistractorPlausibilityAgent } from './DistractorPlausibilityAgent.ts';
 import { CurriculumEvidenceGroundingAgent } from './CurriculumEvidenceGroundingAgent.ts';
@@ -14,9 +14,11 @@ import { PedagogicalClarityAgent } from './PedagogicalClarityAgent.ts';
 export class AuditAgentFactory {
   private static customAgents: IAccuracyEvaluationAgent[] = [];
 
-  public static createDefaultSquad(): readonly IAccuracyEvaluationAgent[] {
+  public static createDefaultSquad(
+    modelConfig?: MedicalAccuracyAgentOptions
+  ): readonly IAccuracyEvaluationAgent[] {
     return [
-      new MedicalFactualAccuracyAgent(),
+      new MedicalFactualAccuracyAgent(modelConfig),
       new SingleBestAnswerInvariantAgent(),
       new DistractorPlausibilityAgent(),
       new CurriculumEvidenceGroundingAgent(),

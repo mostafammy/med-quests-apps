@@ -131,4 +131,76 @@ describe('CrossModelVerificationPromptBuilder (External LLM Cross-Examination)',
     expect(batchPrompt).toContain('Question 2 of 2');
     expect(batchPrompt).toContain('Expected Output Format Per Item');
   });
+
+  it('correctly executes injected cloud LLM provider and parses structured medical output', async () => {
+    const mockProvider = {
+      providerId: 'gemini' as const,
+      modelId: 'gemini-2.5-pro',
+      async *streamTurn() {
+        yield {
+          type: 'text',
+          delta: JSON.stringify({
+            items: [
+              {
+                tempId: 'mock-item-1',
+                rawInputExcerpt: 'Patient with crescendo-decrescendo murmur...',
+                wasAnswerKeyProvidedInInput: false,
+                aiGeneratedAnswerKey: true,
+                selectedCorrectChoiceId: 'b',
+                confidenceScore: 99,
+                warnings: ['⚠️ Answer Key was missing in raw text: AI solved the clinical scenario.'],
+                question: {
+                  id: 'q-parsed-mock-01',
+                  blockId: 'cvs',
+                  subjectId: 'physiology',
+                  chapterId: 'cvs-phys-valvular',
+                  topicId: 'cvs-phys-valvular/aortic-stenosis',
+                  concept: 'Aortic Stenosis Hemodynamics',
+                  type: 'single-best-answer',
+                  stem: 'A 68-year-old male presents with exertional syncope. Cardiac auscultation demonstrates a harsh crescendo-decrescendo systolic murmur at the right upper sternal border. Which of the following is the most likely diagnosis?',
+                  choices: [
+                    { id: 'a', text: 'Mitral regurgitation', isCorrect: false, rationale: 'Holosystolic murmur at apex.' },
+                    { id: 'b', text: 'Aortic stenosis', isCorrect: true, rationale: 'Classic presentation of severe AS.' },
+                    { id: 'c', text: 'Tricuspid regurgitation', isCorrect: false, rationale: 'Murmur increases with inspiration.' },
+                    { id: 'd', text: 'Aortic regurgitation', isCorrect: false, rationale: 'Early diastolic decrescendo murmur.' },
+                  ],
+                  explanation: 'Aortic stenosis classically presents with exertional angina, syncope, and dyspnea (SAD triad).',
+                  examTip: 'Right 2nd intercostal space murmur radiating to the carotids is pathognomonic for aortic stenosis.',
+                  mnemonic: 'SAD: Syncope, Angina, Dyspnea',
+                  difficulty: 2,
+                  cognitiveLevel: 'application',
+                  highYield: true,
+                  origin: 'authored-grounded',
+                  evidence: [
+                    {
+                      chunkId: 'chunk-test-1',
+                      sourceName: 'Guyton and Hall Medical Physiology',
+                      location: 'Chapter 23: Heart Valves and Heart Sounds',
+                      quote: 'Aortic valve stenosis causes high left ventricular systolic pressure and systolic ejection murmur.',
+                      kind: 'text',
+                    },
+                  ],
+                  status: 'active',
+                  bankVersion: 1,
+                },
+              },
+            ],
+          }),
+        };
+      },
+    };
+
+    const cloudAgent = new QuestionParsingAgent(mockProvider);
+    const result = await cloudAgent.parseRawQuestions({
+      rawText: 'Patient with crescendo-decrescendo murmur...',
+      providerId: 'gemini',
+      modelId: 'gemini-2.5-pro',
+    });
+
+    expect(result.totalParsed).toBe(1);
+    expect(result.items[0].question.concept).toBe('Aortic Stenosis Hemodynamics');
+    expect(result.items[0].selectedCorrectChoiceId).toBe('b');
+    expect(result.items[0].aiGeneratedAnswerKey).toBe(true);
+    expect(result.items[0].question.choices[1].isCorrect).toBe(true);
+  });
 });

@@ -154,3 +154,78 @@ export function getAvailableFallbackProvider(
 
   return null;
 }
+
+/**
+ * Directly instantiates a cloud provider for a specified provider and model,
+ * resolving credentials from passed settings or environment variables.
+ */
+export function createCloudProvider(
+  providerId: 'gemini' | 'groq' | 'openrouter' | string,
+  modelId?: string,
+  settings?: Partial<AiSettings>
+): AnyCloudProvider | null {
+  const effectiveSettings: AiSettings = {
+    engine: (providerId as any) || 'gemini',
+    chatLanguage: 'auto',
+    openRouterApiKey: '',
+    openRouterModel: 'nvidia/nemotron-3.5-lightning:free',
+    groqApiKey: '',
+    groqModel: 'openai/gpt-oss-20b',
+    geminiApiKey: '',
+    geminiModel: 'gemini-2.5-flash',
+    ...(settings || {}),
+  };
+
+  if (providerId === 'gemini') {
+    let key = getGeminiKey(effectiveSettings);
+    if (!key) {
+      try {
+        if (typeof process !== 'undefined' && process.env?.VITE_GEMINI_API_KEY) {
+          key = process.env.VITE_GEMINI_API_KEY.trim();
+        } else if ((import.meta as any).env?.VITE_GEMINI_API_KEY) {
+          key = (import.meta as any).env.VITE_GEMINI_API_KEY.trim();
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (!key) return null;
+    return new GeminiProvider(key, modelId || 'gemini-2.5-flash');
+  }
+
+  if (providerId === 'groq') {
+    let key = getGroqKey(effectiveSettings);
+    if (!key) {
+      try {
+        if (typeof process !== 'undefined' && process.env?.VITE_GROQ_API_KEY) {
+          key = process.env.VITE_GROQ_API_KEY.trim();
+        } else if ((import.meta as any).env?.VITE_GROQ_API_KEY) {
+          key = (import.meta as any).env.VITE_GROQ_API_KEY.trim();
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (!key) return null;
+    return new GroqProvider(key, modelId || 'openai/gpt-oss-120b');
+  }
+
+  if (providerId === 'openrouter') {
+    let key = getOpenRouterKey(effectiveSettings);
+    if (!key) {
+      try {
+        if (typeof process !== 'undefined' && process.env?.VITE_OPENROUTER_API_KEY) {
+          key = process.env.VITE_OPENROUTER_API_KEY.trim();
+        } else if ((import.meta as any).env?.VITE_OPENROUTER_API_KEY) {
+          key = (import.meta as any).env.VITE_OPENROUTER_API_KEY.trim();
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (!key) return null;
+    return new OpenRouterProvider(key, modelId || 'anthropic/claude-3.7-sonnet');
+  }
+
+  return null;
+}

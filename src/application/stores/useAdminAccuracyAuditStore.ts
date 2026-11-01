@@ -19,6 +19,7 @@ import type {
   AuditProgressTelemetry,
   AuditVerdict,
 } from '../../domain/questionBank/accuracyAudit/types.ts';
+import type { CloudProviderId } from '../../domain/ai/settings.ts';
 import { useAuthStore } from './useAuthStore.ts';
 import { useQuestionStore } from './useQuestionStore.ts';
 
@@ -27,7 +28,10 @@ export type AuditFilterVerdict = 'all' | AuditVerdict;
 interface AdminAccuracyAuditStoreState {
   // Configuration
   samplingConfig: SamplingConfiguration;
+  selectedProvider: CloudProviderId;
+  selectedModelId: string;
   setSamplingConfig: (partial: Partial<SamplingConfiguration>) => void;
+  setSelectedModel: (provider: CloudProviderId, modelId: string) => void;
 
   // Active Execution State
   isAuditing: boolean;
@@ -63,12 +67,28 @@ interface AdminAccuracyAuditStoreState {
 const auditService = new AdminAccuracyAuditService();
 
 export const useAdminAccuracyAuditStore = create<AdminAccuracyAuditStoreState>((set, get) => ({
+  selectedProvider: 'gemini',
+  selectedModelId: 'gemini-2.5-pro',
   samplingConfig: {
     strategyType: 'uniform_random',
     sampleSize: 20,
     seed: undefined,
     highYieldOnly: false,
     blockId: 'cvs',
+    providerId: 'gemini',
+    modelId: 'gemini-2.5-pro',
+  },
+
+  setSelectedModel: (selectedProvider, selectedModelId) => {
+    set((state) => ({
+      selectedProvider,
+      selectedModelId,
+      samplingConfig: {
+        ...state.samplingConfig,
+        providerId: selectedProvider,
+        modelId: selectedModelId,
+      },
+    }));
   },
 
   setSamplingConfig: (partial) => {
@@ -267,6 +287,7 @@ export const useAdminAccuracyAuditStore = create<AdminAccuracyAuditStoreState>((
         `**Run ID**: \`${report.runId}\``,
         `**Date & Time**: ${new Date(report.timestamp).toLocaleString()}`,
         `**Executed By**: ${report.executedByAdmin.displayName} (Admin: \`${report.executedByAdmin.userId}\`)`,
+        `**Auditing Intelligence Model**: ${report.auditingModel ? `**${report.auditingModel.modelName}** (\`${report.auditingModel.modelId}\`)` : 'Deterministic Ruleset'}`,
         `**Sampling Strategy**: \`${report.configuration.strategyType}\` (Seed: \`${report.extractionMetadata.randomSeed}\`)`,
         `**Sample Size**: ${report.extractionMetadata.sampledCount} of ${report.extractionMetadata.totalBankQuestions} questions`,
         ``,

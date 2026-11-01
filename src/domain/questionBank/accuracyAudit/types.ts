@@ -6,6 +6,7 @@
 
 import type { Question, QuestionId, BlockId, SubjectId } from '../../model/types.ts';
 import type { UserId } from '../../auth/types.ts';
+import type { CloudProviderId } from '../../ai/settings.ts';
 
 // ==========================================
 // 1. EVALUATION DIMENSIONS & CRITIQUE
@@ -72,6 +73,8 @@ export interface SamplingConfiguration {
   readonly seed?: number; // Optional seed for deterministic reproducibility in testing & audit verification
   readonly highYieldOnly?: boolean;
   readonly blockId?: BlockId;
+  readonly providerId?: CloudProviderId;
+  readonly modelId?: string;
 }
 
 export interface SampleExtractionResult {
@@ -114,6 +117,11 @@ export interface AccuracyAuditRunReport {
     readonly displayName: string;
   };
   readonly configuration: SamplingConfiguration;
+  readonly auditingModel?: {
+    readonly providerId: CloudProviderId;
+    readonly modelId: string;
+    readonly modelName: string;
+  };
   readonly extractionMetadata: {
     readonly totalBankQuestions: number;
     readonly sampledCount: number;

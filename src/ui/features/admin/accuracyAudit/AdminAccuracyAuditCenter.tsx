@@ -35,6 +35,51 @@ import type {
   SamplingStrategyType,
   AuditEvaluationDimension,
 } from '../../../../domain/questionBank/accuracyAudit/types.ts';
+import type { CloudProviderId } from '../../../../domain/ai/settings.ts';
+
+const AUDIT_MODEL_OPTIONS: Array<{
+  providerId: CloudProviderId;
+  modelId: string;
+  name: string;
+  badge: string;
+}> = [
+  {
+    providerId: 'gemini',
+    modelId: 'gemini-2.5-pro',
+    name: 'Google Gemini 2.5 Pro',
+    badge: 'Flagship • Deep Clinical Reasoning (1M TPM)',
+  },
+  {
+    providerId: 'gemini',
+    modelId: 'gemini-2.5-flash',
+    name: 'Google Gemini 2.5 Flash',
+    badge: 'Lightning Fast (Sub-second)',
+  },
+  {
+    providerId: 'groq',
+    modelId: 'openai/gpt-oss-120b',
+    name: 'Groq GPT-OSS 120B',
+    badge: 'Ultra-Fast Complex Analysis',
+  },
+  {
+    providerId: 'groq',
+    modelId: 'openai/gpt-oss-20b',
+    name: 'Groq GPT-OSS 20B',
+    badge: 'Instant Baseline (<100ms)',
+  },
+  {
+    providerId: 'openrouter',
+    modelId: 'anthropic/claude-3.7-sonnet',
+    name: 'Claude 3.7 Sonnet (via OpenRouter)',
+    badge: 'Medical Benchmark Leader',
+  },
+  {
+    providerId: 'openrouter',
+    modelId: 'deepseek/deepseek-r1',
+    name: 'DeepSeek R1 (via OpenRouter)',
+    badge: 'Clinical Chain-of-Thought',
+  },
+];
 
 const DIMENSION_LABELS: Record<AuditEvaluationDimension, { label: string; icon: string }> = {
   factual_accuracy: { label: 'Clinical Factuality', icon: '🩺' },
@@ -49,6 +94,9 @@ export const AdminAccuracyAuditCenter: React.FC = () => {
   const {
     samplingConfig,
     setSamplingConfig,
+    selectedProvider,
+    selectedModelId,
+    setSelectedModel,
     isAuditing,
     progress,
     error,
@@ -68,6 +116,11 @@ export const AdminAccuracyAuditCenter: React.FC = () => {
     exportReport,
     flagQuestionForRemediation,
   } = useAdminAccuracyAuditStore();
+
+  const selectedModel =
+    AUDIT_MODEL_OPTIONS.find(
+      (m) => m.providerId === selectedProvider && m.modelId === selectedModelId
+    ) || AUDIT_MODEL_OPTIONS[0];
 
   const [copiedFormat, setCopiedFormat] = useState<string | null>(null);
   const [remediationFeedback, setRemediationFeedback] = useState<string | null>(null);
@@ -174,9 +227,38 @@ export const AdminAccuracyAuditCenter: React.FC = () => {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Row 1: Model Selection & Sampling Strategy */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          {/* AI Model Selector */}
+          <div className="space-y-1.5 md:col-span-7">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                Auditing AI Model Selector
+              </label>
+              <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
+                {selectedModel.badge}
+              </span>
+            </div>
+            <select
+              value={`${selectedProvider}::${selectedModelId}`}
+              onChange={(e) => {
+                const [p, m] = e.target.value.split('::') as [CloudProviderId, string];
+                setSelectedModel(p, m);
+              }}
+              disabled={isAuditing}
+              className="w-full text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2.5 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-indigo-500 transition-all font-medium"
+            >
+              {AUDIT_MODEL_OPTIONS.map((opt) => (
+                <option key={`${opt.providerId}::${opt.modelId}`} value={`${opt.providerId}::${opt.modelId}`}>
+                  {opt.name} — {opt.badge}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Strategy Picker */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 md:col-span-5">
             <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
               Sampling Strategy
             </label>
@@ -196,9 +278,12 @@ export const AdminAccuracyAuditCenter: React.FC = () => {
               <option value="stratified_by_cognitive_level">Stratified by Cognitive Level</option>
             </select>
           </div>
+        </div>
 
+        {/* Row 2: Sample Size, Deterministic Seed, and Execution CTA */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
           {/* Sample Size */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 md:col-span-5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 Sample Size
@@ -225,7 +310,7 @@ export const AdminAccuracyAuditCenter: React.FC = () => {
           </div>
 
           {/* Random Seed (Optional for Deterministic Reproduction) */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 md:col-span-3">
             <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1">
               Deterministic Seed
               <span className="text-[10px] font-normal text-zinc-400">(Optional)</span>
@@ -245,7 +330,7 @@ export const AdminAccuracyAuditCenter: React.FC = () => {
           </div>
 
           {/* High Yield Toggle & CTA */}
-          <div className="flex flex-col justify-end gap-2">
+          <div className="flex flex-col justify-end gap-2 md:col-span-4">
             <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-700 dark:text-zinc-300 select-none">
               <input
                 type="checkbox"
@@ -310,6 +395,22 @@ export const AdminAccuracyAuditCenter: React.FC = () => {
       {/* KPI DASHBOARD & AUDIT REPORT METRICS */}
       {currentReport && (
         <div className="space-y-6">
+          {/* Executive Model Audit Banner */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-2xl bg-zinc-100/80 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/60 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-500">Audited with:</span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                {currentReport.auditingModel?.modelName || 'Deterministic Engine'}
+              </span>
+            </div>
+            <div className="flex items-center gap-4 text-zinc-500 dark:text-zinc-400">
+              <span>Strategy: <strong className="text-zinc-800 dark:text-zinc-200 capitalize">{currentReport.configuration.strategyType.replace(/_/g, ' ')}</strong></span>
+              <span>Auditor: <strong className="text-zinc-800 dark:text-zinc-200">{currentReport.executedByAdmin.displayName}</strong></span>
+              <span>{new Date(currentReport.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Accuracy Index Card */}
             <div className="p-5 rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl shadow-md">
@@ -699,8 +800,15 @@ export const AdminAccuracyAuditCenter: React.FC = () => {
                     className="p-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer flex items-center justify-between gap-3 transition-all"
                   >
                     <div>
-                      <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                        {new Date(report.timestamp).toLocaleString()}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                          {new Date(report.timestamp).toLocaleString()}
+                        </span>
+                        {report.auditingModel && (
+                          <span className="text-[10px] px-2 py-0.2 rounded-full font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                            {report.auditingModel.modelName}
+                          </span>
+                        )}
                       </div>
                       <div className="text-[11px] text-zinc-500">
                         Sample: {report.extractionMetadata.sampledCount} questions • Strategy:{' '}

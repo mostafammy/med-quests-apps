@@ -66,7 +66,12 @@ export class AccuracyAuditEngine {
 
     // Stage 2: Multi-Agent Evaluation
     const questionResults: QuestionAccuracyAuditResult[] = [];
-    const agents = this.defaultAgents;
+    const agents = config.providerId
+      ? AuditAgentFactory.createDefaultSquad({
+          providerId: config.providerId,
+          modelId: config.modelId,
+        })
+      : this.defaultAgents;
 
     for (let i = 0; i < totalToAudit; i++) {
       if (signal?.aborted) {
@@ -118,6 +123,14 @@ export class AccuracyAuditEngine {
         displayName: adminUser.displayName,
       },
       configuration: config,
+      auditingModel:
+        config.providerId && config.modelId
+          ? {
+              providerId: config.providerId,
+              modelId: config.modelId,
+              modelName: this.resolveModelDisplayName(config.providerId, config.modelId),
+            }
+          : undefined,
       extractionMetadata: {
         totalBankQuestions: extraction.totalPopulationSize,
         sampledCount: totalToAudit,
@@ -317,5 +330,20 @@ export class AccuracyAuditEngine {
       criticalErrorCount,
       dimensionAverages,
     };
+  }
+
+  private resolveModelDisplayName(providerId: string, modelId: string): string {
+    const map: Record<string, string> = {
+      'gemini-2.5-pro': 'Google Gemini 2.5 Pro',
+      'gemini-2.5-flash': 'Google Gemini 2.5 Flash',
+      'gemini-3.5-flash-lite': 'Google Gemini 3.5 Flash Lite',
+      'openai/gpt-oss-120b': 'Groq GPT-OSS 120B',
+      'openai/gpt-oss-20b': 'Groq GPT-OSS 20B',
+      'qwen/qwen3.8-27b': 'Groq Qwen 3.8 27B',
+      'anthropic/claude-3.7-sonnet': 'Claude 3.7 Sonnet',
+      'deepseek/deepseek-r1': 'DeepSeek R1',
+      'nvidia/nemotron-3.5-lightning:free': 'Nemotron 3.5 Lightning',
+    };
+    return map[modelId] || `${providerId.toUpperCase()} (${modelId})`;
   }
 }
