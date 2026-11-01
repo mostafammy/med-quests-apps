@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Shield,
   ShieldAlert,
@@ -26,10 +26,12 @@ import {
   X,
   ExternalLink,
   Sparkles,
+  UploadCloud,
 } from 'lucide-react';
 import { QuestionBankGovernancePanel } from './QuestionBankGovernancePanel.tsx';
 import { AdminExportBankModal } from './AdminExportBankModal.tsx';
 import { AdminAccuracyAuditCenter } from './accuracyAudit/AdminAccuracyAuditCenter.tsx';
+import { AdminAiQuestionParserLab } from './aiQuestionParser/AdminAiQuestionParserLab.tsx';
 import { useAuthStore, type GovernanceViewTab } from '../../../application/stores/useAuthStore.ts';
 import type { UserRole, FeatureFlagKey } from '../../../domain/auth/types.ts';
 import {
@@ -95,9 +97,29 @@ export const AdminDashboardPage: React.FC = () => {
     revalidate,
   } = useAuthStore();
 
+  const [searchParams] = useSearchParams();
+
   useEffect(() => {
     void revalidate();
   }, [revalidate]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (
+      tab &&
+      [
+        'network-telemetry',
+        'cohort-analytics',
+        'user-directory',
+        'audit-trail',
+        'question-bank',
+        'accuracy-audit',
+        'ai-question-parser',
+      ].includes(tab)
+    ) {
+      setGovernanceTab(tab as GovernanceViewTab);
+    }
+  }, [searchParams, setGovernanceTab]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
@@ -540,6 +562,12 @@ export const AdminDashboardPage: React.FC = () => {
           },
           ...(isAdmin
             ? [
+                {
+                  id: 'ai-question-parser' as const,
+                  label: 'AI Ingestion Lab',
+                  icon: UploadCloud,
+                  badge: 'Multi-Model',
+                },
                 {
                   id: 'accuracy-audit' as const,
                   label: 'Accuracy Audit Lab',
@@ -1111,6 +1139,9 @@ export const AdminDashboardPage: React.FC = () => {
 
       {/* TAB: ACCURACY AUDIT LAB */}
       {activeGovernanceTab === 'accuracy-audit' && <AdminAccuracyAuditCenter />}
+
+      {/* TAB: AI QUESTION INGESTION & ANTI-HALLUCINATION LAB */}
+      {activeGovernanceTab === 'ai-question-parser' && <AdminAiQuestionParserLab />}
 
       {/* TAB 1: COHORT ANALYTICS */}
       {activeGovernanceTab === 'cohort-analytics' && (

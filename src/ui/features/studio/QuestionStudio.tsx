@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { NavLink } from 'react-router-dom';
 import { CVS_TAXONOMY } from '../../../domain/taxonomy/cvsTaxonomy.ts';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 import { useAuthStore } from '../../../application/stores/useAuthStore.ts';
@@ -200,6 +201,16 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
           <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl leading-relaxed">
             {t.studio.subtitle}
           </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <NavLink
+            to="/admin?tab=ai-question-parser"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-500/15 via-indigo-500/15 to-pink-500/15 hover:from-purple-500/25 hover:to-pink-500/25 border border-purple-300 dark:border-purple-700 text-xs font-bold text-purple-700 dark:text-purple-300 shadow-sm transition-all apple-tap cursor-pointer"
+          >
+            <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            <span>Launch AI Ingestion Lab</span>
+          </NavLink>
         </div>
       </div>
 

@@ -17,6 +17,7 @@ import {
   X,
   Check,
   Star,
+  UploadCloud,
 } from 'lucide-react';
 import { useBankGovernanceStore } from '../../../application/stores/useBankGovernanceStore.ts';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
@@ -347,14 +348,25 @@ export const QuestionBankGovernancePanel: React.FC = () => {
           )}
 
           {isAdmin && (
-            <button
-              onClick={() => setGovernanceTab('accuracy-audit')}
-              className="py-2 px-3.5 rounded-xl bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-indigo-500/10 hover:from-pink-500/20 hover:to-indigo-500/20 border border-purple-200/80 dark:border-purple-800 text-xs font-bold text-purple-700 dark:text-purple-300 flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer apple-tap"
-              title="Launch Random Sample Accuracy Audit Lab"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-pink-500" />
-              <span>Accuracy Audit Lab</span>
-            </button>
+            <>
+              <button
+                onClick={() => setGovernanceTab('ai-question-parser')}
+                className="py-2 px-3.5 rounded-xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-pink-500/10 hover:from-purple-500/20 hover:to-pink-500/20 border border-purple-200/80 dark:border-purple-800 text-xs font-bold text-purple-700 dark:text-purple-300 flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer apple-tap"
+                title="Direct AI Question Ingestion & Anti-Hallucination Studio"
+              >
+                <UploadCloud className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                <span>AI Ingestion Lab</span>
+              </button>
+
+              <button
+                onClick={() => setGovernanceTab('accuracy-audit')}
+                className="py-2 px-3.5 rounded-xl bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-indigo-500/10 hover:from-pink-500/20 hover:to-indigo-500/20 border border-purple-200/80 dark:border-purple-800 text-xs font-bold text-purple-700 dark:text-purple-300 flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer apple-tap"
+                title="Launch Random Sample Accuracy Audit Lab"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-pink-500" />
+                <span>Accuracy Audit Lab</span>
+              </button>
+            </>
           )}
 
           <button

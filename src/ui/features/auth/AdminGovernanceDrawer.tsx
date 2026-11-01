@@ -27,9 +27,11 @@ import {
   Copy,
   Check,
   Server,
+  UploadCloud,
 } from 'lucide-react';
 import { QuestionBankGovernancePanel } from '../admin/QuestionBankGovernancePanel.tsx';
 import { AdminAccuracyAuditCenter } from '../admin/accuracyAudit/AdminAccuracyAuditCenter.tsx';
+import { AdminAiQuestionParserLab } from '../admin/aiQuestionParser/AdminAiQuestionParserLab.tsx';
 import {
   useAuthStore,
   type GovernanceViewTab,
@@ -374,6 +376,12 @@ export const AdminGovernanceDrawer: React.FC = () => {
                 badge: 'Curriculum',
               },
               {
+                id: 'ai-question-parser',
+                label: 'AI Ingestion Lab',
+                icon: UploadCloud,
+                badge: 'Multi-Model',
+              },
+              {
                 id: 'accuracy-audit',
                 label: 'Accuracy Audit Lab',
                 icon: Sparkles,
@@ -582,6 +590,15 @@ export const AdminGovernanceDrawer: React.FC = () => {
           {activeGovernanceTab === 'accuracy-audit' && (
             <div className="py-2">
               <AdminAccuracyAuditCenter />
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB: AI QUESTION INGESTION & ANTI-HALLUCINATION LAB       */}
+          {/* ========================================================= */}
+          {activeGovernanceTab === 'ai-question-parser' && (
+            <div className="py-2">
+              <AdminAiQuestionParserLab />
             </div>
           )}
 

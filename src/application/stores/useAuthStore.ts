@@ -27,7 +27,8 @@ export type GovernanceViewTab =
   | 'user-directory'
   | 'audit-trail'
   | 'question-bank'
-  | 'accuracy-audit';
+  | 'accuracy-audit'
+  | 'ai-question-parser';
 
 export interface AuthStoreState {
   readonly authState: AuthState;

@@ -1,0 +1,291 @@
+/**
+ * Application Store: useAdminAiQuestionParserStore
+ * State Management: Zustand 5
+ * Manages raw input text, AI model selection, parsing state, pre-approval anti-hallucination inspection,
+ * per-question missing answer detection, verification prompt export, and canonical bank commits.
+ *
+ * Restricted to Administrators.
+ */
+
+import { create } from 'zustand';
+import type { CloudProviderId } from '../../domain/ai/settings.ts';
+import type { ChoiceId, Question } from '../../domain/model/types.ts';
+import { QuestionParsingAgent } from '../../domain/questionBank/aiQuestionParser/QuestionParsingAgent.ts';
+import { CrossModelVerificationPromptBuilder } from '../../domain/questionBank/aiQuestionParser/CrossModelVerificationPromptBuilder.ts';
+import type { ParsedQuestionItem } from '../../domain/questionBank/aiQuestionParser/types.ts';
+import { useAuthStore } from './useAuthStore.ts';
+import { useBankGovernanceStore } from './useBankGovernanceStore.ts';
+import { useQuestionStore } from './useQuestionStore.ts';
+
+interface AdminAiQuestionParserStoreState {
+  // Input & Configuration
+  rawInputText: string;
+  selectedProvider: CloudProviderId;
+  selectedModelId: string;
+  targetSubjectId: string;
+  targetChapterId: string;
+
+  // Parsing & State
+  isParsing: boolean;
+  parsedQuestions: ParsedQuestionItem[];
+  selectedTempIds: Set<string>;
+  error: string | null;
+  isCommitting: boolean;
+  commitFeedback: { type: 'success' | 'error'; message: string } | null;
+
+  // Actions
+  setRawInputText: (text: string) => void;
+  setSelectedModel: (provider: CloudProviderId, modelId: string) => void;
+  setTargetTaxonomy: (subjectId: string, chapterId: string) => void;
+  parseRawQuestions: () => Promise<void>;
+  toggleQuestionSelection: (tempId: string) => void;
+  selectAll: (select: boolean) => void;
+  updateQuestionStem: (index: number, stem: string) => void;
+  updateChoice: (index: number, choiceId: ChoiceId, text: string, rationale: string) => void;
+  setKeyedCorrectChoice: (index: number, choiceId: ChoiceId) => void;
+  updateExplanation: (index: number, explanation: string) => void;
+  removeParsedQuestion: (index: number) => void;
+  clearParsedQuestions: () => void;
+  commitToGlobalQuestionBank: (selectedOnly?: boolean) => Promise<boolean>;
+  getSingleQuestionPrompt: (index: number) => string;
+  getBatchVerificationPrompt: () => string;
+}
+
+const parsingAgent = new QuestionParsingAgent();
+
+export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreState>((set, get) => ({
+  rawInputText: '',
+  selectedProvider: 'gemini',
+  selectedModelId: 'gemini-2.5-flash',
+  targetSubjectId: 'anatomy',
+  targetChapterId: 'all',
+
+  isParsing: false,
+  parsedQuestions: [],
+  selectedTempIds: new Set(),
+  error: null,
+  isCommitting: false,
+  commitFeedback: null,
+
+  setRawInputText: (rawInputText) => set({ rawInputText }),
+
+  setSelectedModel: (selectedProvider, selectedModelId) =>
+    set({ selectedProvider, selectedModelId }),
+
+  setTargetTaxonomy: (targetSubjectId, targetChapterId) =>
+    set({ targetSubjectId, targetChapterId }),
+
+  parseRawQuestions: async () => {
+    const { rawInputText, selectedProvider, selectedModelId, targetSubjectId, targetChapterId } = get();
+
+    if (!rawInputText.trim()) {
+      set({ error: 'Please enter or paste question text before initiating AI parsing.' });
+      return;
+    }
+
+    set({ isParsing: true, error: null, commitFeedback: null });
+
+    try {
+      const result = await parsingAgent.parseRawQuestions({
+        rawText: rawInputText,
+        providerId: selectedProvider,
+        modelId: selectedModelId,
+        targetSubjectId: targetSubjectId === 'all' ? undefined : targetSubjectId,
+        targetChapterId: targetChapterId === 'all' ? undefined : targetChapterId,
+      });
+
+      if (result.items.length === 0) {
+        set({
+          isParsing: false,
+          error: 'Could not extract valid question structure from input. Check format and try again.',
+        });
+        return;
+      }
+
+      const allIds = new Set(result.items.map((i) => i.tempId));
+      set({
+        isParsing: false,
+        parsedQuestions: [...result.items],
+        selectedTempIds: allIds,
+      });
+    } catch (err: any) {
+      set({
+        isParsing: false,
+        error: err.message || 'An unexpected error occurred while parsing questions.',
+      });
+    }
+  },
+
+  toggleQuestionSelection: (tempId) => {
+    const current = new Set(get().selectedTempIds);
+    if (current.has(tempId)) {
+      current.delete(tempId);
+    } else {
+      current.add(tempId);
+    }
+    set({ selectedTempIds: current });
+  },
+
+  selectAll: (select) => {
+    if (select) {
+      const allIds = new Set(get().parsedQuestions.map((i) => i.tempId));
+      set({ selectedTempIds: allIds });
+    } else {
+      set({ selectedTempIds: new Set() });
+    }
+  },
+
+  updateQuestionStem: (index, stem) => {
+    const questions = [...get().parsedQuestions];
+    if (!questions[index]) return;
+    const updatedQ: Question = { ...questions[index].question, stem };
+    questions[index] = { ...questions[index], question: updatedQ };
+    set({ parsedQuestions: questions });
+  },
+
+  updateChoice: (index, choiceId, text, rationale) => {
+    const questions = [...get().parsedQuestions];
+    if (!questions[index]) return;
+    const currentChoices = questions[index].question.choices.map((c) => {
+      if (c.id === choiceId) {
+        return { ...c, text, rationale };
+      }
+      return c;
+    });
+    const updatedQ: Question = { ...questions[index].question, choices: currentChoices };
+    questions[index] = { ...questions[index], question: updatedQ };
+    set({ parsedQuestions: questions });
+  },
+
+  setKeyedCorrectChoice: (index, choiceId) => {
+    const questions = [...get().parsedQuestions];
+    if (!questions[index]) return;
+    const currentChoices = questions[index].question.choices.map((c) => ({
+      ...c,
+      isCorrect: c.id === choiceId,
+    }));
+    const updatedQ: Question = { ...questions[index].question, choices: currentChoices };
+    questions[index] = {
+      ...questions[index],
+      question: updatedQ,
+      selectedCorrectChoiceId: choiceId,
+      aiGeneratedAnswerKey: false, // Explicitly verified by admin
+    };
+    set({ parsedQuestions: questions });
+  },
+
+  updateExplanation: (index, explanation) => {
+    const questions = [...get().parsedQuestions];
+    if (!questions[index]) return;
+    const updatedQ: Question = { ...questions[index].question, explanation };
+    questions[index] = { ...questions[index], question: updatedQ };
+    set({ parsedQuestions: questions });
+  },
+
+  removeParsedQuestion: (index) => {
+    const questions = [...get().parsedQuestions];
+    const removed = questions.splice(index, 1);
+    const selected = new Set(get().selectedTempIds);
+    if (removed[0]) selected.delete(removed[0].tempId);
+    set({ parsedQuestions: questions, selectedTempIds: selected });
+  },
+
+  clearParsedQuestions: () => {
+    set({ parsedQuestions: [], selectedTempIds: new Set(), commitFeedback: null });
+  },
+
+  commitToGlobalQuestionBank: async (selectedOnly = true) => {
+    const { parsedQuestions, selectedTempIds } = get();
+    const authState = useAuthStore.getState().authState;
+
+    if (authState.status !== 'authenticated-active' || authState.user.role !== 'admin') {
+      set({
+        commitFeedback: {
+          type: 'error',
+          message: 'Unauthorized: Platform Administrator privileges required.',
+        },
+      });
+      return false;
+    }
+
+    const itemsToCommit = selectedOnly
+      ? parsedQuestions.filter((item) => selectedTempIds.has(item.tempId))
+      : parsedQuestions;
+
+    if (itemsToCommit.length === 0) {
+      set({
+        commitFeedback: {
+          type: 'error',
+          message: 'No questions selected for commit.',
+        },
+      });
+      return false;
+    }
+
+    set({ isCommitting: true, commitFeedback: null });
+
+    try {
+      const canonicalQuestions = itemsToCommit.map((item) => item.question);
+      const { createCanonicalQuestions } = useBankGovernanceStore.getState();
+
+      const success = await createCanonicalQuestions(canonicalQuestions, {
+        id: authState.user.id,
+        displayName: authState.user.displayName,
+        role: authState.user.role,
+      });
+
+      if (success) {
+        // Also refresh question store
+        await useQuestionStore.getState().loadQuestions('cvs');
+
+        // Clear committed items from list
+        const remaining = parsedQuestions.filter(
+          (item) => !itemsToCommit.some((c) => c.tempId === item.tempId)
+        );
+
+        set({
+          isCommitting: false,
+          parsedQuestions: remaining,
+          selectedTempIds: new Set(remaining.map((r) => r.tempId)),
+          rawInputText: remaining.length === 0 ? '' : get().rawInputText,
+          commitFeedback: {
+            type: 'success',
+            message: `Successfully approved & committed ${itemsToCommit.length} canonical questions to the Global Bank!`,
+          },
+        });
+        return true;
+      } else {
+        set({
+          isCommitting: false,
+          commitFeedback: {
+            type: 'error',
+            message: 'Failed to commit questions to Global Question Bank. Check console for logs.',
+          },
+        });
+        return false;
+      }
+    } catch (err: any) {
+      set({
+        isCommitting: false,
+        commitFeedback: {
+          type: 'error',
+          message: err.message || 'Error committing questions to bank.',
+        },
+      });
+      return false;
+    }
+  },
+
+  getSingleQuestionPrompt: (index: number) => {
+    const item = get().parsedQuestions[index];
+    if (!item) return '';
+    return CrossModelVerificationPromptBuilder.buildSingleQuestionPrompt(item);
+  },
+
+  getBatchVerificationPrompt: () => {
+    const { parsedQuestions, selectedTempIds } = get();
+    const targetItems = parsedQuestions.filter((item) => selectedTempIds.has(item.tempId));
+    const items = targetItems.length > 0 ? targetItems : parsedQuestions;
+    return CrossModelVerificationPromptBuilder.buildBatchQuestionsPrompt(items);
+  },
+}));
