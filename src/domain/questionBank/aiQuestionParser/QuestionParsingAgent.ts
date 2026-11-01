@@ -19,7 +19,7 @@ import type {
   ParsedQuestionItem,
   ParseResultSummary,
 } from './types.ts';
-import { CVS_TAXONOMY } from '../../taxonomy/cvsTaxonomy.ts';
+import { curriculumClassificationAgent } from '../../taxonomy/CurriculumClassificationAgent.ts';
 import { createCloudProvider } from '../../../infrastructure/ai/engineRegistry.ts';
 import type { LlmMessage } from '../../../infrastructure/ai/providers/openAiCompatibleProvider.ts';
 
@@ -215,6 +215,19 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
         const correctChoice = finalQuestion.choices.find((c: any) => c.isCorrect) || finalQuestion.choices[0];
         const selectedCorrectChoiceId = (correctChoice?.id as ChoiceId) || 'a';
 
+        const choicesStr = (finalQuestion.choices || []).map((c: any) => c.text).join(' ');
+        const classification = item.taxonomyClassification || curriculumClassificationAgent.classify(
+          finalQuestion.stem,
+          choicesStr,
+          finalQuestion.explanation
+        );
+
+        if (!request.targetSubjectId || request.targetSubjectId === 'all' || request.targetSubjectId === 'auto') {
+          finalQuestion.subjectId = classification.subjectId;
+          finalQuestion.chapterId = classification.chapterId;
+          finalQuestion.topicId = `${classification.chapterId}/core-concepts`;
+        }
+
         validatedItems.push({
           tempId: `item-${i + 1}-${Math.random().toString(36).slice(2, 7)}`,
           rawInputExcerpt: typeof item.rawInputExcerpt === 'string' ? item.rawInputExcerpt : request.rawText.slice(0, 200),
@@ -225,6 +238,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
           confidenceScore: typeof item.confidenceScore === 'number' ? item.confidenceScore : 94,
           warnings: Array.isArray(item.warnings) ? item.warnings.map(String) : [],
           isApproved: false,
+          taxonomyClassification: classification,
         });
       }
 
@@ -324,9 +338,22 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     // Standardize 4 choices (A, B, C, D)
     const choices = this.standardizeChoices(rawChoices, resolvedKeyId);
 
-    // Subject & Chapter resolution
-    const subjectId = request.targetSubjectId || this.inferSubject(stem);
-    const chapterId = request.targetChapterId || this.inferChapter(subjectId, stem);
+    // Dynamic Curriculum Taxonomy Classification & Gap Analysis
+    const classification = curriculumClassificationAgent.classify(
+      stem,
+      rawChoices.map((c) => c.text).join(' '),
+      detectedExplanation
+    );
+
+    const isAutoSubject = !request.targetSubjectId || request.targetSubjectId === 'all' || request.targetSubjectId === 'auto';
+    const isAutoChapter = !request.targetChapterId || request.targetChapterId === 'all' || request.targetChapterId === 'auto';
+
+    const subjectId = isAutoSubject ? classification.subjectId : request.targetSubjectId!;
+    const chapterId = isAutoChapter ? classification.chapterId : request.targetChapterId!;
+
+    if (classification.isNewDomainSuggested) {
+      warnings.push(`💡 Curriculum Scope Notice: ${classification.rationale}`);
+    }
 
     // Concept extraction
     const concept = this.extractConceptTitle(stem, subjectId);
@@ -379,6 +406,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
       confidenceScore: wasAnswerKeyProvided ? 98 : 88,
       warnings,
       isApproved: false,
+      taxonomyClassification: classification,
     };
   }
 
@@ -516,31 +544,6 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
         rationale,
       };
     });
-  }
-
-  private inferSubject(stem: string): string {
-    const lower = stem.toLowerCase();
-    if (lower.includes('embryo') || lower.includes('septum') || lower.includes('arch') || lower.includes('artery') || lower.includes('vein')) {
-      return 'anatomy';
-    }
-    if (lower.includes('pressure') || lower.includes('loop') || lower.includes('murmur') || lower.includes('sound') || lower.includes('hemodynamic') || lower.includes('stenosis')) {
-      return 'physiology';
-    }
-    if (lower.includes('drug') || lower.includes('receptor') || lower.includes('blocker') || lower.includes('amiodarone') || lower.includes('digoxin') || lower.includes('pharmacology')) {
-      return 'pharmacology';
-    }
-    if (lower.includes('endocarditis') || lower.includes('streptococcus') || lower.includes('culture') || lower.includes('bacterial') || lower.includes('fever')) {
-      return 'microbiology';
-    }
-    return 'physiology';
-  }
-
-  private inferChapter(subjectId: string, _stem: string): string {
-    const chapters = CVS_TAXONOMY.chapters.filter((c) => c.subjectId === subjectId);
-    if (chapters.length > 0) {
-      return chapters[0].id;
-    }
-    return 'cvs-ana-heart-mediastinum';
   }
 
   private extractConceptTitle(stem: string, subjectId: string): string {

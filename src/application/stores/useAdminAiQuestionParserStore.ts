@@ -13,6 +13,7 @@ import type { ChoiceId, Question } from '../../domain/model/types.ts';
 import { QuestionParsingAgent } from '../../domain/questionBank/aiQuestionParser/QuestionParsingAgent.ts';
 import { CrossModelVerificationPromptBuilder } from '../../domain/questionBank/aiQuestionParser/CrossModelVerificationPromptBuilder.ts';
 import type { ParsedQuestionItem } from '../../domain/questionBank/aiQuestionParser/types.ts';
+import { curriculumTaxonomyRegistry } from '../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
 import { useAuthStore } from './useAuthStore.ts';
 import { useBankGovernanceStore } from './useBankGovernanceStore.ts';
 import { useQuestionStore } from './useQuestionStore.ts';
@@ -44,6 +45,8 @@ interface AdminAiQuestionParserStoreState {
   updateChoice: (index: number, choiceId: ChoiceId, text: string, rationale: string) => void;
   setKeyedCorrectChoice: (index: number, choiceId: ChoiceId) => void;
   updateExplanation: (index: number, explanation: string) => void;
+  updateQuestionTaxonomy: (index: number, subjectId: string, chapterId: string) => void;
+  approveTaxonomyProposal: (tempId: string, type: 'subject' | 'chapter') => void;
   removeParsedQuestion: (index: number) => void;
   clearParsedQuestions: () => void;
   commitToGlobalQuestionBank: (selectedOnly?: boolean) => Promise<boolean>;
@@ -57,8 +60,8 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
   rawInputText: '',
   selectedProvider: 'gemini',
   selectedModelId: 'gemini-2.5-flash',
-  targetSubjectId: 'anatomy',
-  targetChapterId: 'all',
+  targetSubjectId: 'auto',
+  targetChapterId: 'auto',
 
   isParsing: false,
   parsedQuestions: [],
@@ -90,8 +93,8 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
         rawText: rawInputText,
         providerId: selectedProvider,
         modelId: selectedModelId,
-        targetSubjectId: targetSubjectId === 'all' ? undefined : targetSubjectId,
-        targetChapterId: targetChapterId === 'all' ? undefined : targetChapterId,
+        targetSubjectId: targetSubjectId === 'all' || targetSubjectId === 'auto' ? undefined : targetSubjectId,
+        targetChapterId: targetChapterId === 'all' || targetChapterId === 'auto' ? undefined : targetChapterId,
       });
 
       if (result.items.length === 0) {
@@ -180,6 +183,111 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
     const updatedQ: Question = { ...questions[index].question, explanation };
     questions[index] = { ...questions[index], question: updatedQ };
     set({ parsedQuestions: questions });
+  },
+
+  updateQuestionTaxonomy: (index, subjectId, chapterId) => {
+    const questions = [...get().parsedQuestions];
+    if (!questions[index]) return;
+
+    const subjects = curriculumTaxonomyRegistry.getSubjects();
+    const chapters = curriculumTaxonomyRegistry.getChapters();
+    const subjObj = subjects.find((s) => s.id === subjectId);
+    const chapObj = chapters.find((c) => c.id === chapterId);
+
+    const updatedQ: Question = {
+      ...questions[index].question,
+      subjectId,
+      chapterId,
+      topicId: `${chapterId}/core-concepts`,
+    };
+
+    questions[index] = {
+      ...questions[index],
+      question: updatedQ,
+      taxonomyClassification: {
+        subjectId,
+        subjectName: subjObj?.name || subjectId,
+        chapterId,
+        chapterName: chapObj?.name || chapterId,
+        confidenceScore: 100,
+        rationale: 'Manually verified and assigned by Administrator.',
+        isNewDomainSuggested: false,
+      },
+    };
+    set({ parsedQuestions: questions });
+  },
+
+  approveTaxonomyProposal: (tempId, type) => {
+    const questions = [...get().parsedQuestions];
+    const itemIndex = questions.findIndex((q) => q.tempId === tempId);
+    if (itemIndex === -1) return;
+
+    const item = questions[itemIndex];
+    const classification = item.taxonomyClassification;
+    if (!classification) return;
+
+    if (type === 'subject' && classification.newSubjectProposal) {
+      const regSubject = curriculumTaxonomyRegistry.registerSubject({
+        id: classification.newSubjectProposal.id,
+        name: classification.newSubjectProposal.name,
+      });
+
+      if (classification.newChapterProposal) {
+        curriculumTaxonomyRegistry.registerChapter({
+          id: classification.newChapterProposal.id,
+          subjectId: regSubject.id,
+          name: classification.newChapterProposal.name,
+        });
+      }
+
+      const updatedQ: Question = {
+        ...item.question,
+        subjectId: regSubject.id,
+        chapterId: classification.newChapterProposal?.id || item.question.chapterId,
+        topicId: `${classification.newChapterProposal?.id || item.question.chapterId}/core-concepts`,
+      };
+
+      questions[itemIndex] = {
+        ...item,
+        question: updatedQ,
+        taxonomyClassification: {
+          ...classification,
+          subjectId: regSubject.id,
+          subjectName: regSubject.name,
+          isNewDomainSuggested: false,
+          newSubjectProposal: undefined,
+          newChapterProposal: undefined,
+          rationale: `Approved and registered into active curriculum by Administrator.`,
+        },
+      };
+      set({ parsedQuestions: questions });
+    } else if (type === 'chapter' && classification.newChapterProposal) {
+      const regChapter = curriculumTaxonomyRegistry.registerChapter({
+        id: classification.newChapterProposal.id,
+        subjectId: classification.newChapterProposal.subjectId,
+        name: classification.newChapterProposal.name,
+      });
+
+      const updatedQ: Question = {
+        ...item.question,
+        chapterId: regChapter.id,
+        topicId: `${regChapter.id}/core-concepts`,
+      };
+
+      questions[itemIndex] = {
+        ...item,
+        question: updatedQ,
+        taxonomyClassification: {
+          ...classification,
+          chapterId: regChapter.id,
+          chapterName: regChapter.name,
+          isNewDomainSuggested: false,
+          newChapterProposal: undefined,
+          rationale: `Approved chapter registered into active curriculum by Administrator.`,
+        },
+      };
+      set({ parsedQuestions: questions });
+    }
   },
 
   removeParsedQuestion: (index) => {

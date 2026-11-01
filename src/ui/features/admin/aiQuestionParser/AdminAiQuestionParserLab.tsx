@@ -1,16 +1,15 @@
 /**
  * Presentation Component: AdminAiQuestionParserLab
  * World-Class AI Question Ingestion, Formatting & Anti-Hallucination Inspection Chamber
- *
- * Exclusively for Platform Administrators:
- * - Direct unstructured raw text input.
- * - Dynamic AI Model selection (Gemini, Groq, OpenRouter).
- * - Automatic missing answer key detection with per-question warning flags.
- * - Pre-approval inspection drawer to certify clinical factuality before global commit.
- * - Dedicated per-question and batch Copy Verification Prompt buttons for cross-model auditing.
+ * Designed with Apple Human Interface Guidelines:
+ * - Fluid spring animations, glassmorphism, clarity, depth, and precision.
+ * - Dynamic AI Model selection (Gemini 2.5 Pro/Flash, Groq 120B/20B, Claude 3.7 Sonnet, DeepSeek R1).
+ * - Autonomous Curriculum Taxonomy Assignment with AI Gap Analysis (Subject/Chapter Proposals).
+ * - Pre-approval anti-hallucination inspection drawer before committing to the Global Bank.
+ * - Single-item and batch verification prompt exports for cross-model auditing.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   ShieldCheck,
@@ -28,56 +27,96 @@ import {
   Square,
   Cpu,
   LogIn,
+  Sliders,
+  FolderPlus,
+  BookOpen,
+  HelpCircle,
+  X,
+  PlusCircle,
+  Layers,
+  ArrowRight,
 } from 'lucide-react';
 import { useAuthStore } from '../../../../application/stores/useAuthStore.ts';
 import { useAdminAiQuestionParserStore } from '../../../../application/stores/useAdminAiQuestionParserStore.ts';
-import { CVS_TAXONOMY } from '../../../../domain/taxonomy/cvsTaxonomy.ts';
+import { curriculumTaxonomyRegistry } from '../../../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
 import type { ChoiceId } from '../../../../domain/model/types.ts';
 import type { CloudProviderId } from '../../../../domain/ai/settings.ts';
 
-const MODEL_OPTIONS: Array<{
-  providerId: CloudProviderId;
-  modelId: string;
-  name: string;
-  badge: string;
-}> = [
+interface ModelOption {
+  readonly providerId: CloudProviderId;
+  readonly modelId: string;
+  readonly name: string;
+  readonly providerName: string;
+  readonly badge: string;
+  readonly speed: string;
+  readonly description: string;
+}
+
+const MODEL_OPTIONS: ModelOption[] = [
   {
     providerId: 'gemini',
     modelId: 'gemini-2.5-flash',
     name: 'Google Gemini 2.5 Flash',
+    providerName: 'Google Cloud Vertex',
     badge: 'Recommended • Fast & High Accuracy',
+    speed: '< 400ms Sub-Second',
+    description: 'High throughput, optimal balance of medical reasoning and ultra-fast structured parsing.',
   },
   {
     providerId: 'gemini',
     modelId: 'gemini-2.5-pro',
     name: 'Google Gemini 2.5 Pro',
-    badge: 'Deep Clinical Reasoning',
+    providerName: 'Google Cloud Vertex',
+    badge: 'Flagship Clinical Reasoning',
+    speed: 'Deep Multi-turn (1M TPM)',
+    description: 'Gold standard for complex multi-system vignettes and deep pathophysiological rationale generation.',
   },
   {
     providerId: 'groq',
     modelId: 'openai/gpt-oss-120b',
-    name: 'Groq GPT-OSS (120B)',
-    badge: 'Ultra-Fast Complex Analysis',
+    name: 'Groq GPT-OSS 120B',
+    providerName: 'Groq Cloud LPU',
+    badge: 'LPU Ultra-Low Latency',
+    speed: '500+ tokens/sec',
+    description: 'Extreme inference throughput on massive parameter open weights for rapid bulk parsing.',
   },
   {
     providerId: 'groq',
     modelId: 'openai/gpt-oss-20b',
-    name: 'Groq GPT-OSS (20B)',
-    badge: 'Instant Parsing (<100ms)',
+    name: 'Groq GPT-OSS 20B',
+    providerName: 'Groq Cloud LPU',
+    badge: 'Instant Light Model',
+    speed: 'Instantaneous (<100ms)',
+    description: 'Ultra-lightweight model for swift single-question text formatting and basic MCQ extraction.',
   },
   {
     providerId: 'openrouter',
     modelId: 'anthropic/claude-3.7-sonnet',
-    name: 'Claude 3.7 Sonnet (via OpenRouter)',
-    badge: 'Supreme Clinical Nuance',
+    name: 'Claude 3.7 Sonnet',
+    providerName: 'OpenRouter (Anthropic)',
+    badge: 'Medical Benchmark Leader',
+    speed: 'Nuanced Reasoning',
+    description: 'Unmatched medical subtlety and psychometric distractor plausibility grading.',
   },
   {
     providerId: 'openrouter',
     modelId: 'deepseek/deepseek-r1',
-    name: 'DeepSeek R1 Reasoning (via OpenRouter)',
-    badge: 'Extended Chain-of-Thought',
+    name: 'DeepSeek R1 Reasoning',
+    providerName: 'OpenRouter (DeepSeek)',
+    badge: 'Extended Thinking',
+    speed: 'High CoT Latency',
+    description: 'Deep counterfactual clinical reasoning traces with extensive pathophysiological exploration.',
   },
 ];
+
+const SUBJECT_META: Record<string, { icon: string; badgeColor: string }> = {
+  anatomy: { icon: '🩺', badgeColor: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/25' },
+  histology: { icon: '🔬', badgeColor: 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/25' },
+  microbiology: { icon: '🧫', badgeColor: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25' },
+  physiology: { icon: '⚡', badgeColor: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25' },
+  pharmacology: { icon: '💊', badgeColor: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/25' },
+  pathology: { icon: '🧬', badgeColor: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/25' },
+};
 
 const SAMPLE_RAW_TEXT = `1. A 55-year-old man presents with progressive dyspnea on exertion and syncope. Cardiac auscultation reveals a harsh, crescendo-decrescendo systolic murmur heard loudest at the right second intercostal space, radiating to the carotids. Which valve pathology is most likely?
 A. Mitral regurgitation
@@ -92,7 +131,14 @@ A. Truncus arteriosus
 B. Bulbus cordis
 C. Primitive ventricle
 D. Sinus venosus
-Note: (Admin omitted the answer key here to test AI generation)`;
+Note: (Admin omitted the answer key here to test AI generation)
+
+3. A 64-year-old female with persistent atrial fibrillation is initiated on an antiarrhythmic medication that prolongs the cardiac action potential duration by blocking rapid delayed rectifier potassium currents (IKr). Which adverse effect is most concerning?
+A. Lupus-like syndrome
+B. Torsades de pointes (QTc prolongation)
+C. Pulmonary fibrosis
+D. Cinchonism
+Note: (Tests dynamic curriculum detection of Cardiovascular Pharmacology)`;
 
 export const AdminAiQuestionParserLab: React.FC = () => {
   const { authState, elevateToPlatformOwner } = useAuthStore();
@@ -118,6 +164,8 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     updateChoice,
     setKeyedCorrectChoice,
     updateExplanation,
+    updateQuestionTaxonomy,
+    approveTaxonomyProposal,
     removeParsedQuestion,
     commitToGlobalQuestionBank,
     getSingleQuestionPrompt,
@@ -129,6 +177,18 @@ export const AdminAiQuestionParserLab: React.FC = () => {
   const [editingTempId, setEditingTempId] = useState<string | null>(null);
   const [expandedRationales, setExpandedRationales] = useState<Set<string>>(new Set());
   const [isElevating, setIsElevating] = useState(false);
+  const [isModelModalOpen, setIsModelModalOpen] = useState(false);
+  const [taxonomyEditTempId, setTaxonomyEditTempId] = useState<string | null>(null);
+  const [proposalToast, setProposalToast] = useState<string | null>(null);
+  const [, setTaxonomyRevision] = useState(0);
+
+  // Subscribe to registry expansions
+  useEffect(() => {
+    const unsub = curriculumTaxonomyRegistry.subscribe(() => {
+      setTaxonomyRevision((r) => r + 1);
+    });
+    return unsub;
+  }, []);
 
   const isAdmin = authState.status === 'authenticated-active' && authState.user.role === 'admin';
 
@@ -164,6 +224,15 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     );
   }
 
+  const activeModel =
+    MODEL_OPTIONS.find((m) => m.providerId === selectedProvider && m.modelId === selectedModelId) ||
+    MODEL_OPTIONS[0];
+
+  const currentSubjects = curriculumTaxonomyRegistry.getSubjects();
+  const currentChapters = curriculumTaxonomyRegistry.getChapters(
+    targetSubjectId === 'auto' || targetSubjectId === 'all' ? undefined : targetSubjectId
+  );
+
   const handleCopySinglePrompt = async (index: number, tempId: string) => {
     const prompt = getSingleQuestionPrompt(index);
     await navigator.clipboard.writeText(prompt);
@@ -185,10 +254,13 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     setExpandedRationales(next);
   };
 
-  const availableChapters =
-    targetSubjectId === 'all'
-      ? CVS_TAXONOMY.chapters
-      : CVS_TAXONOMY.chapters.filter((c) => c.subjectId === targetSubjectId);
+  const handleApproveProposal = (tempId: string, type: 'subject' | 'chapter', name: string) => {
+    approveTaxonomyProposal(tempId, type);
+    setProposalToast(`Successfully approved and registered "${name}" into the active curriculum!`);
+    setTimeout(() => setProposalToast(null), 4000);
+  };
+
+  const isAutoCurriculumMode = targetSubjectId === 'auto' || targetSubjectId === 'all';
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -210,85 +282,182 @@ export const AdminAiQuestionParserLab: React.FC = () => {
           </h1>
           <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl">
             Directly input unstructured clinical text or lecture MCQs. The AI agent formats items to
-            NBME Single-Best-Answer standards, detects missing answer keys, generates authoritative
-            rationales, and lets you verify accuracy before committing to the Global Question Bank.
+            NBME Single-Best-Answer standards, detects missing answer keys, dynamically classifies
+            curriculum subjects & chapters, and alerts you to curriculum expansion gaps.
           </p>
         </div>
       </div>
 
-      {/* MODEL SELECTION & TAXONOMY BAR */}
-      <div className="p-6 rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl shadow-md space-y-4">
+      {/* APPLE PRO REASONING & CURRICULUM CONTROL DECK */}
+      <div className="p-6 rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl shadow-lg space-y-6">
         <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/60 pb-3">
           <div className="flex items-center gap-2">
             <Cpu className="w-4 h-4 text-purple-500" />
             <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
-              AI Model & Curriculum Targeting
+              AI Reasoning Engine & Dynamic Curriculum Targeting
             </h2>
           </div>
-          <span className="text-[11px] text-zinc-400">Zero Main-Thread Latency</span>
+          <span className="text-[11px] text-zinc-400 font-medium">Apple HIG Cupertino Deck</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* AI Model Picker */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-              Reasoning Engine (Model Selection)
-            </label>
-            <select
-              value={`${selectedProvider}:::${selectedModelId}`}
-              onChange={(e) => {
-                const [provider, model] = e.target.value.split(':::') as [CloudProviderId, string];
-                setSelectedModel(provider, model);
-              }}
-              disabled={isParsing}
-              className="w-full text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2.5 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-purple-500 transition-all font-medium"
-            >
-              {MODEL_OPTIONS.map((opt) => (
-                <option key={`${opt.providerId}:::${opt.modelId}`} value={`${opt.providerId}:::${opt.modelId}`}>
-                  {opt.name} — ({opt.badge})
-                </option>
-              ))}
-            </select>
+        {/* 2-Column Responsive Deck */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          {/* Section 1: AI Reasoning Model Card (Col 5) */}
+          <div className="lg:col-span-5 p-4 rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white dark:bg-zinc-800/60 shadow-xs flex flex-col justify-between space-y-3">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                  Active Reasoning Model
+                </span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                  {activeModel.speed}
+                </span>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                    {activeModel.name}
+                  </h3>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-2">
+                    {activeModel.description}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+              <span className="text-[10px] text-zinc-400 font-mono">
+                Provider: {activeModel.providerName}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsModelModalOpen(true)}
+                disabled={isParsing}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-700/80 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-100 transition-all cursor-pointer"
+              >
+                <Sliders className="w-3.5 h-3.5 text-purple-500" />
+                <span>Switch Model</span>
+                <ChevronDown className="w-3 h-3 text-zinc-400" />
+              </button>
+            </div>
           </div>
 
-          {/* Subject Filter */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-              Target Curriculum Subject
-            </label>
-            <select
-              value={targetSubjectId}
-              onChange={(e) => setTargetTaxonomy(e.target.value, 'all')}
-              disabled={isParsing}
-              className="w-full text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2.5 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-purple-500 transition-all"
-            >
-              <option value="all">Auto-Infer from Stem Content</option>
-              {CVS_TAXONOMY.subjects.map((sub) => (
-                <option key={sub.id} value={sub.id}>
-                  {sub.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Section 2: Curriculum Taxonomy Targeting Deck (Col 7) */}
+          <div className="lg:col-span-7 p-4 rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white dark:bg-zinc-800/60 shadow-xs flex flex-col justify-between space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                Curriculum Scope & Classification Mode
+              </span>
 
-          {/* Chapter Filter */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-              Target Chapter
-            </label>
-            <select
-              value={targetChapterId}
-              onChange={(e) => setTargetTaxonomy(targetSubjectId, e.target.value)}
-              disabled={isParsing}
-              className="w-full text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2.5 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-purple-500 transition-all"
-            >
-              <option value="all">Auto-Assign to High-Yield Chapter</option>
-              {availableChapters.map((ch) => (
-                <option key={ch.id} value={ch.id}>
-                  {ch.name}
-                </option>
-              ))}
-            </select>
+              {/* Apple Segmented Switcher */}
+              <div className="inline-flex p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setTargetTaxonomy('auto', 'auto')}
+                  className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    isAutoCurriculumMode
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>AI Auto-Classify</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTargetTaxonomy(currentSubjects[0]?.id || 'anatomy', 'all')}
+                  className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    !isAutoCurriculumMode
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+                  }`}
+                >
+                  <Sliders className="w-3 h-3" />
+                  <span>Manual Scope</span>
+                </button>
+              </div>
+            </div>
+
+            {isAutoCurriculumMode ? (
+              /* Auto Intelligent Classification Mode Card */
+              <div className="p-3 rounded-xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-pink-500/10 border border-purple-500/20 flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                      Autonomous Curriculum Mapping & Gap Analysis
+                    </span>
+                    <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 bg-purple-500/15 px-2 py-0.2 rounded-full">
+                      Active
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                    The AI dynamically inspects each clinical vignette and assigns the exact Subject &
+                    Chapter from our registered curriculum. If a question addresses unmapped medical
+                    territory (e.g. Pharmacology or Pathology), the AI proposes a formal curriculum expansion.
+                  </p>
+                  <div className="flex items-center gap-2 pt-1 flex-wrap">
+                    {currentSubjects.map((s) => (
+                      <span
+                        key={s.id}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-white/70 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                      >
+                        <span>{SUBJECT_META[s.id]?.icon || '📚'}</span>
+                        <span>{s.name}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Manual Targeting Mode - Subject & Chapter Selectors */
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                {/* Subject Selector */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                    Subject Scope
+                  </label>
+                  <select
+                    value={targetSubjectId}
+                    onChange={(e) => setTargetTaxonomy(e.target.value, 'all')}
+                    disabled={isParsing}
+                    className="w-full text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 font-medium focus:ring-2 focus:ring-purple-500 transition-all"
+                  >
+                    {currentSubjects.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {SUBJECT_META[s.id]?.icon || '📚'} {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Chapter Selector */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                    Chapter Scope
+                  </label>
+                  <select
+                    value={targetChapterId}
+                    onChange={(e) => setTargetTaxonomy(targetSubjectId, e.target.value)}
+                    disabled={isParsing}
+                    className="w-full text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 font-medium focus:ring-2 focus:ring-purple-500 transition-all"
+                  >
+                    <option value="all">All Chapters in {targetSubjectId}</option>
+                    {currentChapters.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -318,115 +487,107 @@ export const AdminAiQuestionParserLab: React.FC = () => {
             value={rawInputText}
             onChange={(e) => setRawInputText(e.target.value)}
             disabled={isParsing}
-            className="w-full text-xs font-mono p-4 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all resize-y"
+            className="w-full text-xs font-mono p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/90 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-purple-500 transition-all shadow-inner leading-relaxed"
           />
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
-          <div className="text-[11px] text-zinc-500">
-            {rawInputText.trim().length} characters • Accepts multiple numbered or unnumbered items
+        {/* Action Button & Parsing Indicator */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>
+              The AI will format into 4-choice SBAs, deduce missing keys, assign curriculum chapters,
+              and build cross-examination prompts.
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            {rawInputText && (
-              <button
-                type="button"
-                onClick={() => setRawInputText('')}
-                className="px-3 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-              >
-                Clear
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={parseRawQuestions}
-              disabled={isParsing || !rawInputText.trim()}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-purple-500 via-indigo-500 to-pink-500 hover:opacity-95 shadow-lg shadow-purple-500/25 transition-all disabled:opacity-50 cursor-pointer active:scale-98"
-            >
-              <Sparkles className={`w-3.5 h-3.5 ${isParsing ? 'animate-spin' : ''}`} />
-              <span>{isParsing ? 'Parsing & Structuring with AI...' : 'Parse & Format Questions with AI'}</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={parseRawQuestions}
+            disabled={isParsing || !rawInputText.trim()}
+            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:opacity-95 shadow-md shadow-purple-500/25 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>{isParsing ? 'Executing AI Medical Analysis...' : 'Parse & Format Questions'}</span>
+          </button>
         </div>
 
         {error && (
-          <div className="flex items-center gap-2 p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300">
+          <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
       </div>
 
-      {/* ANTI-HALLUCINATION INSPECTION & APPROVAL CHAMBER */}
+      {/* INSPECTION & PRE-APPROVAL STAGING DRAWER */}
       {parsedQuestions.length > 0 && (
         <div className="space-y-6 animate-in slide-in-from-bottom duration-300">
-          {/* Summary & Batch Actions Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl shadow-lg">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                  Pre-Approval Inspection ({parsedQuestions.length} Items)
-                </span>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold">
-                  {selectedTempIds.size} Selected
-                </span>
+          {/* Header & Global Batch Actions */}
+          <div className="p-6 rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl shadow-lg space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800/80 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold font-heading text-zinc-900 dark:text-zinc-50">
+                    Pre-Approval Inspection Queue ({parsedQuestions.length} Items)
+                  </h2>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    {selectedTempIds.size} Selected
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                  Inspect the structured questions below before committing to the Global Question Bank.
+                  You can edit stems, choices, keys, or curriculum assignments inline.
+                </p>
               </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Inspect AI-parsed questions before committing. Verify the AI did not hallucinate.
-              </p>
-            </div>
 
-            {/* Batch Action Buttons */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => selectAll(selectedTempIds.size < parsedQuestions.length)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer"
-              >
-                {selectedTempIds.size === parsedQuestions.length ? (
-                  <CheckSquare className="w-3.5 h-3.5 text-purple-600" />
-                ) : (
-                  <Square className="w-3.5 h-3.5 text-zinc-400" />
-                )}
-                <span>Select All</span>
-              </button>
+              {/* Batch Action Toolbar */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => selectAll(selectedTempIds.size !== parsedQuestions.length)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer"
+                >
+                  {selectedTempIds.size === parsedQuestions.length ? 'Deselect All' : 'Select All'}
+                </button>
 
-              <button
-                type="button"
-                onClick={handleCopyBatchPrompt}
-                title="Copy cross-examination prompt for all selected questions to paste into ChatGPT/Claude"
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border border-purple-200 dark:border-purple-800 bg-purple-50/60 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/60 transition-all cursor-pointer shadow-xs"
-              >
-                {copiedBatchPrompt ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-500" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
-                )}
-                <span>Copy Group Verification Prompt ({selectedTempIds.size})</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={handleCopyBatchPrompt}
+                  title="Copy a single comprehensive prompt for all selected questions to cross-examine with other LLMs"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer"
+                >
+                  {copiedBatchPrompt ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-purple-500" />
+                  )}
+                  <span>{copiedBatchPrompt ? 'Batch Prompt Copied!' : 'Copy Batch Prompt'}</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => commitToGlobalQuestionBank(true)}
-                disabled={isCommitting || selectedTempIds.size === 0}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-600/20 transition-all cursor-pointer disabled:opacity-50"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>
-                  {isCommitting ? 'Committing...' : `Approve & Add (${selectedTempIds.size}) to Global Bank`}
-                </span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => commitToGlobalQuestionBank(true)}
+                  disabled={isCommitting || selectedTempIds.size === 0}
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>
+                    {isCommitting
+                      ? 'Committing...'
+                      : `Approve & Commit (${selectedTempIds.size}) to Bank`}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Toast feedback */}
           {commitFeedback && (
             <div
-              className={`p-4 rounded-2xl border text-xs flex items-center gap-2 animate-in fade-in duration-300 ${
+              className={`p-4 rounded-2xl border text-xs flex items-center gap-2 ${
                 commitFeedback.type === 'success'
-                  ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
-                  : 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300'
               }`}
             >
               {commitFeedback.type === 'success' ? (
@@ -443,13 +604,21 @@ export const AdminAiQuestionParserLab: React.FC = () => {
             {parsedQuestions.map((item, idx) => {
               const isSelected = selectedTempIds.has(item.tempId);
               const isEditing = editingTempId === item.tempId;
+              const isTaxonomyEditing = taxonomyEditTempId === item.tempId;
               const isRationaleExpanded = expandedRationales.has(item.tempId);
               const isPromptCopied = copiedPromptId === item.tempId;
+              const classification = item.taxonomyClassification;
+
+              const subjectMeta =
+                SUBJECT_META[item.question.subjectId] || {
+                  icon: '📚',
+                  badgeColor: 'bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-500/25',
+                };
 
               return (
                 <div
                   key={item.tempId}
-                  className={`p-6 rounded-3xl border transition-all ${
+                  className={`p-6 rounded-3xl border transition-all space-y-4 ${
                     isSelected
                       ? 'border-purple-300 dark:border-purple-800 bg-white/90 dark:bg-zinc-900/90 shadow-md'
                       : 'border-zinc-200/80 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/60 opacity-80'
@@ -457,7 +626,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                 >
                   {/* Card Header */}
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800/80 pb-4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <button
                         type="button"
                         onClick={() => toggleQuestionSelection(item.tempId)}
@@ -476,7 +645,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                       {item.aiGeneratedAnswerKey ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                           <AlertTriangle className="w-3 h-3 text-amber-500" />
-                          Answer Key Inferred by AI (Original input lacked key)
+                          Answer Key Inferred by AI
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
@@ -485,9 +654,26 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                         </span>
                       )}
 
-                      <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                        {item.question.concept}
-                      </span>
+                      {/* Dynamic Curriculum Classification Breadcrumb */}
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${subjectMeta.badgeColor}`}
+                        >
+                          <span>{subjectMeta.icon}</span>
+                          <span className="capitalize">{item.question.subjectId}</span>
+                        </span>
+                        <ArrowRight className="w-3 h-3 text-zinc-400" />
+                        <span className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
+                          {classification?.chapterName || item.question.chapterId}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setTaxonomyEditTempId(isTaxonomyEditing ? null : item.tempId)}
+                          className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline cursor-pointer ml-1"
+                        >
+                          {isTaxonomyEditing ? 'Done' : 'Change'}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Quick Item Actions */}
@@ -496,7 +682,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleCopySinglePrompt(idx, item.tempId)}
-                        title="Copy Professional Verification Prompt (to cross-test with external models like ChatGPT or Claude)"
+                        title="Copy Verification Prompt for Cross-Testing with ChatGPT or Claude"
                         className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-medium border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer shadow-xs"
                       >
                         {isPromptCopied ? (
@@ -518,34 +704,135 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                             ? 'bg-purple-100 dark:bg-purple-950 border-purple-300 dark:border-purple-700 text-purple-600'
                             : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800'
                         }`}
-                        title="Edit question text and rationales"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
 
-                      {/* Remove from batch */}
+                      {/* Delete */}
                       <button
                         type="button"
                         onClick={() => removeParsedQuestion(idx)}
-                        className="p-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all cursor-pointer"
-                        title="Remove question from batch"
+                        className="p-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-400 hover:text-rose-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
 
-                  {/* Card Body: Stem & Choices */}
-                  <div className="mt-4 space-y-4">
-                    {/* Stem */}
+                  {/* PROPOSED CURRICULUM EXPANSION BANNER (GAP ANALYSIS) */}
+                  {classification?.isNewDomainSuggested && (
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-indigo-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
+                          <PlusCircle className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                            <span>Proposed Curriculum Expansion</span>
+                            <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/15 px-2 py-0.2 rounded-full">
+                              Unmapped Domain Detected
+                            </span>
+                          </h4>
+                          <p className="text-[11px] text-zinc-600 dark:text-zinc-400 mt-0.5">
+                            {classification.rationale}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                        {classification.newSubjectProposal && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleApproveProposal(
+                                item.tempId,
+                                'subject',
+                                classification.newSubjectProposal!.name
+                              )
+                            }
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 shadow-xs cursor-pointer transition-all"
+                          >
+                            <FolderPlus className="w-3.5 h-3.5" />
+                            <span>Approve Subject: {classification.newSubjectProposal.name}</span>
+                          </button>
+                        )}
+                        {classification.newChapterProposal && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleApproveProposal(
+                                item.tempId,
+                                'chapter',
+                                classification.newChapterProposal!.name
+                              )
+                            }
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow-xs cursor-pointer transition-all"
+                          >
+                            <Layers className="w-3.5 h-3.5" />
+                            <span>Approve Chapter</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* INLINE TAXONOMY EDIT PANEL */}
+                  {isTaxonomyEditing && (
+                    <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                          Reassign Subject
+                        </label>
+                        <select
+                          value={item.question.subjectId}
+                          onChange={(e) => {
+                            const newSub = e.target.value;
+                            const firstChap = curriculumTaxonomyRegistry.getChapters(newSub)[0]?.id || 'cvs-ana-heart-mediastinum';
+                            updateQuestionTaxonomy(idx, newSub, firstChap);
+                          }}
+                          className="w-full text-xs mt-1 p-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium"
+                        >
+                          {currentSubjects.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {SUBJECT_META[s.id]?.icon || '📚'} {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                          Reassign Chapter
+                        </label>
+                        <select
+                          value={item.question.chapterId}
+                          onChange={(e) => {
+                            updateQuestionTaxonomy(idx, item.question.subjectId, e.target.value);
+                          }}
+                          className="w-full text-xs mt-1 p-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium"
+                        >
+                          {curriculumTaxonomyRegistry.getChapters(item.question.subjectId).map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Question Stem */}
+                  <div className="space-y-3">
                     {isEditing ? (
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-bold text-zinc-500 uppercase">Stem</label>
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                          Stem Text
+                        </label>
                         <textarea
                           rows={3}
                           value={item.question.stem}
                           onChange={(e) => updateQuestionStem(idx, e.target.value)}
-                          className="w-full text-xs p-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                          className="w-full text-xs p-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium"
                         />
                       </div>
                     ) : (
@@ -658,7 +945,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                       </button>
 
                       <span className="text-[11px] text-zinc-400 font-mono">
-                        Taxonomy: {item.question.subjectId} • diff {item.question.difficulty}
+                        Concept: {item.question.concept} • Difficulty {item.question.difficulty}
                       </span>
                     </div>
 
@@ -666,7 +953,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                     {isRationaleExpanded && (
                       <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-700/50 space-y-2">
                         <div className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
-                          Clinical Explanation
+                          Clinical Explanation & Pathophysiology
                         </div>
                         {isEditing ? (
                           <textarea
@@ -691,6 +978,95 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* FEEDBACK TOAST */}
+      {proposalToast && (
+        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-2xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom duration-300">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
+          <span>{proposalToast}</span>
+        </div>
+      )}
+
+      {/* APPLE PRO MODEL SELECTION SHEET / MODAL */}
+      {isModelModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold font-heading text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-500" />
+                  Select AI Reasoning Engine
+                </h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  Choose the intelligence model that conducts clinical solving, rationale generation, and curriculum assignment.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsModelModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[460px] overflow-y-auto pr-1">
+              {MODEL_OPTIONS.map((opt) => {
+                const isSelected =
+                  opt.providerId === selectedProvider && opt.modelId === selectedModelId;
+                return (
+                  <div
+                    key={`${opt.providerId}:::${opt.modelId}`}
+                    onClick={() => {
+                      setSelectedModel(opt.providerId, opt.modelId);
+                      setIsModelModalOpen(false);
+                    }}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between space-y-2.5 ${
+                      isSelected
+                        ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-950/20 shadow-sm ring-1 ring-purple-500/30'
+                        : 'border-zinc-200 dark:border-zinc-800 hover:border-purple-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-800/40'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase font-mono">
+                          {opt.providerName}
+                        </span>
+                        <span
+                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+                            isSelected
+                              ? 'bg-purple-600 text-white'
+                              : 'bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'
+                          }`}
+                        >
+                          {opt.speed}
+                        </span>
+                      </div>
+                      <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                        {opt.name}
+                      </h4>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">
+                        {opt.description}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 border-t border-zinc-100 dark:border-zinc-800 text-[10px]">
+                      <span className="font-semibold text-purple-600 dark:text-purple-400">
+                        {opt.badge}
+                      </span>
+                      {isSelected && (
+                        <span className="flex items-center gap-1 font-bold text-purple-600 dark:text-purple-400">
+                          <Check className="w-3 h-3" /> Active
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
