@@ -35,6 +35,7 @@ import {
   PlusCircle,
   Layers,
   ArrowRight,
+  RotateCcw,
 } from 'lucide-react';
 import { useAuthStore } from '../../../../application/stores/useAuthStore.ts';
 import { useAdminAiQuestionParserStore } from '../../../../application/stores/useAdminAiQuestionParserStore.ts';
@@ -151,6 +152,9 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     targetSubjectId,
     targetChapterId,
     setTargetTaxonomy,
+    stemMode,
+    setStemMode,
+    toggleStemFormat,
     isParsing,
     parsedQuestions,
     selectedTempIds,
@@ -458,6 +462,50 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Section 3: Question Stem Fidelity & Formatting Policy */}
+        <div className="p-4 rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white dark:bg-zinc-800/60 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                Question Stem Fidelity
+              </span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                {stemMode === 'verbatim' ? 'Strict Author Fidelity' : 'USMLE Case Study'}
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+              {stemMode === 'verbatim'
+                ? 'Preserves the author’s exact question wording directly (best for faculty tests & direct recall).'
+                : 'Enriches dry recall questions into patient presentation vignettes (best for USMLE Step 1 practice).'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/60 shrink-0">
+            <button
+              type="button"
+              onClick={() => setStemMode('verbatim')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                stemMode === 'verbatim'
+                  ? 'bg-white dark:bg-zinc-700 text-purple-600 dark:text-purple-300 shadow-xs'
+                  : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+              }`}
+            >
+              📄 Verbatim (Faithful)
+            </button>
+            <button
+              type="button"
+              onClick={() => setStemMode('vignette')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                stemMode === 'vignette'
+                  ? 'bg-white dark:bg-zinc-700 text-purple-600 dark:text-purple-300 shadow-xs'
+                  : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+              }`}
+            >
+              🏥 USMLE Vignette
+            </button>
           </div>
         </div>
       </div>
@@ -822,7 +870,40 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                   )}
 
                   {/* Question Stem */}
-                  <div className="space-y-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                          Question Stem
+                        </label>
+                        {item.originalRawStem && item.question.stem !== item.originalRawStem && (
+                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                            USMLE Vignette Active
+                          </span>
+                        )}
+                        {item.originalRawStem && item.question.stem === item.originalRawStem && (
+                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20">
+                            Verbatim Raw Stem
+                          </span>
+                        )}
+                      </div>
+
+                      {(item.originalRawStem || item.enrichedVignetteStem) && (
+                        <button
+                          type="button"
+                          onClick={() => toggleStemFormat(idx)}
+                          title="Switch between author's original verbatim question and USMLE clinical vignette"
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors cursor-pointer"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>
+                            {item.originalRawStem && item.question.stem === item.originalRawStem
+                              ? 'Switch to USMLE Vignette'
+                              : 'Revert to Original Raw Text'}
+                          </span>
+                        </button>
+                      )}
+                    </div>
                     {isEditing ? (
                       <div>
                         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">

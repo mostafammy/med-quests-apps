@@ -12,7 +12,7 @@ import type { CloudProviderId } from '../../domain/ai/settings.ts';
 import type { ChoiceId, Question } from '../../domain/model/types.ts';
 import { QuestionParsingAgent } from '../../domain/questionBank/aiQuestionParser/QuestionParsingAgent.ts';
 import { CrossModelVerificationPromptBuilder } from '../../domain/questionBank/aiQuestionParser/CrossModelVerificationPromptBuilder.ts';
-import type { ParsedQuestionItem } from '../../domain/questionBank/aiQuestionParser/types.ts';
+import type { ParsedQuestionItem, QuestionStemMode } from '../../domain/questionBank/aiQuestionParser/types.ts';
 import { curriculumTaxonomyRegistry } from '../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
 import { useAuthStore } from './useAuthStore.ts';
 import { useBankGovernanceStore } from './useBankGovernanceStore.ts';
@@ -25,6 +25,7 @@ interface AdminAiQuestionParserStoreState {
   selectedModelId: string;
   targetSubjectId: string;
   targetChapterId: string;
+  stemMode: QuestionStemMode;
 
   // Parsing & State
   isParsing: boolean;
@@ -37,11 +38,13 @@ interface AdminAiQuestionParserStoreState {
   // Actions
   setRawInputText: (text: string) => void;
   setSelectedModel: (provider: CloudProviderId, modelId: string) => void;
+  setStemMode: (mode: QuestionStemMode) => void;
   setTargetTaxonomy: (subjectId: string, chapterId: string) => void;
   parseRawQuestions: () => Promise<void>;
   toggleQuestionSelection: (tempId: string) => void;
   selectAll: (select: boolean) => void;
   updateQuestionStem: (index: number, stem: string) => void;
+  toggleStemFormat: (index: number) => void;
   updateChoice: (index: number, choiceId: ChoiceId, text: string, rationale: string) => void;
   setKeyedCorrectChoice: (index: number, choiceId: ChoiceId) => void;
   updateExplanation: (index: number, explanation: string) => void;
@@ -62,6 +65,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
   selectedModelId: 'gemini-2.5-flash',
   targetSubjectId: 'auto',
   targetChapterId: 'auto',
+  stemMode: 'verbatim',
 
   isParsing: false,
   parsedQuestions: [],
@@ -75,11 +79,13 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
   setSelectedModel: (selectedProvider, selectedModelId) =>
     set({ selectedProvider, selectedModelId }),
 
+  setStemMode: (stemMode) => set({ stemMode }),
+
   setTargetTaxonomy: (targetSubjectId, targetChapterId) =>
     set({ targetSubjectId, targetChapterId }),
 
   parseRawQuestions: async () => {
-    const { rawInputText, selectedProvider, selectedModelId, targetSubjectId, targetChapterId } = get();
+    const { rawInputText, selectedProvider, selectedModelId, targetSubjectId, targetChapterId, stemMode } = get();
 
     if (!rawInputText.trim()) {
       set({ error: 'Please enter or paste question text before initiating AI parsing.' });
@@ -93,6 +99,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
         rawText: rawInputText,
         providerId: selectedProvider,
         modelId: selectedModelId,
+        stemMode,
         targetSubjectId: targetSubjectId === 'all' || targetSubjectId === 'auto' ? undefined : targetSubjectId,
         targetChapterId: targetChapterId === 'all' || targetChapterId === 'auto' ? undefined : targetChapterId,
       });
@@ -143,6 +150,35 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
     if (!questions[index]) return;
     const updatedQ: Question = { ...questions[index].question, stem };
     questions[index] = { ...questions[index], question: updatedQ };
+    set({ parsedQuestions: questions });
+  },
+
+  toggleStemFormat: (index) => {
+    const questions = [...get().parsedQuestions];
+    const target = questions[index];
+    if (!target) return;
+
+    const currentStem = target.question.stem;
+    const rawStem = target.originalRawStem || target.rawInputExcerpt.split('\n')[0]?.replace(/^[0-9]+[.-]\s*/, '').trim() || '';
+    const vignetteStem = target.enrichedVignetteStem;
+
+    // Toggle between rawStem and vignetteStem
+    let nextStem = currentStem;
+    if (vignetteStem && currentStem === rawStem) {
+      nextStem = vignetteStem;
+    } else if (rawStem && currentStem !== rawStem) {
+      nextStem = rawStem;
+    } else if (vignetteStem) {
+      nextStem = vignetteStem;
+    }
+
+    questions[index] = {
+      ...target,
+      question: {
+        ...target.question,
+        stem: nextStem,
+      },
+    };
     set({ parsedQuestions: questions });
   },
 

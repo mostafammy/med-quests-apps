@@ -8,17 +8,24 @@ import type { Question, ChoiceId, SubjectId, ChapterId } from '../../model/types
 import type { CloudProviderId } from '../../ai/settings.ts';
 import type { TaxonomyClassificationResult } from '../../taxonomy/CurriculumClassificationAgent.ts';
 
+export type QuestionStemMode = 'verbatim' | 'vignette';
+
 export interface RawQuestionParseRequest {
   readonly rawText: string;
   readonly providerId: CloudProviderId;
   readonly modelId: string;
   readonly targetSubjectId?: SubjectId | 'auto';
   readonly targetChapterId?: ChapterId | 'auto';
+  readonly stemMode?: QuestionStemMode;
 }
 
 export interface ParsedQuestionItem {
   readonly tempId: string;
   readonly rawInputExcerpt: string;
+  /** Original raw stem text extracted from input prior to any vignette transformations */
+  readonly originalRawStem?: string;
+  /** Enriched USMLE-style clinical vignette stem (if generated) */
+  readonly enrichedVignetteStem?: string;
   readonly question: Question;
   /** Whether the administrator explicitly indicated the answer key in the raw text */
   readonly wasAnswerKeyProvidedInInput: boolean;

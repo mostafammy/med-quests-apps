@@ -82,6 +82,8 @@ export class QuestionParsingAgent {
     const provider = this.providerOverride || createCloudProvider(request.providerId, request.modelId);
     if (!provider) return null;
 
+    const isVignetteMode = request.stemMode === 'vignette';
+
     const systemPrompt = `You are an elite Medical Examination Specialist and USMLE/Cardiovascular Board Faculty Member.
 Your mission is to parse unformatted raw medical questions, clinical lecture notes, or rough drafts into strictly formatted, board-standard Single-Best-Answer (SBA) MCQs.
 
@@ -105,9 +107,23 @@ CRITICAL CLINICAL & PEDAGOGICAL REQUIREMENTS:
    - Deep pathophysiological mechanism, cardinal presentation, diagnostic pearl, and guideline recommendation.
 6. METADATA:
    - difficulty: 1 (fundamental), 2 (standard board level), or 3 (complex multisystem).
-   - cognitiveLevel: 'recall' | 'understanding' | 'application'.
+   - cognitiveLevel: ${isVignetteMode ? "'application'" : "'recall' | 'understanding' | 'application'"}.
    - subjectId: ${request.targetSubjectId ? `'${request.targetSubjectId}'` : "'anatomy' | 'physiology' | 'pharmacology' | 'microbiology'"}
    - highYield: true.
+7. STEM INTEGRITY & FORMATTING (CURRENT MODE: ${isVignetteMode ? 'USMLE VIGNETTE ENRICHMENT' : 'VERBATIM / STRICT AUTHOR FIDELITY'}):
+${
+  isVignetteMode
+    ? `   - Convert dry factual recall questions into realistic clinical vignettes (e.g., patient age, symptoms, physical findings) leading into the question stem.
+   - Set "stem" to this clinical vignette.
+   - Set "originalRawStem" to the author's original raw question wording.
+   - Set "enrichedVignetteStem" to the clinical vignette.`
+    : `   - CRITICAL: PRESERVE THE AUTHOR'S ORIGINAL QUESTION STEM WORDING AND PHRASING DIRECTLY.
+   - DO NOT fabricate a fictional patient case, age, or symptoms (DO NOT prepend "A 7-year-old child presents with...").
+   - Strip leading question numbers (e.g. "1-", "Q1.") and clean formatting, but retain the exact question phrasing as written by the author.
+   - Set "stem" to this verbatim stem.
+   - Set "originalRawStem" to this verbatim stem.
+   - You may ALSO provide an optional USMLE clinical vignette version in "enrichedVignetteStem" for the administrator to review.`
+}
 
 RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no backticks, no conversational text):
 {
@@ -115,6 +131,8 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     {
       "tempId": "item-1",
       "rawInputExcerpt": "<first 200 chars of source>",
+      "originalRawStem": "<Author's original question text>",
+      "enrichedVignetteStem": "<USMLE patient presentation clinical vignette>",
       "wasAnswerKeyProvidedInInput": <boolean>,
       "aiGeneratedAnswerKey": <boolean>,
       "selectedCorrectChoiceId": "a" | "b" | "c" | "d",
@@ -128,7 +146,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
         "topicId": "<topic-id>",
         "concept": "<Concise Concept Title>",
         "type": "single-best-answer",
-        "stem": "<Clinical vignette and question>",
+        "stem": "${isVignetteMode ? '<Enriched clinical vignette and question>' : '<Author verbatim question>'}",
         "choices": [
           { "id": "a", "text": "<choice A text>", "isCorrect": <boolean>, "rationale": "<specific rationale>" },
           { "id": "b", "text": "<choice B text>", "isCorrect": <boolean>, "rationale": "<specific rationale>" },
@@ -228,9 +246,19 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
           finalQuestion.topicId = `${classification.chapterId}/core-concepts`;
         }
 
+        const rawStem = typeof item.originalRawStem === 'string' && item.originalRawStem.trim()
+          ? item.originalRawStem.trim()
+          : (request.stemMode !== 'vignette' ? finalQuestion.stem : undefined);
+
+        const vignetteStem = typeof item.enrichedVignetteStem === 'string' && item.enrichedVignetteStem.trim()
+          ? item.enrichedVignetteStem.trim()
+          : (request.stemMode === 'vignette' ? finalQuestion.stem : undefined);
+
         validatedItems.push({
           tempId: `item-${i + 1}-${Math.random().toString(36).slice(2, 7)}`,
           rawInputExcerpt: typeof item.rawInputExcerpt === 'string' ? item.rawInputExcerpt : request.rawText.slice(0, 200),
+          originalRawStem: rawStem,
+          enrichedVignetteStem: vignetteStem,
           question: finalQuestion,
           wasAnswerKeyProvidedInInput: Boolean(item.wasAnswerKeyProvidedInInput),
           aiGeneratedAnswerKey: Boolean(item.aiGeneratedAnswerKey),
@@ -399,6 +427,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     return {
       tempId: `item-${index}-${Math.random().toString(36).slice(2, 7)}`,
       rawInputExcerpt: blockText.slice(0, 300),
+      originalRawStem: stem,
       question: questionDraft,
       wasAnswerKeyProvidedInInput: wasAnswerKeyProvided,
       aiGeneratedAnswerKey,
