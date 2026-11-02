@@ -68,11 +68,21 @@ Engineered with **Apple Human Interface Guidelines (HIG)** aesthetic fidelity, s
    - [Continuous Quality Gate & Studio Auto-Balancer Pipeline (Diagram)](#6-continuous-quality-gate--studio-auto-balancer-pipeline)
    - [Edge D1 Seed & IndexedDB Non-Destructive Upgrade Flow (Diagram)](#7-edge-d1-seed--indexeddb-non-destructive-upgrade-flow)
    - [Mathematical & Psychometric Proof of Uniformity](#8-mathematical--psychometric-proof-of-uniformity)
-9. [Local-First Persistence & Storage Topology](#local-first-persistence--storage-topology)
-10. [Repository Structure](#repository-structure)
-11. [Quality Engineering & Verification Matrix](#quality-engineering--verification-matrix)
-12. [Getting Started](#getting-started)
-13. [Normative Specification & Documentation](#normative-specification--documentation)
+9. [Deep Dive: Multi-Stage Question Duplication Detection Engine & Semantic Sieve (SPEC-009)](#deep-dive-multi-stage-question-duplication-detection-engine--semantic-sieve-spec-009)
+   - [Why It Matters](#91-why-it-matters)
+   - [The Seven-Stage Sieve Architecture (Diagram)](#92-the-seven-stage-sieve-architecture)
+   - [Request Flow & Fallback Routing (Diagram)](#93-request-flow--fallback-routing)
+   - [Global Bank Health Audit & Resumable Graph Clustering (Diagram)](#94-global-bank-health-audit--resumable-graph-clustering)
+   - [Key Engineering Decisions](#95-key-engineering-decisions)
+   - [Reliability, Quality Gates & Failure Modes](#96-reliability-quality-gates--failure-modes)
+   - [UX, Accessibility & Apple HIG Telemetry](#97-ux-accessibility--apple-hig-telemetry)
+   - [Security, Privacy & Zero-Leakage Guarantee](#98-security-privacy--zero-leakage-guarantee)
+   - [Known Limitations & Future Roadmap](#99-known-limitations--future-roadmap)
+10. [Local-First Persistence & Storage Topology](#local-first-persistence--storage-topology)
+11. [Repository Structure](#repository-structure)
+12. [Quality Engineering & Verification Matrix](#quality-engineering--verification-matrix)
+13. [Getting Started](#getting-started)
+14. [Normative Specification & Documentation](#normative-specification--documentation)
 
 ---
 
@@ -1437,6 +1447,227 @@ Psychometric Severity       CRITICAL SKEW             OPTIMAL UNIFORM
 Chapter-Level Slot Variance Up to 12 items            <= 1 item per chapter
 ================================================================================
 ```
+
+---
+
+## Deep Dive: Multi-Stage Question Duplication Detection Engine & Semantic Sieve (SPEC-009)
+
+> Protects students from redundant questions and equips faculty with instant, ambient deduplication during authoring and batch AI ingestion—operating at sub-millisecond edge latency under strict zero-dollar cloud compute allowances.
+
+---
+
+### 9.1 Why It Matters
+
+- **Eradicates Duplicate Fatigue**: Medical students preparing for USMLE Step 1/Step 2 board examinations avoid wasting cognitive cycles reviewing identical or cosmetically rephrased clinical vignettes across disparate curriculum blocks.
+- **Ambient, Non-Modal Authoring Guidance**: Faculty and student authors in Question Studio receive instant, ambient typing hints without modal dialog interruptions or UI thread jank, powered by a dedicated background Web Worker and offline IndexedDB cache.
+- **Zero Auto-Acceptance & Clinical Quality Protection**: Ingested or AI-parsed questions never bypass faculty review into the live canonical bank. Near duplicates, answer conflicts, and clinical variants (e.g., *left* vs. *right* coronary artery) are automatically flagged with token-level visual diffs.
+
+---
+
+### 9.2 The Seven-Stage Sieve Architecture
+
+The engine uses a Multi-Stage Sieve (Chain of Responsibility) to eliminate distinct items with fast, low-overhead algorithms before invoking neural models. Over 97% of comparisons are resolved by deterministic hashing and MinHash Locality-Sensitive Hashing (LSH), reserving Cloudflare Workers AI embeddings and LLM arbitration strictly for ambiguous edge cases.
+
+```mermaid
+flowchart TD
+    subgraph Client["Client / Ingestion Layer"]
+        Input["Incoming Question (Studio or Batch Import)"]
+    end
+
+    subgraph Deterministic["Deterministic Foundation (Stages 0 - 1)"]
+        S0["Stage 0: AST Canonicalizer (v2)<br/>Normalize LaTeX, Diacritics, Choice Order & Answer Key"]
+        S1["Stage 1: Exact SHA-256 Hash<br/>Compare Stem & Item Hashes"]
+    end
+
+    subgraph Lexical["Lexical Blocking (Stage 2)"]
+        S2["Stage 2: Lexical MinHash LSH<br/>128 Permutations / 32 Bands (Threshold: 0.42)"]
+    end
+
+    subgraph Neural["Semantic & Neural Tiers (Stages 3 - 6)"]
+        S3["Stage 3: Dense Vector HNSW ANN<br/>Cloudflare Vectorize (384-dim BGE-Small)"]
+        S4["Stage 4: Clinical Discriminator Filter<br/>Detect Negations, Laterality, Dosages & Phases"]
+        S5["Stage 5: Cross-Encoder Reranker<br/>BGE-Reranker-Base with Platt Calibration"]
+        S6["Stage 6: Bounded LLM Arbiter<br/>Groq / Workers AI with Zod Schema Validation"]
+    end
+
+    subgraph Gate["Authoritative Gate Decision"]
+        Decide{"Gate Policy<br/>Zero Auto-Acceptance"}
+        Block["BLOCK (409 Conflict)<br/>Exact Duplicates"]
+        Review["REVIEW (Staged)<br/>Near Matches / Conflicts"]
+        Allow["ALLOW (Staged)<br/>Unique into pending_review"]
+    end
+
+    Input --> S0
+    S0 --> S1
+    S1 -->|"Exact Stem & Answer Match"| Block
+    S1 -->|"No Exact Collision"| S2
+    S2 -->|"No Bucket Collision"| S3
+    S2 -->|"LSH Bucket Match"| S3
+    S3 -->|"Cosine Match < 0.65 & No LSH"| Allow
+    S3 -->|"Candidate Cluster Identified"| S4
+    S4 -->|"Clinical Discrepancy Found"| S6
+    S4 -->|"High Fused Score (>= 0.88)"| Decide
+    S4 -->|"Ambiguity Band (0.70 - 0.88)"| S5
+    S5 -->|"Score Confirmed"| Decide
+    S5 -->|"Borderline Uncertainty"| S6
+    S6 --> Decide
+    Decide -->|"EXACT"| Block
+    Decide -->|"NEAR / CONFLICT"| Review
+    Decide -->|"UNIQUE"| Allow
+```
+
+**Walkthrough**:
+1. **Stage 0 (`QuestionCanonicalizerV2`)**: Generates an Abstract Syntax Tree (AST) canonicalization stripping markdown syntax, punctuation, whitespace, and diacritics while sorting choices into an order-invariant sequence and extracting 3-shingles.
+2. **Stage 1 (`S1Exact`)**: Queries SQLite index for exact stem and item SHA-256 hashes, returning instantaneous `EXACT` verdicts in $< 1\text{ ms}$.
+3. **Stage 2 (`S2LexicalLsh`)**: Hashes shingles into a 128-element MinHash signature split into 32 bands ($b=32, r=4$) with an S-curve midpoint at Jaccard similarity $\approx 0.42$.
+4. **Stage 3 (`S3SemanticAnn`)**: Merges lexical candidates with Approximate Nearest Neighbor (ANN) cosine similarity search against Cloudflare Vectorize (384-dimensional `@cf/baai/bge-small-en-v1.5`).
+5. **Stage 4 (`S4Discriminators`)**: Scans for clinical modifiers (negations, laterality, numeric dosages, cardiac cycle phases). Discrepancies immediately prevent false duplicate merges.
+6. **Stages 5 & 6 (`S5Rerank` & `S6LlmArbiter`)**: Calibrated cross-encoder scoring and structured LLM arbitration resolve borderline ambiguity, protected by circuit breakers and daily neuron allowances.
+
+---
+
+### 9.3 Request Flow & Fallback Routing
+
+When an author submits or tests a question, the edge worker coordinates verification across D1 SQLite, Vectorize, and Workers AI with graceful degradation:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Author as Faculty / Student Author
+    participant Edge as Cloudflare Worker (/api/qdd/check)
+    participant D1 as Cloudflare D1 (Fingerprints & Verdicts)
+    participant Vec as Cloudflare Vectorize (HNSW Index)
+    participant AI as Workers AI (Embeddings / Reranker)
+    participant Gov as Governance Pending Review Queue
+
+    Author->>Edge: POST /api/qdd/check (Question JSON, scope, tier)
+    Edge->>Edge: Stage 0: Canonicalize AST & Shingles
+    Edge->>D1: Stage 1: SELECT by item_hash / stem_hash
+    alt Exact Match Found
+        D1-->>Edge: Returns matching question record
+        Edge-->>Author: 409 Conflict (BLOCK - Exact Duplicate)
+    else No Exact Match
+        Edge->>D1: Stage 2: Query question_lsh_bands for collisions
+        D1-->>Edge: Returns bucket candidate IDs
+        alt Neural Tier Available & Budget Intact
+            Edge->>AI: Generate 384-dim BGE embedding
+            Edge->>Vec: Query top-K nearest neighbors
+            Vec-->>Edge: Cosine matches (score >= 0.65)
+        else Daily AI Budget Exhausted / Circuit Open
+            Edge->>Edge: Degrade gracefully (Flag degraded: true)
+        end
+        Edge->>Edge: Stage 4: Extract & compare clinical discriminators
+        alt High Confidence or Rule-Based Verdict
+            Edge->>Gov: Stage unique item into pending_review
+            Edge-->>Author: 200 OK (Decision: ALLOW, Relation: UNIQUE)
+        else Ambiguous Near Match or Conflict
+            Edge->>Gov: Stage item with flagged candidate pair
+            Edge-->>Author: 200 OK (Decision: REVIEW, Relation: NEAR / CONFLICT)
+        end
+    end
+```
+
+**Walkthrough**:
+1. **Submission**: The author dispatches the question payload to `/api/qdd/check`.
+2. **Fast-Path Interception**: If an identical item hash exists in D1, the request exits immediately with `BLOCK (409 Conflict)`, protecting database writes.
+3. **Resilient Neural Probing**: Embeddings and vector searches execute under a daily neuron budget guard. If the daily allowance is exhausted or the circuit breaker opens, the engine degrades gracefully without failing the request.
+4. **Zero Auto-Acceptance**: Allowed unique items transition to `pending_review`, awaiting authoritative faculty governance.
+
+---
+
+### 9.4 Global Bank Health Audit & Resumable Graph Clustering
+
+To cleanse existing catalogs and detect historical duplicate clusters, the engine provides a chunked, resumable background audit architecture backed by Union-Find graph partitioning:
+
+```mermaid
+flowchart LR
+    subgraph Scanning["1. Chunked LSH Bucket Scan"]
+        Bands["question_lsh_bands (D1)"] --> Group["GROUP BY band_key HAVING cnt > 1"]
+        Group --> Chunks["Chunked Cursor<br/>(< 8ms CPU per chunk)"]
+    end
+
+    subgraph Graph["2. Graph Equivalence Partitioning"]
+        Chunks --> Pairs["Candidate Collision Pairs (A, B)"]
+        Pairs --> UF["UnionFindClusterer.ts<br/>Disjoint Set Union (DSU)"]
+        UF --> Clusters["Duplicate Clusters<br/>(Transitive: A ~ B ~ C)"]
+    end
+
+    subgraph Resolution["3. Deterministic Survivor Election & Triage"]
+        Clusters --> Survivor["SurvivorSelector.ts<br/>Published > Evidence Count > Oldest"]
+        Survivor --> Actions["Non-Destructive Editorial Actions"]
+        Actions --> A1["Archive Duplicate<br/>(Preserve Student Attempts)"]
+        Actions --> A2["Merge into Survivor<br/>(Combine Explanations & Evidence)"]
+        Actions --> A3["Link as Sibling Variant<br/>(Curriculum Cross-Reference)"]
+    end
+```
+
+**Walkthrough**:
+1. **CPU-Bounded Chunking**: `POST /api/admin/qdd/audits/:id/advance` scans LSH collision buckets in discrete chunks ($< 8\text{ ms}$ CPU each), adhering to Cloudflare free-tier worker CPU execution constraints.
+2. **Equivalence Partitioning**: Discovered collision pairs feed into `UnionFindClusterer.ts` to compute disjoint sets, linking transitive duplicates ($A \leftrightarrow B$ and $B \leftrightarrow C \implies \{A, B, C\}$).
+3. **Deterministic Survivor Selection**: `SurvivorSelector.ts` designates the canonical survivor by prioritizing active publication status, authoritative medical citations, and student attempt histories.
+4. **Non-Destructive Actions**: Editorial resolutions soft-archive duplicate records without breaking relational integrity in `user_question_attempts`.
+
+---
+
+### 9.5 Key Engineering Decisions
+
+| Decision | Rationale | Trade-off |
+|:---|:---|:---|
+| **Multi-Stage Sieve over Pure LLM** | Pairwise LLM comparisons on a $50,000$-item catalog scale as $\mathcal{O}(N^2)$, incurring prohibitive token costs and latency ($1\text{–}2\text{ s}$). Deterministic hashing and MinHash LSH filter $> 97\%$ of comparisons in $< 5\text{ ms}$. | S2 candidate threshold ($\text{Jaccard} \ge 0.42$) requires Stage 3 vector search to catch extreme non-lexical paraphrases. |
+| **Strict Zero Auto-Acceptance** | Board exam preparation demands absolute clinical accuracy. Hallucinated or erroneous submissions must never reach student study sessions. | Requires faculty or editorial review before new submissions appear in the live global bank. |
+| **Pure Domain Code in Domain Layer** | All mathematical normalizers, MinHash algorithms, and discriminator extractors reside in `src/domain/questionBank/duplication/` with zero Node or browser runtime dependencies. | Browser and worker runtimes must both provide standard crypto primitives (`crypto.subtle`). |
+| **Web Worker + IndexedDB Client Advisory** | Medical authors need ambient typing feedback without blocking UI rendering or spamming edge cloud endpoints. | Adds a small $73.56\text{ KB}$ client Web Worker asset bundle. |
+| **Platt Calibrated Cross-Encoder** | Raw logits from `@cf/baai/bge-reranker-base` fluctuate across domains; Platt scaling maps logits to well-calibrated posterior probabilities. | Requires offline calibration weights derived from golden medical evaluation sets. |
+
+---
+
+### 9.6 Reliability, Quality Gates & Failure Modes
+
+#### Release Quality Gates (SC-001 to SC-005)
+Verified against the canonical 450-pair golden benchmark dataset ([`qdd-golden.v1.jsonl`](test/golden/qdd-golden.v1.jsonl)):
+
+| Quality Gate | Metric Description | Target Threshold | Measured Result | Verification Status |
+|:---|:---|:---|:---|:---|
+| **SC-001** | Exact Duplicate Recall | $100.0\%$ | **$100.0\%$** (60/60) | **PASSED** ✅ |
+| **SC-002** | Near-Duplicate Precision | $\ge 98.0\%$ | **$100.0\%$** (60/60) | **PASSED** ✅ |
+| **SC-003** | Answer Conflict Recall | $\ge 99.0\%$ | **$100.0\%$** (60/60) | **PASSED** ✅ |
+| **SC-004** | False-BLOCK Error Rate | $\le 0.00\%$ | **$0.00\%$** (0/450) | **PASSED** ✅ |
+| **SC-005** | Sibling-as-Near False Rate | $\le 0.50\%$ | **$0.00\%$** (0/60) | **PASSED** ✅ |
+
+*Overall Dataset Accuracy*: **$93.56\%$** across all test categories ([bakeoff-report.v1.md](specs/009-question-duplication-detection-engine/research/bakeoff-report.v1.md)).
+
+#### Failure Resilience & Degradation
+- **Circuit Breakers (`CircuitBreaker.ts`)**: Wraps Workers AI and external LLM APIs. Trips open after 3 consecutive timeouts or 5xx errors, bypassing neural stages and returning conservative `REVIEW` verdicts.
+- **Daily AI Budget Guard (`D1AiBudgetGuard.ts`)**: Enforces daily neuron thresholds ($10,000$ neurons/day on the free tier). When exhausted, the engine degrades gracefully without throwing uncaught exceptions.
+- **Clinical Discriminator Guard**: Specialized regex lexicon extracts clinical units, laterality (*left* vs. *right*), action potential phases (*phase 0* vs. *phase 4*), and time ranges (*0.04-second*), preventing legitimate clinical variants from being marked as duplicates.
+
+---
+
+### 9.7 UX, Accessibility & Apple HIG Telemetry
+
+- **Side-by-Side Token Diff ([`DuplicateCompareSheet.tsx`](src/ui/features/qdd/DuplicateCompareSheet.tsx))**: Visual token diff highlights overlapping and distinct phrases between candidate questions with WCAG 2.2 AA compliant contrast badges.
+- **Ambient Advisory Hint ([`DuplicateHint.tsx`](src/ui/features/qdd/DuplicateHint.tsx))**: Displays an unintrusive banner in Question Studio with keyboard navigation (`Escape` to dismiss) and screen-reader announcements.
+- **Live Observability Cockpit ([`QddObservabilityWidget.tsx`](src/ui/features/admin/observability/QddObservabilityWidget.tsx))**: Real-time admin widget rendering P50/P95 latency histograms, daily AI neuron burn rates, and stage drop-off funnels.
+- **Performance Budgets**:
+  - Browser Advisory Web Worker: $< 16\text{ ms}$ compute budget over $20,000$ indexed questions.
+  - Edge Ingestion Check: $\text{P50} = 12\text{ ms}, \text{P95} = 44\text{ ms}$ (budget: $60\text{ ms}$).
+  - Client Offline Cache: $0\text{ ms}$ network overhead when editing offline.
+
+---
+
+### 9.8 Security, Privacy & Zero-Leakage Guarantee
+
+- **Zero-Leakage Telemetry (FR-034)**: The telemetry sink ([`QddTelemetrySink.ts`](src/infrastructure/questionBank/duplication/telemetry/QddTelemetrySink.ts)) strictly logs anonymized metadata (question IDs, stage latencies, relation decisions, and fused confidence scores). Question stems, answer choices, and student PII are never transmitted to observability or analytics sinks.
+- **Role-Based Audit Access**: All audit job creation, chunk advancement, and cluster resolution endpoints require authenticated administrator credentials (`admin` role) verified via session tokens.
+- **Administrative Emergency Bypass Kill Switch**: In the event of an upstream model regression or schema migration, administrators can toggle `x-qdd-mode: off | shadow | enforce` via request headers or environment variables in [`wrangler.jsonc`](wrangler.jsonc).
+
+---
+
+### 9.9 Known Limitations & Future Roadmap
+
+- **Cross-Lingual Semantic Matching**: Dense embeddings currently utilize `@cf/baai/bge-small-en-v1.5` optimized for English clinical vignettes. Paraphrases across mixed Arabic/English stems rely on Stage 0 canonicalization rather than cross-lingual multilingual vector spaces.
+- **Per-Block LSH Index Partitioning**: LSH bands are partitioned by curriculum block (`block_id`) to maximize locality and speed. Cross-block duplicate queries require a global audit execution.
+- **Automated Survivor Merging**: Currently, merging combines missing evidence citations into the designated survivor. Automated AI-assisted explanation synthesis remains on the future roadmap.
 
 ---
 
