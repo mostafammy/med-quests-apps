@@ -3,8 +3,24 @@ import { db } from '../../infrastructure/storage/db.ts';
 import { Question, Attempt } from '../../domain/model/types.ts';
 import { CVS_TAXONOMY } from '../../domain/taxonomy/cvsTaxonomy.ts';
 import defaultCvsBank from '../../../content/cvs/dist/bank.v1.json';
+import { useQuestionStore } from './useQuestionStore.ts';
 
 export const LOCAL_TELEMETRY_STORAGE_KEY = 'medquests_local_study_telemetry_v1';
+
+export function broadcastTelemetryUpdate(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('medquests:telemetry-updated'));
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('medquests_study_telemetry');
+        bc.postMessage({ type: 'TELEMETRY_UPDATED', timestamp: Date.now() });
+        bc.close();
+      }
+    } catch {
+      // Ignore broadcast errors in unsupported environments
+    }
+  }
+}
 
 export interface TopicStat {
   topicId: string;
@@ -99,7 +115,7 @@ export interface StatsState {
   isLoading: boolean;
 
   // Actions
-  refreshStats: (questions: Question[]) => Promise<void>;
+  refreshStats: (questions?: Question[]) => Promise<void>;
   resetStats: (questions?: Question[]) => Promise<void>;
   resetSubjectStats: (subjectId: string, questions?: Question[]) => Promise<void>;
   getScopeCoverage: (
@@ -112,8 +128,10 @@ export interface StatsState {
   ) => ScopeCoverageSummary;
 }
 
-function buildDefaultSubjectReadiness(questions: Question[]): Record<string, SubjectReadinessStat> {
-  const activeBank = questions.length > 0 ? questions : (defaultCvsBank as Question[]);
+function buildDefaultSubjectReadiness(questions?: Question[]): Record<string, SubjectReadinessStat> {
+  const activeBank = (questions && questions.length > 0)
+    ? questions
+    : (defaultCvsBank as Question[]);
   const result: Record<string, SubjectReadinessStat> = {};
 
   for (const subj of CVS_TAXONOMY.subjects) {
@@ -224,10 +242,14 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   favoriteSubspecialty: 'Anatomy & Pericardium',
   isLoading: false,
 
-  refreshStats: async (questions: Question[]) => {
+  refreshStats: async (questions?: Question[]) => {
     set({ isLoading: true });
     try {
-      const activeBank = questions.length > 0 ? questions : (defaultCvsBank as Question[]);
+      const activeBank = (questions && questions.length > 0)
+        ? questions
+        : (useQuestionStore.getState().questions.length > 0
+          ? useQuestionStore.getState().questions
+          : (defaultCvsBank as Question[]));
       const [attempts, reviewCards, srsCards, aiMetrics] = await Promise.all([
         db.attempts.toArray(),
         db.reviewCards.toArray(),
@@ -652,7 +674,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     };
   },
 
-  resetStats: async (questions = []) => {
+  resetStats: async (questions?: Question[]) => {
     set({ isLoading: true });
     try {
       await db.attempts.clear();
@@ -660,22 +682,34 @@ export const useStatsStore = create<StatsState>((set, get) => ({
       if (typeof window !== 'undefined') {
         localStorage.removeItem(LOCAL_TELEMETRY_STORAGE_KEY);
       }
-      await get().refreshStats(questions);
+      const activeBank = (questions && questions.length > 0)
+        ? questions
+        : (useQuestionStore.getState().questions.length > 0
+          ? useQuestionStore.getState().questions
+          : (defaultCvsBank as Question[]));
+      await get().refreshStats(activeBank);
+      broadcastTelemetryUpdate();
     } finally {
       set({ isLoading: false });
     }
   },
 
-  resetSubjectStats: async (subjectId: string, questions = []) => {
+  resetSubjectStats: async (subjectId: string, questions?: Question[]) => {
     set({ isLoading: true });
     try {
+      const activeBank = (questions && questions.length > 0)
+        ? questions
+        : (useQuestionStore.getState().questions.length > 0
+          ? useQuestionStore.getState().questions
+          : (defaultCvsBank as Question[]));
       const subjectQIds = new Set(
-        questions.filter((q) => q.subjectId === subjectId).map((q) => q.id)
+        activeBank.filter((q) => q.subjectId === subjectId).map((q) => q.id)
       );
       if (subjectQIds.size > 0) {
         await db.attempts.where('questionId').anyOf(Array.from(subjectQIds)).delete();
       }
-      await get().refreshStats(questions);
+      await get().refreshStats(activeBank);
+      broadcastTelemetryUpdate();
     } finally {
       set({ isLoading: false });
     }
