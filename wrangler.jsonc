@@ -12,7 +12,20 @@
   },
   "vars": {
     "ENVIRONMENT": "production",
-    "BETTER_AUTH_URL": "https://med-quests-apps.mostafa-yaser-developer.workers.dev"
+    "BETTER_AUTH_URL": "https://med-quests-apps.mostafa-yaser-developer.workers.dev",
+    "POSTHOG_HOST": "https://eu.i.posthog.com",
+    "QDD_MODE": "enforce",
+    "QDD_THRESHOLDS_VERSION": "v1",
+    "QDD_DAILY_BUDGET": "{\"embedding\":4000,\"rerank\":1500,\"llm\":150}"
+  },
+  "vectorize": [
+    {
+      "binding": "QDD_VECTORS",
+      "index_name": "qdd-bge-small-en-v1"
+    }
+  ],
+  "ai": {
+    "binding": "AI"
   },
   "d1_databases": [
     {
