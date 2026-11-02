@@ -282,7 +282,16 @@ export interface TranslationDictionary {
       readonly answerShortcut: string;
       readonly navigateShortcut: string;
       readonly submitExam: string;
+      readonly finishPractice: string;
+      readonly finishTest: string;
       readonly finishResults: string;
+      readonly finishModalTitle: string;
+      readonly finishModalSubtitle: string;
+      readonly finishModalAnswered: string;
+      readonly finishModalUnanswered: string;
+      readonly finishModalFlagged: string;
+      readonly finishModalConfirm: string;
+      readonly finishModalKeepPracticing: string;
       readonly next: string;
       readonly flagQuestion: string;
       readonly flagged: string;
@@ -293,6 +302,11 @@ export interface TranslationDictionary {
       readonly yourAnswerCorrect: string;
       readonly yourChoiceIncorrect: string;
       readonly correctAnswerKey: string;
+      readonly confidenceLabel: string;
+      readonly confidenceGuess: string;
+      readonly confidenceUnsure: string;
+      readonly confidenceSure: string;
+      readonly gridShortcut: string;
     };
     readonly matrix: {
       readonly title: string;
@@ -450,5 +464,23 @@ export interface TranslationDictionary {
     readonly backToDashboardBtn: string;
     readonly breakdownTitle: string;
     readonly breakdownSub: string;
+  };
+  readonly qdd: {
+    readonly badgeExact: string;
+    readonly badgeNear: string;
+    readonly badgeConflict: string;
+    readonly badgeSibling: string;
+    readonly badgeUnique: string;
+    readonly checkingShimmer: string;
+    readonly hintTitle: string;
+    readonly hintSiblingTitle: string;
+    readonly compareAction: string;
+    readonly makeVariantAction: string;
+    readonly dismissAction: string;
+    readonly explanationExact: string;
+    readonly explanationNear: string;
+    readonly explanationConflict: string;
+    readonly explanationSibling: string;
+    readonly saveAllUniqueBtn: string;
   };
 }
