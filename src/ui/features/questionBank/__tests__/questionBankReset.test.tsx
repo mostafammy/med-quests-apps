@@ -43,6 +43,7 @@ describe('Global Question Bank Reset Feature for All Users', () => {
 
     expect(html).toContain('206');
     expect(html).toContain('lucide-chevron-down');
+    expect(html).toContain('data-testid="question-bank-status-trigger"');
   });
 
   it('includes Reset to Global Bank button on Dashboard for all students', () => {
