@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
+import { useStatsStore, broadcastTelemetryUpdate } from '../../../application/stores/useStatsStore.ts';
 import { Question, ChoiceId, Confidence, ReviewCard } from '../../../domain/model/types.ts';
 import { db } from '../../../infrastructure/storage/db.ts';
 import { PostTestReport, QuestionAttemptTelemetry } from './PostTestReport.tsx';
@@ -12,8 +13,10 @@ import { edgeAuthGateway } from '../../../infrastructure/auth/edgeAuthGateway.ts
 import { CopilotTriggerButton } from '../copilot/CopilotTriggerButton.tsx';
 import { AiCopilotDrawer } from '../copilot/AiCopilotDrawer.tsx';
 import { ThemeToggle } from '../../app/ThemeToggle.tsx';
+import { LocaleToggle } from '../../app/LocaleToggle.tsx';
 import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 import { SessionSeededSpatialPresentationStrategy } from '../../../domain/questionBank/spatialChoicePresenter.ts';
+import { analytics } from '../../../infrastructure/analytics/medQuestsAnalyticsFacade.ts';
 import type { VisualSlotIndex } from '../../../../specs/006-psychometric-choice-entropy-and-spatial-presentation/contracts/choice-entropy-ports.ts';
 import { 
   ArrowLeft, 
@@ -103,8 +106,47 @@ export const SessionPlayer: React.FC = () => {
   const mode = sessionConfig.mode || 'practice';
   const isExamMode = mode === 'mock' || mode === 'exam';
 
+  // Synchronously compute initial question slice to prevent 1-frame empty flash on first paint
+  const initialSessionQuestions = useMemo(() => {
+    if (sessionConfig.questionIds && sessionConfig.questionIds.length > 0) {
+      const idSet = new Set(sessionConfig.questionIds);
+      const ordered = allQuestions.filter((q) => idSet.has(q.id));
+      const rawCount = sessionConfig.questionCount;
+      const count =
+        rawCount === 'all'
+          ? ordered.length
+          : typeof rawCount === 'number'
+          ? rawCount
+          : ordered.length;
+      return ordered.slice(0, count);
+    }
+
+    let pool = [...allQuestions];
+    if (sessionConfig.subjectId && sessionConfig.subjectId !== 'all') {
+      pool = pool.filter((q) => q.subjectId === sessionConfig.subjectId);
+    }
+    if (sessionConfig.chapterId && sessionConfig.chapterId !== 'all') {
+      pool = pool.filter((q) => q.chapterId === sessionConfig.chapterId);
+    }
+    if (sessionConfig.highYieldOnly) {
+      const hyPool = pool.filter((q) => q.highYield);
+      if (hyPool.length > 0) {
+        pool = hyPool;
+      }
+    }
+
+    const rawCount = sessionConfig.questionCount;
+    const count =
+      rawCount === 'all'
+        ? pool.length
+        : typeof rawCount === 'number'
+        ? rawCount
+        : 20;
+    return pool.slice(0, count);
+  }, [allQuestions, sessionConfig]);
+
   // Filter questions according to session config
-  const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
+  const [sessionQuestions, setSessionQuestions] = useState<Question[]>(initialSessionQuestions);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, { choiceId: ChoiceId; isCorrect: boolean }>>({});
   const [confidences, setConfidences] = useState<Record<string, Confidence>>({});
@@ -113,6 +155,7 @@ export const SessionPlayer: React.FC = () => {
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
   const [showExplanation, setShowExplanation] = useState(true);
   const [showMatrixModal, setShowMatrixModal] = useState(false);
+  const [showFinishModal, setShowFinishModal] = useState(false);
   const [sessionStartTime] = useState<number>(() => Date.now());
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(
     (sessionConfig.timeLimitMinutes || 120) * 60
@@ -230,12 +273,71 @@ export const SessionPlayer: React.FC = () => {
   const currentConfidence: Confidence = currentQ ? confidences[currentQ.id] ?? 'unsure' : 'unsure';
   const isAnswered = !!currentAnswer;
   const isLastQuestion = sessionQuestions.length > 0 && currentIndex === sessionQuestions.length - 1;
+  const answeredCount = Object.keys(answers).length;
+  const unansweredCount = Math.max(0, sessionQuestions.length - answeredCount);
+  const flaggedCount = Object.values(flags).filter(Boolean).length;
 
-  // Start / resume telemetry stopwatch whenever active question changes
+  // 1. Session Lifecycle Telemetry (study_session:started)
+  const sessionStartedRef = React.useRef(false);
+  useEffect(() => {
+    if (sessionStartedRef.current || sessionQuestions.length === 0) return;
+    sessionStartedRef.current = true;
+    analytics.capture('study_session:started', {
+      session_id: activeSessionId,
+      session_mode: mode,
+      target_question_count: sessionQuestions.length,
+      time_limit_minutes: isExamMode ? Math.round(timeLeftSeconds / 60) : null,
+      subject_filter_id: sessionConfig.subjectId ?? null,
+      chapter_filter_id: sessionConfig.chapterId ?? null,
+      question_filter: sessionConfig.questionFilter ?? 'all',
+      high_yield_only: !!sessionConfig.highYieldOnly,
+    });
+  }, [sessionQuestions.length, activeSessionId, mode, isExamMode, timeLeftSeconds, sessionConfig]);
+
+  // 2. Active Question Impression Telemetry (question:displayed)
   useEffect(() => {
     if (!currentQ || isSubmitted) return;
     questionTelemetryTracker.startQuestion(currentQ.id);
-  }, [currentQ?.id, isSubmitted]);
+
+    analytics.capture('question:displayed', {
+      session_id: activeSessionId,
+      question_id: currentQ.id,
+      sequence_index: currentIndex,
+      subject_id: currentQ.subjectId,
+      chapter_id: currentQ.chapterId,
+      topic_id: currentQ.topicId,
+      spatial_presentation_mode: 'session-seeded-shuffle',
+    });
+  }, [currentQ?.id, currentIndex, isSubmitted, activeSessionId]);
+
+  // 3. Early Session Abandonment Telemetry (study_session:abandoned)
+  const isSubmittedRef = React.useRef(isSubmitted);
+  isSubmittedRef.current = isSubmitted;
+  const answersCountRef = React.useRef(Object.keys(answers).length);
+  answersCountRef.current = Object.keys(answers).length;
+  const sessionQuestionsLenRef = React.useRef(sessionQuestions.length);
+  sessionQuestionsLenRef.current = sessionQuestions.length;
+  const currentIndexRef = React.useRef(currentIndex);
+  currentIndexRef.current = currentIndex;
+
+  useEffect(() => {
+    return () => {
+      if (
+        sessionStartedRef.current &&
+        !isSubmittedRef.current &&
+        answersCountRef.current < sessionQuestionsLenRef.current
+      ) {
+        analytics.capture('study_session:abandoned', {
+          session_id: activeSessionId,
+          session_mode: mode,
+          abandoned_at_question_index: currentIndexRef.current,
+          total_questions_planned: sessionQuestionsLenRef.current,
+          answered_before_abandon_count: answersCountRef.current,
+          elapsed_duration_ms: Math.max(0, Date.now() - sessionStartTime),
+        });
+      }
+    };
+  }, [activeSessionId, mode, sessionStartTime]);
 
   // AI Co-Pilot Viewport Integration
   const { setSurface } = useCopilotStore();
@@ -289,15 +391,38 @@ export const SessionPlayer: React.FC = () => {
           confidence: level,
         },
       }));
+
+      analytics.capture('question:confidence_rated', {
+        session_id: activeSessionId,
+        question_id: currentQ.id,
+        confidence_level: level,
+        input_modality: 'pointer-click',
+      });
     },
-    [currentQ]
+    [currentQ, activeSessionId]
   );
 
   const handleSubmitExam = useCallback(async () => {
     try {
+      const totalAnswered = Object.keys(answers).length;
+      const totalCorrect = Object.values(answers).filter((a) => a.isCorrect).length;
+      const accuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
+      const totalDuration = Math.max(1000, Date.now() - sessionStartTime);
+
+      analytics.capture('study_session:completed', {
+        session_id: activeSessionId,
+        session_mode: mode,
+        total_questions: sessionQuestions.length,
+        answered_questions: totalAnswered,
+        correct_count: totalCorrect,
+        accuracy_percent: accuracy,
+        total_duration_ms: totalDuration,
+        avg_pace_ms_per_question: Math.round(totalDuration / Math.max(1, totalAnswered)),
+        completion_reason: isExamMode && timeLeftSeconds <= 0 ? 'timer-expired' : 'user-submitted',
+      });
+
       if (isExamMode) {
         const nowIso = new Date().toISOString();
-        const sessId = `sess-${Date.now()}`;
         const nextTelemetryMap: Record<string, QuestionAttemptTelemetry> = { ...questionTelemetryMap };
 
         const records = Object.entries(answers).map(([qId, ans]) => {
@@ -314,7 +439,7 @@ export const SessionPlayer: React.FC = () => {
             id: `att-${Date.now()}-${qId}`,
             questionId: qId,
             blockId: 'cvs',
-            sessionId: sessId,
+            sessionId: activeSessionId,
             mode,
             selectedChoiceId: ans.choiceId,
             isCorrect: ans.isCorrect,
@@ -339,15 +464,26 @@ export const SessionPlayer: React.FC = () => {
               rec.confidence
             );
           }
+          await useStatsStore.getState().refreshStats();
+          broadcastTelemetryUpdate();
         }
       }
       void edgeAuthGateway.syncLocalStudyTelemetryToEdge();
     } catch (err) {
       console.error('Failed to save exam attempts in DB:', err);
     } finally {
+      setShowFinishModal(false);
       setIsSubmitted(true);
     }
-  }, [answers, confidences, isExamMode, mode, questionTelemetryMap]);
+  }, [answers, confidences, isExamMode, mode, questionTelemetryMap, activeSessionId, sessionQuestions.length, sessionStartTime, timeLeftSeconds]);
+
+  const handleRequestFinish = useCallback(() => {
+    if (unansweredCount === 0) {
+      void handleSubmitExam();
+    } else {
+      setShowFinishModal(true);
+    }
+  }, [unansweredCount, handleSubmitExam]);
 
   // Countdown timer for Exam Mode
   useEffect(() => {
@@ -366,12 +502,17 @@ export const SessionPlayer: React.FC = () => {
   }, [isExamMode, isSubmitted, handleSubmitExam]);
 
   // Immediate Commit Answer handler
-  const handleSelectAnswer = useCallback((choiceId: ChoiceId) => {
+  const handleSelectAnswer = useCallback((
+    choiceId: ChoiceId,
+    slotIdx: VisualSlotIndex = 0,
+    modality: 'pointer-click' | 'keyboard-digit-shortcut' | 'touch-tap' = 'pointer-click'
+  ) => {
     if (!currentQ) return;
 
     // In practice mode, once committed, cannot change
     if (!isExamMode && isAnswered) return;
 
+    const hadPriorAnswer = !!answers[currentQ.id];
     questionTelemetryTracker.recordChoiceSelection(choiceId);
     const snap = questionTelemetryTracker.getQuestionSnapshot(currentQ.id);
     const selectedConf = confidences[currentQ.id] ?? snap.confidence ?? 'unsure';
@@ -379,6 +520,17 @@ export const SessionPlayer: React.FC = () => {
 
     const correctChoice = currentQ.choices.find((c) => c.isCorrect);
     const isCorrect = correctChoice?.id === choiceId;
+
+    analytics.capture('question:choice_interacted', {
+      session_id: activeSessionId,
+      question_id: currentQ.id,
+      interaction_type: hadPriorAnswer ? 'change_choice' : 'select_choice',
+      canonical_choice_id: choiceId,
+      visual_slot_index: slotIdx,
+      input_modality: modality,
+      time_since_question_displayed_ms: responseTimeMs,
+      choice_changes_so_far: snap.choiceChangesCount ?? 0,
+    });
 
     setAnswers((prev) => ({
       ...prev,
@@ -396,6 +548,39 @@ export const SessionPlayer: React.FC = () => {
     }));
 
     if (!isExamMode) {
+      const isFast = responseTimeMs <= 45000;
+      const pacingQuadrant = isFast
+        ? (isCorrect ? 'fast-accurate' : 'fast-wrong')
+        : (isCorrect ? 'slow-accurate' : 'slow-wrong');
+
+      let instinctPivot: 'none' | 'wrong-to-right' | 'right-to-wrong' | 'wrong-to-wrong' = 'none';
+      if (snap.firstSelectedChoiceId && snap.firstSelectedChoiceId !== choiceId) {
+        const wasFirstCorrect = snap.firstSelectedChoiceId === correctChoice?.id;
+        if (!wasFirstCorrect && isCorrect) instinctPivot = 'wrong-to-right';
+        else if (wasFirstCorrect && !isCorrect) instinctPivot = 'right-to-wrong';
+        else if (!wasFirstCorrect && !isCorrect) instinctPivot = 'wrong-to-wrong';
+      }
+
+      analytics.capture('question:attempt_committed', {
+        session_id: activeSessionId,
+        question_id: currentQ.id,
+        subject_id: currentQ.subjectId,
+        chapter_id: currentQ.chapterId,
+        topic_id: currentQ.topicId,
+        selected_canonical_choice_id: choiceId,
+        first_instinct_choice_id: snap.firstSelectedChoiceId ?? null,
+        selected_visual_slot_index: slotIdx,
+        is_correct: isCorrect,
+        confidence_level: selectedConf,
+        active_dwell_ms: responseTimeMs,
+        pacing_quadrant: pacingQuadrant,
+        choice_changes_count: snap.choiceChangesCount ?? 0,
+        instinct_pivot_outcome: instinctPivot,
+        eliminated_choices_count: snap.eliminatedChoiceIds?.length ?? 0,
+        ai_copilot_consulted: !!snap.aiCopilotConsulted,
+        sm2_resulting_interval_days: isCorrect ? (selectedConf === 'sure' ? 3 : 1) : 0,
+      });
+
       setShowExplanation(true);
       const blockId = currentQ.blockId || 'cvs';
       void db.attempts
@@ -403,7 +588,7 @@ export const SessionPlayer: React.FC = () => {
           id: `att-${Date.now()}-${currentQ.id}`,
           questionId: currentQ.id,
           blockId,
-          sessionId: `practice-session`,
+          sessionId: activeSessionId,
           mode: 'practice',
           selectedChoiceId: choiceId,
           isCorrect,
@@ -417,10 +602,12 @@ export const SessionPlayer: React.FC = () => {
         })
         .then(async () => {
           await upsertSm2ReviewCard(currentQ.id, blockId, isCorrect, selectedConf);
+          await useStatsStore.getState().refreshStats();
+          broadcastTelemetryUpdate();
           void edgeAuthGateway.syncLocalStudyTelemetryToEdge();
         });
     }
-  }, [currentQ, isExamMode, isAnswered, confidences]);
+  }, [currentQ, isExamMode, isAnswered, activeSessionId, answers, confidences]);
 
   const handleNext = useCallback(() => {
     if (currentIndex < sessionQuestions.length - 1) {
@@ -470,6 +657,11 @@ export const SessionPlayer: React.FC = () => {
       // Ignore if typing in input
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
 
+      if (e.key === 'Escape' && showFinishModal) {
+        setShowFinishModal(false);
+        return;
+      }
+
       if (['1', '2', '3', '4'].includes(e.key)) {
         const slotIdx = (parseInt(e.key, 10) - 1) as VisualSlotIndex;
         const targetCanonicalId = spatialPresenter.resolveCanonicalChoiceIdBySlot(
@@ -477,7 +669,7 @@ export const SessionPlayer: React.FC = () => {
           slotIdx
         );
         if (targetCanonicalId) {
-          handleSelectAnswer(targetCanonicalId);
+          handleSelectAnswer(targetCanonicalId, slotIdx, 'keyboard-digit-shortcut');
         }
       }
       else if (e.key === 'ArrowRight') {
@@ -527,6 +719,7 @@ export const SessionPlayer: React.FC = () => {
     isLastQuestion,
     presentedChoices,
     spatialPresenter,
+    showFinishModal,
   ]);
 
   if (sessionQuestions.length === 0) {
@@ -600,7 +793,10 @@ export const SessionPlayer: React.FC = () => {
       }`}>
         <div className="flex items-center space-x-2 sm:space-x-3 rtl:space-x-reverse shrink-0">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => {
+              void useStatsStore.getState().refreshStats();
+              navigate('/');
+            }}
             className={`p-2 rounded-xl text-xs font-semibold flex items-center space-x-1.5 rtl:space-x-reverse apple-tap cursor-pointer transition-all ${
               isExamMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
             }`}
@@ -657,9 +853,9 @@ export const SessionPlayer: React.FC = () => {
         </div>
 
         {/* Center / Right: Timer, Theme Toggle & Controls */}
-        <div className="flex items-center space-x-1.5 sm:space-x-2.5 rtl:space-x-reverse shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           {isExamMode && (
-            <div className="flex items-center space-x-1 sm:space-x-1.5 rtl:space-x-reverse px-2.5 sm:px-3 py-1 bg-slate-800 border border-slate-700 rounded-xl text-xs font-mono font-bold text-amber-400 shadow-xs">
+            <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 bg-slate-800 border border-slate-700 rounded-xl text-xs font-mono font-bold text-amber-400 shadow-xs">
               <Clock className="w-3.5 h-3.5" />
               <span>{formatTime(timeLeftSeconds)}</span>
             </div>
@@ -667,7 +863,7 @@ export const SessionPlayer: React.FC = () => {
 
           <button
             onClick={handleToggleFlag}
-            className={`p-2 rounded-xl text-xs font-semibold flex items-center space-x-1 rtl:space-x-reverse transition-all apple-tap cursor-pointer ${
+            className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all apple-tap cursor-pointer ${
               flags[currentQ.id]
                 ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/40'
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100/70 dark:hover:bg-zinc-800/70'
@@ -675,12 +871,12 @@ export const SessionPlayer: React.FC = () => {
             title={flags[currentQ.id] ? t.test.player.flagged : t.test.player.flagQuestion}
           >
             <Flag className={`w-4 h-4 ${flags[currentQ.id] ? 'fill-current text-amber-500' : ''}`} />
-            <span className="hidden md:inline font-bold">{flags[currentQ.id] ? t.test.player.flagged : t.test.player.flagQuestion}</span>
+            <span className="hidden lg:inline font-bold">{flags[currentQ.id] ? t.test.player.flagged : t.test.player.flagQuestion}</span>
           </button>
 
           <button
             onClick={handleToggleBookmark}
-            className={`p-2 rounded-xl text-xs font-semibold flex items-center space-x-1 rtl:space-x-reverse transition-all apple-tap cursor-pointer ${
+            className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all apple-tap cursor-pointer ${
               bookmarks[currentQ.id]
                 ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/40'
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100/70 dark:hover:bg-zinc-800/70'
@@ -690,29 +886,39 @@ export const SessionPlayer: React.FC = () => {
             <Bookmark className={`w-4 h-4 ${bookmarks[currentQ.id] ? 'fill-current text-blue-500' : ''}`} />
           </button>
 
+          {/* Locale Toggle (Apple Bilingual EN / AR Switcher) */}
+          <div className="hidden sm:inline-flex">
+            <LocaleToggle />
+          </div>
+
           {/* Theme Toggle (Apple Light / Dark Switcher) */}
           <ThemeToggle />
 
           {/* AI Cognitive Co-Pilot Trigger */}
           <CopilotTriggerButton />
 
-          {Object.keys(answers).length > 0 && !isExamMode && (
-            <button
-              onClick={handleSubmitExam}
-              className="hidden sm:inline-flex py-1.5 px-3.5 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 rounded-xl text-xs font-bold transition-all cursor-pointer apple-tap shadow-xs"
-            >
-              {t.common.finish}
-            </button>
-          )}
-
-          {isExamMode && (
-            <button
-              onClick={handleSubmitExam}
-              className="hidden sm:inline-flex py-1.5 px-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-600/25 cursor-pointer apple-tap"
-            >
-              {t.common.submit}
-            </button>
-          )}
+          {/* Always-accessible Finish Practice / Submit Exam CTA across all viewports */}
+          <button
+            type="button"
+            onClick={handleRequestFinish}
+            data-testid="header-finish-session-btn"
+            className={`inline-flex items-center gap-1.5 py-1.5 px-2.5 sm:px-3.5 rounded-xl text-xs font-bold transition-all cursor-pointer apple-tap shadow-xs shrink-0 ${
+              isExamMode
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/25'
+                : answeredCount > 0
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-500/20'
+                : 'bg-slate-100/90 dark:bg-zinc-800/90 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-zinc-200 hover:text-emerald-700 dark:hover:text-emerald-300 border border-slate-200/80 dark:border-zinc-700/80'
+            }`}
+            title={isExamMode ? t.test.player.submitExam : t.test.player.finishPractice}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden md:inline">
+              {isExamMode ? t.test.player.submitExam : t.test.player.finishPractice}
+            </span>
+            <span className="md:hidden">
+              {isExamMode ? t.common.submit : t.common.finish}
+            </span>
+          </button>
         </div>
       </header>
 
@@ -733,7 +939,7 @@ export const SessionPlayer: React.FC = () => {
       />
 
       {/* Main Question Workspace */}
-      <main className="max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex-1 flex flex-col justify-between space-y-6">
+      <main className="max-w-4xl w-full mx-auto px-3.5 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-28 sm:pb-32 flex-1 flex flex-col justify-between space-y-6">
         <div className="space-y-6">
           {/* Question Card (Apple Glass Surface) */}
           <div className="glass-surface rounded-3xl p-5 sm:p-7 space-y-4 border border-white/80 dark:border-white/10 shadow-[0_8px_32px_rgba(15,23,42,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] animate-apple-entrance">
@@ -769,16 +975,16 @@ export const SessionPlayer: React.FC = () => {
 
             {/* Apple Confidence Calibration Pill Bar */}
             <div className="pt-2 border-t border-slate-200/50 dark:border-zinc-800/50 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center space-x-1.5 text-[11px] font-semibold text-slate-500 dark:text-zinc-400">
+              <div className="flex items-center space-x-1.5 rtl:space-x-reverse text-[11px] font-semibold text-slate-500 dark:text-zinc-400">
                 <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Confidence Calibration:</span>
+                <span>{t.test.player.confidenceLabel}</span>
               </div>
-              <div className="inline-flex items-center p-1 rounded-full bg-slate-100/80 dark:bg-zinc-800/80 border border-slate-200/70 dark:border-zinc-700/70 space-x-1">
+              <div className="inline-flex items-center p-1 rounded-full bg-slate-100/80 dark:bg-zinc-800/80 border border-slate-200/70 dark:border-zinc-700/70 gap-1">
                 {(
                   [
-                    { id: 'guess' as const, label: 'Guess' },
-                    { id: 'unsure' as const, label: 'Unsure' },
-                    { id: 'sure' as const, label: 'Confident' },
+                    { id: 'guess' as const, label: t.test.player.confidenceGuess },
+                    { id: 'unsure' as const, label: t.test.player.confidenceUnsure },
+                    { id: 'sure' as const, label: t.test.player.confidenceSure },
                   ]
                 ).map((item) => {
                   const active = currentConfidence === item.id;
@@ -896,7 +1102,7 @@ export const SessionPlayer: React.FC = () => {
               return (
                 <button
                   key={choice.canonicalChoiceId}
-                  onClick={() => handleSelectAnswer(choice.canonicalChoiceId)}
+                  onClick={() => handleSelectAnswer(choice.canonicalChoiceId, idx as VisualSlotIndex, 'pointer-click')}
                   disabled={!isExamMode && isAnswered}
                   className={`w-full text-left p-3.5 sm:p-4 rounded-2xl flex items-center justify-between gap-3 transition-all text-sm sm:text-base select-none apple-tap ${
                     !isExamMode && isAnswered ? '' : 'cursor-pointer'
@@ -904,7 +1110,7 @@ export const SessionPlayer: React.FC = () => {
                   role="radio"
                   aria-checked={isSelected}
                 >
-                  <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 text-start">
                     <span className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-xs flex items-center justify-center shrink-0 uppercase transition-all ${badgeStyle}`}>
                       {choiceLetter}
                     </span>
@@ -989,91 +1195,296 @@ export const SessionPlayer: React.FC = () => {
           )}
         </div>
 
-        {/* Bottom Navigation Toolbar - Apple Frosted Action Dock */}
-        <div className={`sticky bottom-0 z-30 mt-6 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3.5 border-t backdrop-blur-2xl flex items-center justify-between text-xs pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_32px_rgba(0,0,0,0.06)] dark:shadow-[0_-8px_32px_rgba(0,0,0,0.5)] ${
-          isExamMode 
-            ? 'bg-slate-900/90 border-slate-800 text-slate-300' 
-            : 'bg-white/85 dark:bg-zinc-900/85 border-t border-slate-200/80 dark:border-zinc-800/80 text-slate-700 dark:text-zinc-300'
-        }`}>
-          <button
-            onClick={handlePrev}
-            disabled={currentIndex === 0}
-            className="py-2.5 px-4 rounded-xl border border-slate-200/90 dark:border-zinc-700/80 bg-white/70 dark:bg-zinc-800/70 hover:bg-white dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 disabled:opacity-30 font-bold flex items-center space-x-1.5 rtl:space-x-reverse cursor-pointer apple-tap transition-all shadow-xs"
+        {/* Bottom Navigation Toolbar - Apple VisionOS Floating Glass Command Dock */}
+        <div className="fixed bottom-0 inset-x-0 z-30 pointer-events-none px-3 sm:px-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
+          <div
+            data-testid="session-bottom-dock"
+            className={`pointer-events-auto max-w-4xl mx-auto rounded-2xl sm:rounded-full px-2.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-2 sm:gap-3 border backdrop-blur-2xl transition-all duration-300 ${
+              isExamMode
+                ? 'bg-slate-900/90 border-slate-700/80 text-slate-200 shadow-[0_16px_48px_rgba(0,0,0,0.65)]'
+                : 'glass-surface border-white/90 dark:border-zinc-700/80 text-slate-800 dark:text-zinc-100 shadow-[0_12px_40px_rgba(15,23,42,0.12)] dark:shadow-[0_16px_48px_rgba(0,0,0,0.65)]'
+            }`}
           >
-            <ArrowLeft className="w-4 h-4 rtl:rotate-180" />
-            <span className="hidden xs:inline sm:inline">{t.common.back}</span>
-          </button>
-
-          {/* Apple Dynamic Island Keyboard Dock */}
-          <div className="hidden sm:flex items-center space-x-3 rtl:space-x-reverse px-4 sm:px-5 py-2 rounded-full bg-slate-900/90 dark:bg-black/90 text-white border border-white/15 dark:border-white/10 shadow-[0_8px_25px_rgba(0,0,0,0.25)] backdrop-blur-2xl transition-all duration-300">
-            {!isExamMode && isAnswered ? (
-              <div className="flex items-center space-x-2 rtl:space-x-reverse animate-apple-entrance">
-                <kbd className="px-2 py-0.5 rounded-md bg-blue-600 text-white font-mono text-[10px] font-black shadow-xs border border-blue-400">
-                  Enter ⏎
-                </kbd>
-                <span className="text-xs font-bold text-white tracking-tight">
-                  {isLastQuestion ? t.test.player.finishResults : t.test.player.next}
-                </span>
-                <span className="w-1 h-1 rounded-full bg-slate-600" />
-                <div className="flex items-center space-x-1 rtl:space-x-reverse">
-                  <kbd className="px-1.5 py-0.5 rounded bg-white/15 text-slate-300 font-mono text-[10px] font-semibold border border-white/15">
-                    ←
-                  </kbd>
-                  <span className="text-[11px] text-slate-400 font-medium">{t.nav.review}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-2.5">
-                <div className="flex items-center space-x-1.5">
-                  <kbd className="px-2 py-0.5 rounded-md bg-white/15 text-white font-mono text-[10px] font-black border border-white/20 shadow-xs">
-                    1–4
-                  </kbd>
-                  <span className="text-xs font-semibold text-slate-200">{t.test.player.answerShortcut}</span>
-                </div>
-                <span className="w-1 h-1 rounded-full bg-slate-600" />
-                <div className="flex items-center space-x-1.5">
-                  <div className="flex items-center space-x-1">
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/15 text-white font-mono text-[10px] font-black border border-white/20 shadow-xs">
-                      ←
-                    </kbd>
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/15 text-white font-mono text-[10px] font-black border border-white/20 shadow-xs">
-                      →
-                    </kbd>
-                  </div>
-                  <span className="text-xs font-semibold text-slate-200">{t.test.player.navigateShortcut}</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Mobile Question Pill indicator */}
-          <span className="sm:hidden font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
-            {currentIndex + 1} / {sessionQuestions.length}
-          </span>
-
-          {isLastQuestion ? (
+            {/* Left Slot: Tactile Back Pill */}
             <button
-              onClick={handleSubmitExam}
-              className={`py-2.5 px-5 sm:px-6 rounded-xl font-extrabold flex items-center space-x-2 cursor-pointer shadow-lg transition-all apple-tap ${
+              type="button"
+              onClick={handlePrev}
+              disabled={currentIndex === 0}
+              className={`h-10 sm:h-11 px-3.5 sm:px-4 rounded-xl sm:rounded-full border font-bold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer apple-tap transition-all shrink-0 disabled:opacity-35 disabled:pointer-events-none ${
                 isExamMode
-                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/25'
-                  : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-500/25'
+                  ? 'border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-200'
+                  : 'border-slate-200/90 dark:border-zinc-700/80 bg-white/80 dark:bg-zinc-800/80 hover:bg-white dark:hover:bg-zinc-800 text-slate-800 dark:text-zinc-100 shadow-2xs'
               }`}
             >
-              <span>{isExamMode ? t.test.player.submitExam : t.test.player.finishResults}</span>
-              <CheckCircle2 className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4 rtl:rotate-180 shrink-0" />
+              <span>{t.common.back}</span>
             </button>
-          ) : (
-            <button
-              onClick={handleNext}
-              className="py-2.5 px-5 sm:px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold flex items-center space-x-1.5 cursor-pointer shadow-md shadow-blue-500/25 transition-all apple-tap"
-            >
-              <span>{t.common.next}</span>
-              <ArrowRight className={`w-3.5 h-3.5 ${isRtl ? 'rotate-180' : ''}`} />
-            </button>
-          )}
+
+            {/* Center Slot: Apple Dynamic HUD & Keyboard Command Bar */}
+            <div className="flex items-center justify-center min-w-0 flex-1">
+              {/* Desktop / Tablet: Refined Tactile Keycap Command Capsule */}
+              <div
+                className={`hidden md:inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border transition-all duration-300 ${
+                  isExamMode
+                    ? 'bg-slate-950/80 border-slate-800 text-slate-300'
+                    : 'bg-slate-100/85 dark:bg-zinc-900/90 border-slate-200/80 dark:border-zinc-800 text-slate-600 dark:text-zinc-300 shadow-inner'
+                }`}
+              >
+                {!isExamMode && isAnswered ? (
+                  <div className="flex items-center gap-2.5 animate-apple-entrance">
+                    <button
+                      type="button"
+                      onClick={isLastQuestion ? handleRequestFinish : handleNext}
+                      className="inline-flex items-center gap-1.5 group cursor-pointer"
+                    >
+                      <kbd className="ltr-isolate px-2 py-0.5 rounded-md bg-blue-600 text-white font-mono text-[10px] font-extrabold shadow-2xs border border-blue-500">
+                        Enter ⏎
+                      </kbd>
+                      <span className="text-xs font-bold text-slate-800 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {isLastQuestion ? t.test.player.finishResults : t.test.player.next}
+                      </span>
+                    </button>
+
+                    <span className="h-3.5 w-px bg-slate-300/80 dark:bg-zinc-700" />
+
+                    <div className="inline-flex items-center gap-1.5">
+                      <kbd className="ltr-isolate px-1.5 py-0.5 rounded-md bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-mono text-[10px] font-bold border border-slate-300/80 dark:border-zinc-700 shadow-2xs">
+                        ←
+                      </kbd>
+                      <span className="text-[11px] font-semibold text-slate-500 dark:text-zinc-400">
+                        {t.nav.review}
+                      </span>
+                    </div>
+
+                    <span className="h-3.5 w-px bg-slate-300/80 dark:bg-zinc-700" />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowMatrixModal(true)}
+                      className="inline-flex items-center gap-1.5 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                      title={t.test.player.questionMatrixShortcut}
+                    >
+                      <kbd className="ltr-isolate px-1.5 py-0.5 rounded-md bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-mono text-[10px] font-bold border border-slate-300/80 dark:border-zinc-700 shadow-2xs">
+                        G
+                      </kbd>
+                      <span className="text-[11px] font-semibold text-slate-500 dark:text-zinc-400">
+                        {t.test.player.gridShortcut}
+                      </span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2.5">
+                    {/* 1-4 Answer Keycaps */}
+                    <div className="inline-flex items-center gap-1.5">
+                      <div className="ltr-isolate inline-flex items-center gap-0.5">
+                        {(['1', '2', '3', '4'] as const).map((k) => (
+                          <kbd
+                            key={k}
+                            className="w-5 h-5 inline-flex items-center justify-center rounded-md bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-mono text-[10px] font-extrabold border border-slate-300/90 dark:border-zinc-700 shadow-[0_1px_0_rgba(0,0,0,0.08)]"
+                          >
+                            {k}
+                          </kbd>
+                        ))}
+                      </div>
+                      <span className="text-[11px] font-semibold text-slate-600 dark:text-zinc-300">
+                        {t.test.player.answerShortcut}
+                      </span>
+                    </div>
+
+                    <span className="h-3.5 w-px bg-slate-300/80 dark:bg-zinc-700" />
+
+                    {/* Arrow Keycaps */}
+                    <div className="inline-flex items-center gap-1.5">
+                      <div className="ltr-isolate inline-flex items-center gap-0.5">
+                        <kbd className="w-5 h-5 inline-flex items-center justify-center rounded-md bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-mono text-[10px] font-extrabold border border-slate-300/90 dark:border-zinc-700 shadow-[0_1px_0_rgba(0,0,0,0.08)]">
+                          ←
+                        </kbd>
+                        <kbd className="w-5 h-5 inline-flex items-center justify-center rounded-md bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-mono text-[10px] font-extrabold border border-slate-300/90 dark:border-zinc-700 shadow-[0_1px_0_rgba(0,0,0,0.08)]">
+                          →
+                        </kbd>
+                      </div>
+                      <span className="text-[11px] font-semibold text-slate-600 dark:text-zinc-300">
+                        {t.test.player.navigateShortcut}
+                      </span>
+                    </div>
+
+                    <span className="h-3.5 w-px bg-slate-300/80 dark:bg-zinc-700" />
+
+                    {/* Matrix Grid Shortcut */}
+                    <button
+                      type="button"
+                      onClick={() => setShowMatrixModal(true)}
+                      className="inline-flex items-center gap-1.5 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                      title={t.test.player.questionMatrixShortcut}
+                    >
+                      <kbd className="ltr-isolate w-5 h-5 inline-flex items-center justify-center rounded-md bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-mono text-[10px] font-extrabold border border-slate-300/90 dark:border-zinc-700 shadow-[0_1px_0_rgba(0,0,0,0.08)]">
+                        G
+                      </kbd>
+                      <span className="text-[11px] font-semibold text-slate-600 dark:text-zinc-300">
+                        {t.test.player.gridShortcut}
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile / Compact Tablet: Interactive Matrix Progress Pill */}
+              <button
+                type="button"
+                onClick={() => setShowMatrixModal(true)}
+                className={`md:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer apple-tap ${
+                  isExamMode
+                    ? 'bg-slate-800 border-slate-700 text-slate-200'
+                    : 'bg-slate-100/90 dark:bg-zinc-800/90 border-slate-200/80 dark:border-zinc-700 text-slate-700 dark:text-zinc-200'
+                }`}
+                title={t.test.matrix.title}
+              >
+                <LayoutGrid className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span className="ltr-isolate font-mono font-extrabold text-blue-600 dark:text-blue-400">
+                  {currentIndex + 1}
+                </span>
+                <span className="text-slate-400">/</span>
+                <span className="ltr-isolate font-mono text-slate-500 dark:text-zinc-400">
+                  {sessionQuestions.length}
+                </span>
+              </button>
+            </div>
+
+            {/* Right Slot: Finish Practice CTA + Next Action */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {!isLastQuestion && (
+                <button
+                  type="button"
+                  onClick={handleRequestFinish}
+                  data-testid="dock-finish-session-btn"
+                  title={isExamMode ? t.test.player.submitExam : t.test.player.finishPractice}
+                  className={`h-10 sm:h-11 px-3 sm:px-4 rounded-xl sm:rounded-full font-bold text-xs sm:text-sm flex items-center gap-1.5 border cursor-pointer transition-all apple-tap ${
+                    isExamMode
+                      ? 'bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border-emerald-700/60'
+                      : 'bg-emerald-50/90 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border-emerald-200/90 dark:border-emerald-800/70 shadow-2xs'
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <span className="hidden sm:inline">
+                    {isExamMode ? t.test.player.submitExam : t.test.player.finishPractice}
+                  </span>
+                  <span className="sm:hidden">
+                    {isExamMode ? t.common.submit : t.common.finish}
+                  </span>
+                </button>
+              )}
+
+              {isLastQuestion ? (
+                <button
+                  type="button"
+                  onClick={handleSubmitExam}
+                  data-testid="dock-primary-finish-btn"
+                  className={`h-10 sm:h-11 px-4 sm:px-6 rounded-xl sm:rounded-full font-extrabold text-xs sm:text-sm flex items-center gap-2 cursor-pointer shadow-lg transition-all apple-tap ${
+                    isExamMode
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/25'
+                      : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-500/25'
+                  }`}
+                >
+                  <span>{isExamMode ? t.test.player.submitExam : t.test.player.finishResults}</span>
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  className="h-10 sm:h-11 px-4 sm:px-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl sm:rounded-full font-bold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer shadow-md shadow-blue-500/25 transition-all apple-tap"
+                >
+                  <span>{t.common.next}</span>
+                  <ArrowRight className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${isRtl ? 'rotate-180' : ''}`} />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </main>
+
+      {/* Apple Confirmation Sheet when finishing early with unanswered questions */}
+      {showFinishModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xl"
+          onClick={() => setShowFinishModal(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="finish-session-modal-title"
+            className="w-full max-w-md glass-surface rounded-t-[28px] sm:rounded-3xl p-5 sm:p-6 shadow-2xl border border-white/80 dark:border-white/10 space-y-5 animate-sheet-slide-up sm:animate-spring-modal-in pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-zinc-700 rounded-full mx-auto -mt-1 sm:hidden" />
+
+            <div className="space-y-1.5 text-center sm:text-start">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold border border-emerald-500/30">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{isExamMode ? t.test.player.submitExam : t.test.player.finishPractice}</span>
+              </div>
+              <h2
+                id="finish-session-modal-title"
+                className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white tracking-tight font-heading"
+              >
+                {t.test.player.finishModalTitle}
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400">
+                {t.test.player.finishModalSubtitle}
+              </p>
+            </div>
+
+            {/* Session Telemetry Summary Counters */}
+            <div className="grid grid-cols-3 gap-2.5 text-center">
+              <div className="p-3 rounded-2xl bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/25">
+                <div className="text-lg sm:text-xl font-black text-emerald-700 dark:text-emerald-300 font-mono">
+                  {answeredCount}
+                </div>
+                <div className="text-[11px] font-semibold text-emerald-800/80 dark:text-emerald-400">
+                  {t.test.player.finishModalAnswered}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-100/80 dark:bg-zinc-800/80 border border-slate-200/80 dark:border-zinc-700/80">
+                <div className="text-lg sm:text-xl font-black text-slate-800 dark:text-zinc-100 font-mono">
+                  {unansweredCount}
+                </div>
+                <div className="text-[11px] font-semibold text-slate-500 dark:text-zinc-400">
+                  {t.test.player.finishModalUnanswered}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/25">
+                <div className="text-lg sm:text-xl font-black text-amber-700 dark:text-amber-300 font-mono">
+                  {flaggedCount}
+                </div>
+                <div className="text-[11px] font-semibold text-amber-800/80 dark:text-amber-400">
+                  {t.test.player.finishModalFlagged}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowFinishModal(false)}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs sm:text-sm font-bold transition-all cursor-pointer apple-tap"
+              >
+                {t.test.player.finishModalKeepPracticing}
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitExam}
+                data-testid="confirm-finish-session-btn"
+                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs sm:text-sm font-extrabold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/25 transition-all cursor-pointer apple-tap"
+              >
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{t.test.player.finishModalConfirm}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Full Question Matrix Modal (G shortcut) */}
       <QuestionMatrixModal
@@ -1090,6 +1501,7 @@ export const SessionPlayer: React.FC = () => {
           const targetQ = sessionQuestions[idx];
           setShowExplanation(!!(targetQ && answers[targetQ.id]));
         }}
+        onFinishSession={handleRequestFinish}
       />
 
       {/* AI Cognitive Co-Pilot Sliding Drawer */}
