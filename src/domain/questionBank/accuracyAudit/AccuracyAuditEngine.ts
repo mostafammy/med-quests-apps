@@ -343,6 +343,9 @@ export class AccuracyAuditEngine {
       'anthropic/claude-3.7-sonnet': 'Claude 3.7 Sonnet',
       'deepseek/deepseek-r1': 'DeepSeek R1',
       'nvidia/nemotron-3.5-lightning:free': 'Nemotron 3.5 Lightning',
+      'nvidia/nemotron-3-ultra-550b-a55b:free': 'Nemotron 3 Ultra 550B',
+      'nvidia/nemotron-3.5-super-vl:free': 'Nemotron 3.5 Super VL',
+      'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free': 'Nemotron 3 Nano Omni',
     };
     return map[modelId] || `${providerId.toUpperCase()} (${modelId})`;
   }
