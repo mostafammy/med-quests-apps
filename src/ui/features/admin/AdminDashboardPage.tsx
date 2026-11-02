@@ -27,7 +27,9 @@ import {
   ExternalLink,
   Sparkles,
   UploadCloud,
+  Activity,
 } from 'lucide-react';
+import { LiveEdgeObservabilityPortal } from './observability/LiveEdgeObservabilityPortal.tsx';
 import { QuestionBankGovernancePanel } from './QuestionBankGovernancePanel.tsx';
 import { AdminExportBankModal } from './AdminExportBankModal.tsx';
 import { AdminAccuracyAuditCenter } from './accuracyAudit/AdminAccuracyAuditCenter.tsx';
@@ -108,6 +110,7 @@ export const AdminDashboardPage: React.FC = () => {
     if (
       tab &&
       [
+        'cloud-observability',
         'network-telemetry',
         'cohort-analytics',
         'user-directory',
@@ -535,6 +538,12 @@ export const AdminDashboardPage: React.FC = () => {
           ...(isAdmin
             ? [
                 {
+                  id: 'cloud-observability' as const,
+                  label: 'Live Edge & Cohort Observability',
+                  icon: Activity,
+                  badge: 'Live 100% SLA',
+                },
+                {
                   id: 'network-telemetry' as const,
                   label: 'Live Edge Network, IPs & Security Forensics',
                   icon: Globe,
@@ -611,6 +620,13 @@ export const AdminDashboardPage: React.FC = () => {
           );
         })}
       </div>
+
+      {/* ========================================================= */}
+      {/* TAB PREMIER: LIVE CLOUDFLARE EDGE & COHORT OBSERVABILITY   */}
+      {/* ========================================================= */}
+      {activeGovernanceTab === 'cloud-observability' && (
+        <LiveEdgeObservabilityPortal />
+      )}
 
       {/* ========================================================= */}
       {/* TAB 0: LIVE EDGE NETWORK, IPS & SECURITY FORENSICS         */}
