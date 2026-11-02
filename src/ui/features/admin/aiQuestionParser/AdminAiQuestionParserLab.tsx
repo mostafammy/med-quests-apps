@@ -32,19 +32,21 @@ import {
   BookOpen,
   HelpCircle,
   X,
-  PlusCircle,
   Layers,
   ArrowRight,
   RotateCcw,
   Scale,
-  Clock,
-  Activity,
   Loader2,
   StopCircle,
+  Info,
 } from 'lucide-react';
 import { useAuthStore } from '../../../../application/stores/useAuthStore.ts';
 import { useAdminAiQuestionParserStore } from '../../../../application/stores/useAdminAiQuestionParserStore.ts';
 import { curriculumTaxonomyRegistry } from '../../../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
+import { AppleIntelligenceAgentOrchestrator } from './AppleIntelligenceAgentOrchestrator.tsx';
+import { DuplicateBadge } from '../../qdd/DuplicateBadge.tsx';
+import { DuplicateCompareSheet } from '../../qdd/DuplicateCompareSheet.tsx';
+import type { ParsedQuestionItem } from '../../../../domain/questionBank/aiQuestionParser/types.ts';
 import type { ChoiceId } from '../../../../domain/model/types.ts';
 import type { CloudProviderId } from '../../../../domain/ai/settings.ts';
 
@@ -78,6 +80,15 @@ const MODEL_OPTIONS: ModelOption[] = [
     description: 'Gold standard for complex multi-system vignettes and deep pathophysiological rationale generation.',
   },
   {
+    providerId: 'gemini',
+    modelId: 'gemini-3.5-flash-lite',
+    name: 'Gemini 3.5 Flash-Lite',
+    providerName: 'Google DeepMind',
+    badge: 'Sub-100ms Ultra-Fast',
+    speed: '< 80ms Instantaneous',
+    description: 'Next-generation lightweight Flash architecture for ultra-rapid parsing and real-time quorum validation.',
+  },
+  {
     providerId: 'groq',
     modelId: 'openai/gpt-oss-120b',
     name: 'Groq GPT-OSS 120B',
@@ -97,21 +108,21 @@ const MODEL_OPTIONS: ModelOption[] = [
   },
   {
     providerId: 'openrouter',
-    modelId: 'anthropic/claude-3.7-sonnet',
-    name: 'Claude 3.7 Sonnet',
-    providerName: 'OpenRouter (Anthropic)',
-    badge: 'Medical Benchmark Leader',
-    speed: 'Nuanced Reasoning',
-    description: 'Unmatched medical subtlety and psychometric distractor plausibility grading.',
+    modelId: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+    name: 'Nemotron 3 Ultra 550B',
+    providerName: 'OpenRouter (NVIDIA)',
+    badge: '550B Reasoning Beast',
+    speed: 'Live & Verified (~1.4s)',
+    description: 'Massive 550-billion parameter reasoning model with deep medical thinking tokens and board-caliber accuracy.',
   },
   {
     providerId: 'openrouter',
-    modelId: 'deepseek/deepseek-r1',
-    name: 'DeepSeek R1 Reasoning',
-    providerName: 'OpenRouter (DeepSeek)',
-    badge: 'Extended Thinking',
-    speed: 'High CoT Latency',
-    description: 'Deep counterfactual clinical reasoning traces with extensive pathophysiological exploration.',
+    modelId: 'nvidia/nemotron-3.5-super-vl:free',
+    name: 'Nemotron 3.5 Super VL',
+    providerName: 'OpenRouter (NVIDIA)',
+    badge: 'Clinical Reasoning Specialist',
+    speed: 'Live & Verified (~1.2s)',
+    description: 'High-speed reasoning model with deep pathophysiological logic and structured output.',
   },
 ];
 
@@ -172,6 +183,8 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     error,
     isCommitting,
     commitFeedback,
+    isCheckingDuplication,
+    saveAllUnique,
     parseRawQuestions,
     toggleQuestionSelection,
     selectAll,
@@ -187,6 +200,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     getBatchVerificationPrompt,
   } = useAdminAiQuestionParserStore();
 
+  const [inspectingQuestionItem, setInspectingQuestionItem] = useState<ParsedQuestionItem | null>(null);
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
   const [copiedBatchPrompt, setCopiedBatchPrompt] = useState(false);
   const [editingTempId, setEditingTempId] = useState<string | null>(null);
@@ -641,103 +655,16 @@ export const AdminAiQuestionParserLab: React.FC = () => {
           </div>
         </div>
 
-        {/* LIVE AGENT ACTIVITY & TOOL PIPELINE STEPPER */}
+        {/* APPLE INTELLIGENCE INTERACTIVE NEURAL ORCHESTRATOR */}
         {agentTelemetry && (
-          <div className="p-5 rounded-2xl border border-purple-500/25 bg-gradient-to-br from-purple-500/5 via-indigo-500/5 to-pink-500/5 dark:from-purple-950/20 dark:via-zinc-900/60 dark:to-zinc-950/60 backdrop-blur-xl shadow-md space-y-4 animate-in fade-in duration-200">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-purple-500/10 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                  <Activity className={`w-4 h-4 ${agentTelemetry.isRunning ? 'animate-pulse text-purple-600' : ''}`} />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                    <span>Active Agent Orchestration Telemetry</span>
-                    {agentTelemetry.isRunning ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">
-                        <Loader2 className="w-3 h-3 animate-spin" /> In Progress
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                        <CheckCircle2 className="w-3 h-3" /> Pipeline Completed
-                      </span>
-                    )}
-                  </h3>
-                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                    Executing ordered tool chain: tokenization, curriculum taxonomy, clinical reasoning, and multi-model consensus.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className="text-[11px] font-mono text-zinc-400 flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>{(agentTelemetry.elapsedMs / 1000).toFixed(1)}s elapsed</span>
-                </span>
-                {agentTelemetry.isRunning && (
-                  <button
-                    type="button"
-                    onClick={abortCurrentExecution}
-                    className="inline-flex items-center gap-1 px-3 py-1 rounded-xl text-xs font-semibold text-rose-600 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 hover:bg-rose-100 transition-all cursor-pointer"
-                  >
-                    <StopCircle className="w-3.5 h-3.5 text-rose-500" />
-                    <span>Cancel</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Stepper Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
-              {agentTelemetry.steps.map((step, stepIdx) => {
-                const isRunning = step.status === 'running';
-                const isDone = step.status === 'completed';
-                const isSkipped = step.status === 'skipped';
-                const isFailed = step.status === 'failed';
-
-                return (
-                  <div
-                    key={step.id}
-                    className={`p-3 rounded-xl border transition-all text-xs flex flex-col justify-between space-y-1.5 ${
-                      isRunning
-                        ? 'bg-purple-500/10 border-purple-500/40 shadow-xs ring-1 ring-purple-500/20'
-                        : isDone
-                        ? 'bg-white/80 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700/60'
-                        : isSkipped
-                        ? 'bg-zinc-100/50 dark:bg-zinc-800/20 border-zinc-200/40 dark:border-zinc-800/40 opacity-60'
-                        : isFailed
-                        ? 'bg-rose-500/10 border-rose-500/30'
-                        : 'bg-zinc-50 dark:bg-zinc-900/40 border-zinc-200/50 dark:border-zinc-800'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold font-mono text-zinc-400">
-                        0{stepIdx + 1}
-                      </span>
-                      {isRunning && <Loader2 className="w-3 h-3 text-purple-600 animate-spin" />}
-                      {isDone && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
-                      {isSkipped && <span className="text-[9px] text-zinc-400">Skipped</span>}
-                      {isFailed && <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />}
-                    </div>
-
-                    <div>
-                      <h4 className="text-[11px] font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
-                        {step.label}
-                      </h4>
-                      <p className="text-[10px] text-zinc-500 dark:text-zinc-400 line-clamp-2 mt-0.5">
-                        {step.detail || step.description}
-                      </p>
-                    </div>
-
-                    {step.durationMs !== undefined && (
-                      <span className="text-[9px] font-mono text-zinc-400">
-                        {step.durationMs}ms
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <AppleIntelligenceAgentOrchestrator
+            telemetry={agentTelemetry}
+            isParsing={isParsing}
+            onAbort={abortCurrentExecution}
+            activeModelName={activeModel.name}
+            stemMode={stemMode}
+            enableConsensusCheck={enableConsensusCheck}
+          />
         )}
 
         {error && (
@@ -795,6 +722,19 @@ export const AdminAiQuestionParserLab: React.FC = () => {
 
                 <button
                   type="button"
+                  onClick={() => saveAllUnique()}
+                  disabled={isCommitting || isCheckingDuplication || parsedQuestions.length === 0}
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Automatically skip all questions flagged as duplicates or conflicts and commit only unique items to the bank"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>
+                    {isCommitting ? 'Saving…' : 'Save all unique'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => commitToGlobalQuestionBank(true)}
                   disabled={isCommitting || selectedTempIds.size === 0}
                   className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -807,6 +747,46 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                   </span>
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* CURRICULUM AUTO-CLASSIFIER BATCH OVERVIEW DECK */}
+          <div className="p-4 rounded-2xl border border-purple-500/20 bg-gradient-to-r from-purple-500/10 via-indigo-500/5 to-cyan-500/10 backdrop-blur-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-purple-500/20">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-purple-900 dark:text-purple-200">
+                    Autonomous Curriculum Auto-Classifier Scope
+                  </h3>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-bold">
+                    100% Items Classified
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-600 dark:text-zinc-400 flex-wrap">
+                  <span>Target Block: <strong className="text-zinc-900 dark:text-zinc-100 font-semibold">{parsedQuestions[0]?.taxonomyClassification?.blockName || 'Cardiovascular System (CVS) - Block 206'}</strong></span>
+                  <span>•</span>
+                  <span>{parsedQuestions.length} Question(s) Grounded to Active Syllabus</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {Array.from(new Set(parsedQuestions.map((q) => q.question.subjectId))).map((subjId) => {
+                const count = parsedQuestions.filter((q) => q.question.subjectId === subjId).length;
+                const meta = SUBJECT_META[subjId] || { icon: '📚', badgeColor: 'bg-zinc-500/10 text-zinc-700' };
+                return (
+                  <span
+                    key={subjId}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-white/80 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 shadow-2xs"
+                  >
+                    <span>{meta.icon}</span>
+                    <span className="capitalize">{subjId}: {count}</span>
+                  </span>
+                );
+              })}
             </div>
           </div>
 
@@ -882,6 +862,13 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                         </span>
                       )}
 
+                      {/* QDD Duplication Status Badge */}
+                      <DuplicateBadge
+                        verdict={item.qddVerdict}
+                        isChecking={isCheckingDuplication || item.isCheckingDuplication}
+                        onInspect={() => setInspectingQuestionItem(item)}
+                      />
+
                       {/* Dynamic Curriculum Classification Breadcrumb */}
                       <div className="flex items-center gap-1.5">
                         <span
@@ -894,13 +881,6 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                         <span className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
                           {classification?.chapterName || item.question.chapterId}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setTaxonomyEditTempId(isTaxonomyEditing ? null : item.tempId)}
-                          className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline cursor-pointer ml-1"
-                        >
-                          {isTaxonomyEditing ? 'Done' : 'Change'}
-                        </button>
                       </div>
                     </div>
 
@@ -910,8 +890,8 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleCopySinglePrompt(idx, item.tempId)}
-                        title="Copy Verification Prompt for Cross-Testing with ChatGPT or Claude"
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-medium border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer shadow-xs"
+                        title="Copy Verification Prompt for Cross-Testing with ChatGPT or Claude (Includes Block, Subject, & Chapter Grounding)"
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-medium border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer shadow-xs"
                       >
                         {isPromptCopied ? (
                           <Check className="w-3.5 h-3.5 text-emerald-500" />
@@ -919,7 +899,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                           <Copy className="w-3.5 h-3.5 text-purple-500" />
                         )}
                         <span className="text-[11px] font-semibold">
-                          {isPromptCopied ? 'Copied Audit Prompt!' : 'Copy Verification Prompt'}
+                          {isPromptCopied ? 'Copied Prompt with Scope!' : 'Copy Verification Prompt'}
                         </span>
                       </button>
 
@@ -947,107 +927,178 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* PROPOSED CURRICULUM EXPANSION BANNER (GAP ANALYSIS) */}
-                  {classification?.isNewDomainSuggested && (
-                    <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-indigo-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
-                          <PlusCircle className="w-4 h-4" />
+                  {/* DEDICATED AUTONOMOUS CURRICULUM AUTO-CLASSIFIER RESULT LENS */}
+                  <div className="p-4 rounded-2xl border border-purple-500/25 bg-gradient-to-r from-purple-500/5 via-indigo-500/5 to-cyan-500/5 dark:from-purple-950/20 dark:via-zinc-900/40 dark:to-cyan-950/20 backdrop-blur-md space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-purple-200/50 dark:border-purple-800/40 pb-2.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-xs">
+                          <Sparkles className="w-3.5 h-3.5" />
                         </div>
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
+                          Autonomous Curriculum Auto-Classifier Result
+                        </span>
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                          {classification?.confidenceScore || 95}% Match Confidence
+                        </span>
+                        {classification?.isNewDomainSuggested && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 animate-pulse">
+                            Curriculum Gap Detected
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setTaxonomyEditTempId(isTaxonomyEditing ? null : item.tempId)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold text-purple-600 dark:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 transition-all cursor-pointer self-start sm:self-auto"
+                      >
+                        <Sliders className="w-3 h-3" />
+                        <span>{isTaxonomyEditing ? 'Close Re-Assignment' : 'Re-Assign Taxonomy'}</span>
+                      </button>
+                    </div>
+
+                    {/* 3-Pill Taxonomy Grid: Block, Subject, Chapter */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {/* 1. Target Block */}
+                      <div className="p-3 rounded-xl bg-white/90 dark:bg-zinc-800/90 border border-zinc-200/70 dark:border-zinc-700/60 shadow-2xs space-y-1">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                          <span>Target Block</span>
+                          <span className="text-xs">🫀</span>
+                        </div>
+                        <div
+                          className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate"
+                          title={classification?.blockName || 'Cardiovascular System (CVS) - Block 206'}
+                        >
+                          {classification?.blockName || 'Cardiovascular System (CVS) - Block 206'}
+                        </div>
+                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                          Integrated Organ System
+                        </div>
+                      </div>
+
+                      {/* 2. Target Subject */}
+                      <div className="p-3 rounded-xl bg-white/90 dark:bg-zinc-800/90 border border-zinc-200/70 dark:border-zinc-700/60 shadow-2xs space-y-1">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                          <span>Target Subject</span>
+                          <span className="text-xs">{subjectMeta.icon}</span>
+                        </div>
+                        <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate capitalize">
+                          {classification?.subjectName || item.question.subjectId}
+                        </div>
+                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                          Academic Discipline
+                        </div>
+                      </div>
+
+                      {/* 3. Target Chapter */}
+                      <div className="p-3 rounded-xl bg-white/90 dark:bg-zinc-800/90 border border-zinc-200/70 dark:border-zinc-700/60 shadow-2xs space-y-1">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                          <span>Target Chapter</span>
+                          <span className="text-xs">📖</span>
+                        </div>
+                        <div
+                          className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate"
+                          title={classification?.chapterName || item.question.chapterId}
+                        >
+                          {classification?.chapterName || item.question.chapterId}
+                        </div>
+                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                          Curriculum Syllabus Topic
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Classification Rationale callout */}
+                    {classification?.rationale && (
+                      <div className="flex items-start gap-2 text-xs text-zinc-600 dark:text-zinc-400 bg-white/60 dark:bg-zinc-800/60 p-2.5 rounded-xl border border-zinc-200/60 dark:border-zinc-700/50">
+                        <Info className="w-3.5 h-3.5 text-purple-500 shrink-0 mt-0.5" />
+                        <div className="leading-relaxed">
+                          <strong className="text-zinc-900 dark:text-zinc-200 font-semibold">Classification Evidence: </strong>
+                          {classification.rationale}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Curriculum Gap Action Banner if suggested */}
+                    {classification?.isNewDomainSuggested && (
+                      <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-amber-900 dark:text-amber-200">
+                        <div className="flex items-start gap-2.5 text-xs">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <div>
+                            <div className="font-bold">Proposed Curriculum Expansion</div>
+                            <div className="text-[11px] opacity-90">{classification.rationale}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {classification.newSubjectProposal && (
+                            <button
+                              type="button"
+                              onClick={() => handleApproveProposal(item.tempId, 'subject', classification.newSubjectProposal!.name)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 shadow-xs cursor-pointer transition-all"
+                            >
+                              <FolderPlus className="w-3.5 h-3.5" />
+                              <span>Approve Subject</span>
+                            </button>
+                          )}
+                          {classification.newChapterProposal && (
+                            <button
+                              type="button"
+                              onClick={() => handleApproveProposal(item.tempId, 'chapter', classification.newChapterProposal!.name)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow-xs cursor-pointer transition-all"
+                            >
+                              <Layers className="w-3.5 h-3.5" />
+                              <span>Approve Chapter</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Inline Re-assignment Drawer */}
+                    {isTaxonomyEditing && (
+                      <div className="p-3.5 rounded-xl bg-white dark:bg-zinc-800 border border-purple-300 dark:border-purple-700/80 shadow-xs grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in duration-200">
                         <div>
-                          <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                            <span>Proposed Curriculum Expansion</span>
-                            <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/15 px-2 py-0.2 rounded-full">
-                              Unmapped Domain Detected
-                            </span>
-                          </h4>
-                          <p className="text-[11px] text-zinc-600 dark:text-zinc-400 mt-0.5">
-                            {classification.rationale}
-                          </p>
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                            Reassign Subject
+                          </label>
+                          <select
+                            value={item.question.subjectId}
+                            onChange={(e) => {
+                              const newSub = e.target.value;
+                              const firstChap = curriculumTaxonomyRegistry.getChapters(newSub)[0]?.id || 'cvs-ana-heart-mediastinum';
+                              updateQuestionTaxonomy(idx, newSub, firstChap);
+                            }}
+                            className="w-full text-xs mt-1 p-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-850 font-medium"
+                          >
+                            {currentSubjects.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {SUBJECT_META[s.id]?.icon || '📚'} {s.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                            Reassign Chapter
+                          </label>
+                          <select
+                            value={item.question.chapterId}
+                            onChange={(e) => {
+                              updateQuestionTaxonomy(idx, item.question.subjectId, e.target.value);
+                            }}
+                            className="w-full text-xs mt-1 p-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-850 font-medium"
+                          >
+                            {curriculumTaxonomyRegistry.getChapters(item.question.subjectId).map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
-                        {classification.newSubjectProposal && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleApproveProposal(
-                                item.tempId,
-                                'subject',
-                                classification.newSubjectProposal!.name
-                              )
-                            }
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 shadow-xs cursor-pointer transition-all"
-                          >
-                            <FolderPlus className="w-3.5 h-3.5" />
-                            <span>Approve Subject: {classification.newSubjectProposal.name}</span>
-                          </button>
-                        )}
-                        {classification.newChapterProposal && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleApproveProposal(
-                                item.tempId,
-                                'chapter',
-                                classification.newChapterProposal!.name
-                              )
-                            }
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow-xs cursor-pointer transition-all"
-                          >
-                            <Layers className="w-3.5 h-3.5" />
-                            <span>Approve Chapter</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* INLINE TAXONOMY EDIT PANEL */}
-                  {isTaxonomyEditing && (
-                    <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                          Reassign Subject
-                        </label>
-                        <select
-                          value={item.question.subjectId}
-                          onChange={(e) => {
-                            const newSub = e.target.value;
-                            const firstChap = curriculumTaxonomyRegistry.getChapters(newSub)[0]?.id || 'cvs-ana-heart-mediastinum';
-                            updateQuestionTaxonomy(idx, newSub, firstChap);
-                          }}
-                          className="w-full text-xs mt-1 p-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium"
-                        >
-                          {currentSubjects.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {SUBJECT_META[s.id]?.icon || '📚'} {s.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                          Reassign Chapter
-                        </label>
-                        <select
-                          value={item.question.chapterId}
-                          onChange={(e) => {
-                            updateQuestionTaxonomy(idx, item.question.subjectId, e.target.value);
-                          }}
-                          className="w-full text-xs mt-1 p-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium"
-                        >
-                          {curriculumTaxonomyRegistry.getChapters(item.question.subjectId).map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* Question Stem */}
                   <div className="space-y-2">
@@ -1280,35 +1331,44 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                           {/* Individual Model Cards Grid */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-1">
                             {item.consensusSummary.modelVerdicts.map((v) => {
-                              const isConsensusWinner = v.selectedChoiceId === item.consensusSummary?.consensusChoiceId;
+                              const isSuccess = v.status === 'success';
+                              const isConsensusWinner = isSuccess && v.selectedChoiceId === item.consensusSummary?.consensusChoiceId;
                               return (
                                 <div
                                   key={v.modelId}
                                   className={`p-2.5 rounded-xl border text-xs flex flex-col justify-between space-y-1 ${
-                                    isConsensusWinner
+                                    !isSuccess
+                                      ? 'bg-rose-500/5 dark:bg-rose-950/20 border-rose-300 dark:border-rose-900/60 opacity-80'
+                                      : isConsensusWinner
                                       ? 'bg-white dark:bg-zinc-800/90 border-zinc-200 dark:border-zinc-700/80 shadow-2xs'
                                       : 'bg-amber-500/5 dark:bg-amber-950/20 border-amber-500/30'
                                   }`}
                                 >
-                                  <div className="flex items-center justify-between">
+                                  <div className="flex items-center justify-between gap-1">
                                     <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300 truncate max-w-[120px]">
                                       {v.modelName}
                                     </span>
-                                    <span
-                                      className={`px-1.5 py-0.2 rounded text-[10px] font-extrabold ${
-                                        isConsensusWinner
-                                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                                          : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                                      }`}
-                                    >
-                                      Key: ({v.selectedChoiceId.toUpperCase()})
-                                    </span>
+                                    {isSuccess ? (
+                                      <span
+                                        className={`px-1.5 py-0.2 rounded text-[10px] font-extrabold ${
+                                          isConsensusWinner
+                                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                        }`}
+                                      >
+                                        Key: ({v.selectedChoiceId.toUpperCase()})
+                                      </span>
+                                    ) : (
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25">
+                                        {v.status === 'timeout' ? 'Timed Out' : 'Offline / Failed'}
+                                      </span>
+                                    )}
                                   </div>
                                   <p className="text-[10px] text-zinc-500 dark:text-zinc-400 line-clamp-2">
                                     {v.clinicalRationale}
                                   </p>
                                   <div className="flex items-center justify-between text-[9px] text-zinc-400 pt-1 font-mono">
-                                    <span>Conf: {v.confidenceScore}%</span>
+                                    <span>{isSuccess ? `Conf: ${v.confidenceScore}%` : 'Unvoted'}</span>
                                     <span>{v.latencyMs}ms</span>
                                   </div>
                                 </div>
@@ -1441,6 +1501,16 @@ export const AdminAiQuestionParserLab: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* QDD Duplicate Comparison & Diff Sheet */}
+      {inspectingQuestionItem && (
+        <DuplicateCompareSheet
+          isOpen={true}
+          onClose={() => setInspectingQuestionItem(null)}
+          subjectQuestion={inspectingQuestionItem.question}
+          verdict={inspectingQuestionItem.qddVerdict}
+        />
       )}
     </div>
   );
