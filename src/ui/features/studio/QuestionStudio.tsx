@@ -18,6 +18,10 @@ import {
 } from 'lucide-react';
 import { StudioBankSyncDiffCenter } from './StudioBankSyncDiffCenter.tsx';
 import { ResetBankConfirmationModal } from '../questionBank/ResetBankConfirmationModal.tsx';
+import { useQddAdvisoryHint } from '../qdd/useQddAdvisoryHint.ts';
+import { DuplicateHint } from '../qdd/DuplicateHint.tsx';
+import { DuplicateCompareSheet } from '../qdd/DuplicateCompareSheet.tsx';
+import type { DuplicationVerdict } from '../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
 
 export const QuestionStudio: React.FC = () => {
   const {
@@ -45,6 +49,24 @@ export const QuestionStudio: React.FC = () => {
   const [showSubmissionsTracker, setShowSubmissionsTracker] = useState(false);
   const [showResetBankModal, setShowResetBankModal] = useState(false);
   const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
+  const [inspectingVerdict, setInspectingVerdict] = useState<DuplicationVerdict | null>(null);
+
+  // Extract candidate stem for instant advisory duplicate check
+  const candidateStem = React.useMemo(() => {
+    if (!jsonInput.trim()) return '';
+    const match = jsonInput.match(/"stem"\s*:\s*"([^"]{12,})"/);
+    if (match && match[1]) {
+      return match[1];
+    }
+    return jsonInput.trim();
+  }, [jsonInput]);
+
+  const { verdict: advisoryVerdict, dismissHint } = useQddAdvisoryHint({
+    stem: candidateStem,
+    blockId: 'cvs',
+    chapterId: selectedChapterId,
+    enabled: true,
+  });
 
   const activeSubject = CVS_TAXONOMY.subjects.find((s) => s.id === selectedSubjectId);
   const availableChapters = CVS_TAXONOMY.chapters.filter((c) => c.subjectId === selectedSubjectId);
@@ -371,6 +393,18 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
             className="w-full text-base sm:text-xs font-mono rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/70 dark:bg-zinc-800/70 backdrop-blur-md p-3.5 sm:p-4 text-slate-800 dark:text-zinc-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all"
           />
 
+          {/* QDD Inline Duplicate Advisory Hint */}
+          {advisoryVerdict && (
+            <DuplicateHint
+              verdict={advisoryVerdict}
+              onInspect={() => setInspectingVerdict(advisoryVerdict)}
+              onDismiss={dismissHint}
+              onMakeVariant={() => {
+                dismissHint();
+              }}
+            />
+          )}
+
           {/* Dual Action Controls */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Action A: Save to My Device Only */}
@@ -451,6 +485,49 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
           )}
         </div>
       </div>
+
+      {/* QDD Duplicate Side-by-Side Comparison Modal */}
+      {inspectingVerdict && (
+        <DuplicateCompareSheet
+          isOpen={true}
+          onClose={() => setInspectingVerdict(null)}
+          subjectQuestion={{
+            id: 'draft-q',
+            blockId: 'cvs',
+            subjectId: selectedSubjectId,
+            chapterId: selectedChapterId,
+            topicId: `${selectedChapterId}/draft`,
+            concept: 'Draft Concept',
+            type: 'single-best-answer',
+            stem: candidateStem,
+            choices: [
+              { id: 'a', text: 'Option A', isCorrect: true, rationale: 'Option A' },
+              { id: 'b', text: 'Option B', isCorrect: false, rationale: 'Option B' },
+              { id: 'c', text: 'Option C', isCorrect: false, rationale: 'Option C' },
+              { id: 'd', text: 'Option D', isCorrect: false, rationale: 'Option D' },
+            ],
+            explanation: 'Draft explanation',
+            examTip: null,
+            mnemonic: null,
+            difficulty: 2,
+            cognitiveLevel: 'understanding',
+            highYield: true,
+            origin: 'authored-grounded',
+            evidence: [
+              {
+                chunkId: 'chk-draft',
+                sourceName: 'Draft Evidence',
+                location: 'Draft',
+                quote: 'Draft quote citation.',
+                kind: 'text',
+              },
+            ],
+            status: 'active',
+            bankVersion: 1,
+          }}
+          verdict={inspectingVerdict}
+        />
+      )}
     </div>
   );
 };
