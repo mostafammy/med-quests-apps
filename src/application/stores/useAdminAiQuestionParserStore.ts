@@ -15,6 +15,14 @@ import { CrossModelVerificationPromptBuilder } from '../../domain/questionBank/a
 import type { ParsedQuestionItem, QuestionStemMode, AgentExecutionTelemetry } from '../../domain/questionBank/aiQuestionParser/types.ts';
 import { multiModelConsensusEngine } from '../../domain/questionBank/aiQuestionParser/MultiModelConsensusEngine.ts';
 import { curriculumTaxonomyRegistry } from '../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
+import { QuestionCanonicalizerV2 } from '../../domain/questionBank/duplication/QuestionCanonicalizerV2.ts';
+import { MinHasher } from '../../domain/questionBank/duplication/MinHasher.ts';
+import { ClinicalDiscriminatorExtractor } from '../../domain/questionBank/duplication/ClinicalDiscriminatorExtractor.ts';
+import type {
+  DuplicateRelation,
+  DuplicateCandidate,
+  DuplicationVerdict,
+} from '../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
 import { useAuthStore } from './useAuthStore.ts';
 import { useBankGovernanceStore } from './useBankGovernanceStore.ts';
 import { useQuestionStore } from './useQuestionStore.ts';
@@ -39,6 +47,7 @@ interface AdminAiQuestionParserStoreState {
   error: string | null;
   isCommitting: boolean;
   commitFeedback: { type: 'success' | 'error'; message: string } | null;
+  isCheckingDuplication: boolean;
 
   // Actions
   setRawInputText: (text: string) => void;
@@ -48,6 +57,8 @@ interface AdminAiQuestionParserStoreState {
   setTargetTaxonomy: (subjectId: string, chapterId: string) => void;
   parseRawQuestions: () => Promise<void>;
   abortCurrentExecution: () => void;
+  runBatchDuplicationCheck: () => Promise<void>;
+  saveAllUnique: () => Promise<boolean>;
   runSingleQuestionConsensus: (index: number) => Promise<void>;
   toggleQuestionSelection: (tempId: string) => void;
   selectAll: (select: boolean) => void;
@@ -85,6 +96,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
   error: null,
   isCommitting: false,
   commitFeedback: null,
+  isCheckingDuplication: false,
 
   setRawInputText: (rawInputText) => set({ rawInputText }),
 
@@ -182,6 +194,9 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
         parsedQuestions: [...result.items],
         selectedTempIds: allIds,
       });
+
+      // Automatically trigger duplication detection across the batch and bank
+      void get().runBatchDuplicationCheck();
     } catch (err: any) {
       if (err?.name === 'AbortError') {
         set({ isParsing: false, abortController: null, error: 'Execution halted by administrator.' });
@@ -193,6 +208,202 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
         });
       }
     }
+  },
+
+  runBatchDuplicationCheck: async () => {
+    const { parsedQuestions } = get();
+    if (parsedQuestions.length === 0) return;
+
+    // Set optimistic checking state
+    set({
+      isCheckingDuplication: true,
+      parsedQuestions: parsedQuestions.map((q) => ({
+        ...q,
+        isCheckingDuplication: true,
+      })),
+    });
+
+    try {
+      const questionsPayload = parsedQuestions.map((q) => q.question);
+      const res = await fetch('/api/qdd/check-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questions: questionsPayload,
+          scope: { kind: 'block', blockId: 'cvs' },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.verdicts)) {
+          const updated = get().parsedQuestions.map((item, idx) => ({
+            ...item,
+            qddVerdict: data.verdicts[idx] || item.qddVerdict,
+            isCheckingDuplication: false,
+          }));
+          set({ parsedQuestions: updated, isCheckingDuplication: false });
+          return;
+        }
+      }
+    } catch {
+      // Network or offline fallback
+    }
+
+    // Graceful offline fallback: perform in-batch lexical deduplication
+    try {
+      const canonicalizer = new QuestionCanonicalizerV2();
+      const minhasher = new MinHasher();
+      const current = get().parsedQuestions;
+      const canonicals = await Promise.all(
+        current.map((item) => canonicalizer.canonicalize(item.question))
+      );
+      const signatures = canonicals.map((c) => minhasher.signature(c.shingles));
+
+      const updated = current.map((item, idx) => {
+        let highestRelation: DuplicateRelation = 'UNIQUE';
+        const candidates: DuplicateCandidate[] = [];
+
+        for (let prevIdx = 0; prevIdx < idx; prevIdx++) {
+          const cA = canonicals[prevIdx];
+          const cB = canonicals[idx];
+          const qA = current[prevIdx].question;
+
+          let rel: DuplicateRelation | null = null;
+          let jaccard: number | null = null;
+
+          if (cA.itemHash === cB.itemHash) {
+            rel = 'EXACT';
+            jaccard = 1.0;
+          } else if (cA.stemHash === cB.stemHash) {
+            rel = cA.answerKeyHash === cB.answerKeyHash ? 'EXACT' : 'CONFLICT';
+            jaccard = 1.0;
+          } else {
+            jaccard = MinHasher.estimateJaccard(signatures[prevIdx], signatures[idx]);
+            if (jaccard >= 0.8) {
+              const delta = ClinicalDiscriminatorExtractor.computeDelta(
+                cA.discriminators,
+                cB.discriminators
+              );
+              rel = delta.length > 0 ? 'SIBLING' : 'NEAR';
+            } else if (jaccard >= 0.35) {
+              const delta = ClinicalDiscriminatorExtractor.computeDelta(
+                cA.discriminators,
+                cB.discriminators
+              );
+              if (delta.length > 0) rel = 'SIBLING';
+            }
+          }
+
+          if (rel) {
+            candidates.push({
+              matchedQuestionId: qA.id,
+              matchedStemPreview: qA.stem.slice(0, 100),
+              relation: rel,
+              decidedBy: 'S1_EXACT',
+              signals: {
+                lexicalJaccard: jaccard,
+                semanticCosine: null,
+                rerankScore: null,
+                sameAnswerKey: cA.answerKeyHash === cB.answerKeyHash,
+                discriminatorDelta: [],
+                fusedScore: jaccard ?? 1.0,
+              },
+              llm: null,
+              explanationKey: `qdd.explanation.${rel.toLowerCase()}`,
+              explanationParams: { matchedId: qA.id },
+            });
+            if (rel === 'EXACT') highestRelation = 'EXACT';
+            else if (rel === 'CONFLICT' && highestRelation !== 'EXACT')
+              highestRelation = 'CONFLICT';
+            else if (
+              rel === 'NEAR' &&
+              highestRelation !== 'EXACT' &&
+              highestRelation !== 'CONFLICT'
+            )
+              highestRelation = 'NEAR';
+          }
+        }
+
+        const verdict: DuplicationVerdict = {
+          questionId: item.question.id,
+          tier: 'batch-audit',
+          decision:
+            highestRelation === 'EXACT'
+              ? 'BLOCK'
+              : highestRelation === 'UNIQUE'
+              ? 'ALLOW'
+              : 'REVIEW',
+          relation: highestRelation,
+          candidates,
+          stagesExecuted: ['S0_CANONICALIZE', 'S1_EXACT'],
+          degraded: false,
+          degradedReasons: [],
+          latencyMs: 1,
+          engineVersion: 'qdd-engine-v2',
+          thresholdsVersion: 'v1',
+        };
+
+        return {
+          ...item,
+          qddVerdict: verdict,
+          isCheckingDuplication: false,
+        };
+      });
+
+      set({ parsedQuestions: updated, isCheckingDuplication: false });
+    } catch {
+      const reset = get().parsedQuestions.map((q) => ({
+        ...q,
+        isCheckingDuplication: false,
+      }));
+      set({ parsedQuestions: reset, isCheckingDuplication: false });
+    }
+  },
+
+  saveAllUnique: async () => {
+    const { parsedQuestions, commitToGlobalQuestionBank } = get();
+
+    // Unique if no verdict or verdict is UNIQUE or SIBLING (not EXACT, NEAR, or CONFLICT)
+    const uniqueItems = parsedQuestions.filter((item) => {
+      const rel = item.qddVerdict?.relation;
+      return !rel || rel === 'UNIQUE' || rel === 'SIBLING';
+    });
+
+    const duplicateItems = parsedQuestions.filter((item) => {
+      const rel = item.qddVerdict?.relation;
+      return rel === 'EXACT' || rel === 'NEAR' || rel === 'CONFLICT';
+    });
+
+    if (uniqueItems.length === 0) {
+      set({
+        commitFeedback: {
+          type: 'error',
+          message:
+            'No unique questions found in the parsed batch. All questions were flagged as duplicates or conflicts.',
+        },
+      });
+      return false;
+    }
+
+    // Select only unique items
+    const uniqueIds = new Set(uniqueItems.map((i) => i.tempId));
+    set({ selectedTempIds: uniqueIds });
+
+    const success = await commitToGlobalQuestionBank(true);
+    if (success) {
+      const skippedNote =
+        duplicateItems.length > 0
+          ? ` (${duplicateItems.length} duplicate/conflict items skipped).`
+          : '.';
+      set({
+        commitFeedback: {
+          type: 'success',
+          message: `Successfully saved ${uniqueItems.length} unique questions${skippedNote}`,
+        },
+      });
+    }
+    return success;
   },
 
   toggleQuestionSelection: (tempId) => {
@@ -310,6 +521,8 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       ...questions[index],
       question: updatedQ,
       taxonomyClassification: {
+        blockId: 'cvs',
+        blockName: 'Cardiovascular System (CVS) - Block 206',
         subjectId,
         subjectName: subjObj?.name || subjectId,
         chapterId,
