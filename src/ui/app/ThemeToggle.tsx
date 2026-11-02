@@ -105,7 +105,7 @@ export const ThemeToggle: React.FC = () => {
       <div
         role="menu"
         aria-orientation="vertical"
-        className={`absolute right-0 top-full mt-2 w-52 rounded-2xl glass-surface p-1.5 shadow-2xl border border-white/90 dark:border-zinc-700/80 backdrop-blur-2xl z-50 origin-top-right transition-all duration-200 ease-out ${
+        className={`absolute end-0 top-full mt-2 w-52 max-w-[calc(100vw-1.5rem)] rounded-2xl glass-surface p-1.5 shadow-2xl border border-white/90 dark:border-zinc-700/80 backdrop-blur-2xl z-50 origin-top-right rtl:origin-top-left transition-all duration-200 ease-out ${
           isOpen
             ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
