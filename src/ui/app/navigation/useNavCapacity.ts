@@ -5,13 +5,16 @@ import { useState, useEffect } from 'react';
  * based on viewport width and Apple Human Interface Guidelines spacing rules.
  */
 function getCapacityForWidth(width: number): number {
-  if (width >= 1240) {
-    return 6; // Ample width: All 6 items visible
+  if (width >= 1440) {
+    return 6; // Wide desktop: All 6 items visible
   }
-  if (width >= 980) {
-    return 5; // Laptop / tablet landscape: 4 visible + 1 'More' pill
+  if (width >= 1220) {
+    return 5; // MacBook Air 13" (1280px) & standard laptops: 5 slots
   }
-  return 4; // Compact tablet / split view: 3 visible + 1 'More' pill
+  if (width >= 960) {
+    return 4; // Compact laptop / tablet landscape: 3 visible + 1 'More' pill
+  }
+  return 3; // Tablet portrait / split view (768px-959px): 2 visible + 1 'More' pill
 }
 
 export function useNavCapacity(): number {
