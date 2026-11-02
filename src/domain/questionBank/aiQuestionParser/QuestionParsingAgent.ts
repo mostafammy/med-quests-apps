@@ -93,7 +93,7 @@ export class QuestionParsingAgent {
     const initialClassification = curriculumClassificationAgent.classify(firstBlockSnippet);
     telemetry = this.updateTelemetryStep(telemetry, 'taxonomy', 'completed', {
       durationMs: Date.now() - taxStartTime,
-      detail: `Targeted ${initialClassification.subjectName} ❯ ${initialClassification.chapterName} (Confidence: ${initialClassification.confidenceScore}%)${
+      detail: `Mapped to [${initialClassification.blockName}] ❯ ${initialClassification.subjectName} ❯ ${initialClassification.chapterName} (${initialClassification.confidenceScore}% Confidence)${
         initialClassification.isNewDomainSuggested ? ' [Curriculum Gap Detected]' : ''
       }`,
     });
