@@ -23,6 +23,8 @@ export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { questions } = useQuestionStore();
   const { t, isRtl } = useLocaleStore();
+  const stats = useStatsStore();
+  const currentStats = typeof window === 'undefined' ? useStatsStore.getState() : stats;
   const { 
     totalAttempts, 
     overallAccuracy, 
@@ -38,7 +40,7 @@ export const Dashboard: React.FC = () => {
     confidenceCalibration,
     refreshStats,
     resetStats
-  } = useStatsStore();
+  } = currentStats;
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showResetBankModal, setShowResetBankModal] = useState(false);
@@ -46,6 +48,35 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     refreshStats(questions);
+
+    const handleRevalidate = () => {
+      refreshStats(questions);
+    };
+
+    window.addEventListener('focus', handleRevalidate);
+    window.addEventListener('pageshow', handleRevalidate);
+    window.addEventListener('medquests:telemetry-updated', handleRevalidate);
+
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc = new BroadcastChannel('medquests_study_telemetry');
+        bc.onmessage = () => {
+          refreshStats(questions);
+        };
+      } catch {
+        // Fallback for non-supporting environments
+      }
+    }
+
+    return () => {
+      window.removeEventListener('focus', handleRevalidate);
+      window.removeEventListener('pageshow', handleRevalidate);
+      window.removeEventListener('medquests:telemetry-updated', handleRevalidate);
+      if (bc) {
+        bc.close();
+      }
+    };
   }, [questions, refreshStats]);
 
   const handleResetConfirm = async () => {
@@ -62,8 +93,8 @@ export const Dashboard: React.FC = () => {
         {/* Subtle Ambient Color Splash */}
         <div className="pointer-events-none absolute -right-16 -top-16 w-80 h-80 bg-gradient-to-br from-blue-500/20 via-indigo-500/15 to-purple-500/10 rounded-full blur-3xl -z-10" />
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-5">
-          <div className="space-y-1.5">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 sm:gap-5">
+          <div className="space-y-1.5 min-w-0">
             <div className="flex items-center space-x-2">
               <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-500/15 dark:bg-blue-400/15 px-2.5 py-0.5 rounded-full border border-blue-400/30 backdrop-blur-md">
                 {t.dashboard.badgeExamPrep}
@@ -85,40 +116,40 @@ export const Dashboard: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-2.5 w-full xl:w-auto shrink-0">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setShowResetBankModal(true)}
-                className="py-2.5 px-3 glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-rose-600 dark:hover:text-rose-400 rounded-2xl text-xs font-bold flex items-center justify-center space-x-1.5 cursor-pointer apple-tap flex-1 sm:flex-none border hover:border-rose-300 dark:hover:border-rose-800 transition-all"
+                className="py-2.5 px-3 glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-rose-600 dark:hover:text-rose-400 rounded-2xl text-xs font-bold flex items-center justify-center space-x-1.5 cursor-pointer apple-tap flex-1 sm:flex-none whitespace-nowrap shrink-0 border hover:border-rose-300 dark:hover:border-rose-800 transition-all"
                 title={t.bank.resetToGlobalBtn}
               >
-                <RotateCcw className="w-3.5 h-3.5 text-rose-500" />
+                <RotateCcw className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                 <span className="hidden sm:inline">{t.bank.resetToGlobalBtn}</span>
               </button>
               <button
                 type="button"
                 onClick={() => setShowResetConfirm(true)}
-                className="py-2.5 px-3 glass-pill-luxury text-slate-600 dark:text-zinc-400 hover:text-amber-600 dark:hover:text-amber-400 rounded-2xl text-xs font-bold flex items-center justify-center space-x-1.5 cursor-pointer apple-tap flex-1 sm:flex-none"
+                className="py-2.5 px-3 glass-pill-luxury text-slate-600 dark:text-zinc-400 hover:text-amber-600 dark:hover:text-amber-400 rounded-2xl text-xs font-bold flex items-center justify-center space-x-1.5 cursor-pointer apple-tap flex-1 sm:flex-none whitespace-nowrap shrink-0"
                 title={t.dashboard.resetModalDesc}
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-3.5 h-3.5 shrink-0" />
                 <span>{t.dashboard.resetBtn}</span>
               </button>
               <button
                 type="button"
                 onClick={() => navigate('/test/mock')}
-                className="py-2.5 px-4 bg-gradient-to-r from-slate-900 to-indigo-950 dark:from-zinc-800 dark:to-zinc-900 hover:from-slate-800 hover:to-indigo-900 text-white rounded-2xl text-xs sm:text-sm font-bold border border-indigo-500/30 dark:border-indigo-500/20 backdrop-blur-md shadow-md shadow-indigo-950/20 transition-all cursor-pointer flex items-center justify-center space-x-1.5 apple-tap flex-1 sm:flex-none"
+                className="py-2.5 px-4 bg-gradient-to-r from-slate-900 to-indigo-950 dark:from-zinc-800 dark:to-zinc-900 hover:from-slate-800 hover:to-indigo-900 text-white rounded-2xl text-xs sm:text-sm font-bold border border-indigo-500/30 dark:border-indigo-500/20 backdrop-blur-md shadow-md shadow-indigo-950/20 transition-all cursor-pointer flex items-center justify-center space-x-1.5 apple-tap flex-1 sm:flex-none whitespace-nowrap shrink-0"
               >
-                <Clock className="w-4 h-4 text-amber-400" />
+                <Clock className="w-4 h-4 text-amber-400 shrink-0" />
                 <span>{t.dashboard.mockExamBtn}</span>
               </button>
             </div>
             <button
               onClick={() => navigate('/test/quick')}
-              className="shimmer-active py-2.5 px-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl text-xs sm:text-sm font-extrabold flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/25 transition-all cursor-pointer apple-tap w-full sm:w-auto"
+              className="shimmer-active py-2.5 px-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl text-xs sm:text-sm font-extrabold flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/25 transition-all cursor-pointer apple-tap w-full sm:w-auto whitespace-nowrap shrink-0"
             >
-              <Play className="w-4 h-4 fill-current text-white" />
+              <Play className="w-4 h-4 fill-current text-white shrink-0" />
               <span>{totalAttempts > 0 ? t.dashboard.continuePractice : t.dashboard.startPractice}</span>
             </button>
           </div>
@@ -645,7 +676,11 @@ export const Dashboard: React.FC = () => {
                     onClick={() => navigate(`/test?subject=${subj.id}`)}
                     className={`${subj.btnClass} font-bold hover:underline cursor-pointer flex items-center space-x-1`}
                   >
-                    <span>{t.dashboard.startPractice} →</span>
+                    <span>
+                      {stat && stat.answeredCount > 0
+                        ? `${t.dashboard.continuePractice} →`
+                        : `${t.dashboard.startPractice} →`}
+                    </span>
                   </button>
                 </div>
               </div>
