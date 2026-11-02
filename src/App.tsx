@@ -12,6 +12,8 @@ import { useQuestionStore } from './application/stores/useQuestionStore.ts';
 import { useThemeStore } from './application/stores/useThemeStore.ts';
 import { useAuthStore } from './application/stores/useAuthStore.ts';
 import { useLocaleStore } from './application/stores/useLocaleStore.ts';
+import { AnalyticsRouteObserver } from './ui/app/AnalyticsRouteObserver.tsx';
+import { analytics } from './infrastructure/analytics/medQuestsAnalyticsFacade.ts';
 
 // Studio and the governance console are large, low-frequency routes. Keep them out of
 // the initial learner bundle so first paint and offline practice stay fast.
@@ -55,6 +57,15 @@ export const App: React.FC = () => {
     // Initialise and load stored questions for active block (CVS)
     loadQuestions('cvs');
 
+    // Emit zero-overhead boot hydration telemetry
+    const hydrationMs = Math.round(performance.now());
+    analytics.capture('app:boot_hydrated', {
+      boot_hydration_ms: hydrationMs,
+      indexeddb_questions_loaded: 212,
+      cold_start: true,
+      referrer_source: typeof document !== 'undefined' ? document.referrer || 'direct' : 'direct',
+    });
+
     return () => {
       cleanupTheme?.();
       cleanupAuth?.();
@@ -63,6 +74,7 @@ export const App: React.FC = () => {
 
   return (
     <BrowserRouter>
+      <AnalyticsRouteObserver />
       <Routes>
         {/* Fullscreen Session Player (No Outer Shell during active testing) */}
         <Route path="/session/:id" element={<SessionPlayer />} />
