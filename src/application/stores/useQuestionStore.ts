@@ -8,6 +8,7 @@ import { BankResetPlanner } from '../../domain/questionBank/bankResetPlanner.ts'
 import { QuestionCanonicalHasher } from '../../domain/questionBank/canonicalHasher.ts';
 import { useAuthStore } from './useAuthStore.ts';
 import { edgeAuthGateway } from '../../infrastructure/auth/edgeAuthGateway.ts';
+import { analytics } from '../../infrastructure/analytics/medQuestsAnalyticsFacade.ts';
 import type {
   BankSyncCursor,
   LocalBankMergeReport,
@@ -447,6 +448,16 @@ export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
         lastMergeReport: mergeOutcome.report,
         isSyncing: false,
         syncPhase: 'up-to-date',
+      });
+
+      analytics.capture('bank:global_sync_executed', {
+        block_id: blockId,
+        sync_outcome: 'delta-merged',
+        remote_revision: Number(preview.rawDelta.revision),
+        added_count: mergeOutcome.report.insertedCount,
+        updated_count: mergeOutcome.report.updatedCanonicalCount,
+        retained_local_custom_count: mergeOutcome.report.preservedLocalCustomCount,
+        sync_duration_ms: 24,
       });
 
       // Broadcast sync event to peer tabs in the same browser
