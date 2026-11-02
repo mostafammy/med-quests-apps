@@ -55,7 +55,7 @@ export const IdentityStatusPill: React.FC = () => {
       </span>
 
       {/* User Display Name (Authenticated) or Sign In Prompt (Guest) */}
-      <span className="hidden items-center text-[11px] font-medium text-zinc-700 dark:text-zinc-300 sm:flex max-w-[120px] truncate">
+      <span className="hidden items-center text-[11px] font-medium text-zinc-700 dark:text-zinc-300 2xl:flex max-w-[110px] truncate">
         {isGuest ? 'Sign In' : displayName}
       </span>
     </button>
