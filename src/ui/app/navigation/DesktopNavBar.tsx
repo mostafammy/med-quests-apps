@@ -171,7 +171,7 @@ export const DesktopNavBar: React.FC<DesktopNavBarProps> = ({ isAdmin, t }) => {
             key={item.id}
             to={item.path}
             end={item.exact}
-            className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse transition-all duration-200 apple-tap ${
+            className={`px-2.5 lg:px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse whitespace-nowrap shrink-0 transition-all duration-200 apple-tap ${
               isActive ? activeStyle : inactiveStyle
             }`}
           >
