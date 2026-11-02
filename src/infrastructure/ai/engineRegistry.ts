@@ -224,7 +224,7 @@ export function createCloudProvider(
       }
     }
     if (!key) return null;
-    return new OpenRouterProvider(key, modelId || 'anthropic/claude-3.7-sonnet');
+    return new OpenRouterProvider(key, modelId || 'nvidia/nemotron-3.5-super-vl:free');
   }
 
   return null;
