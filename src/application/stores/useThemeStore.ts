@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { analytics } from '../../infrastructure/analytics/medQuestsAnalyticsFacade.ts';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
@@ -39,9 +40,16 @@ export const useThemeStore = create<ThemeState>((set, get) => {
     preference: storedPref,
     resolvedTheme: initialResolved,
     setTheme: (preference: ThemePreference) => {
+      const prev = get().preference;
       try {
         localStorage.setItem('mq_theme', preference);
       } catch (_) {}
+
+      analytics.capture('ux:preference_changed', {
+        preference_type: 'theme',
+        previous_value: prev,
+        next_value: preference,
+      });
 
       const resolved = preference === 'system' ? getSystemTheme() : preference;
       applyDocumentTheme(resolved);
