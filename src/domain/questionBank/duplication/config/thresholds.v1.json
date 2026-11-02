@@ -1,0 +1,10 @@
+{
+  "version": "v1",
+  "lexicalCandidateMin": 0.35,
+  "semanticCandidateMin": 0.72,
+  "nearAutoMin": 0.88,
+  "uniqueAutoMax": 0.60,
+  "conflictMin": 0.75,
+  "llmMinConfidence": 0.80,
+  "maxCandidatesPerStage": 10
+}

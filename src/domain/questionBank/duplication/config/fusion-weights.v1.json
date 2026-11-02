@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "bias": -3.5,
+  "weights": {
+    "jaccard": 3.8,
+    "cosine": 4.5,
+    "rerank": 2.2,
+    "sameAnswerKey": 2.5,
+    "sameTopic": 0.8,
+    "lengthRatio": 1.2,
+    "discriminatorDelta": -5.0
+  }
+}
