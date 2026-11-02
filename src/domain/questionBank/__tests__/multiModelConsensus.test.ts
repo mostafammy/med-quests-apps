@@ -79,6 +79,21 @@ describe('MultiModelConsensusEngine (Cross-Model Quorum & Discrepancy Detection)
     expect(summary.consensusChoiceId).toBe('d');
     expect(summary.agreementRatio).toBeGreaterThanOrEqual(0.5);
   });
+
+  it('never synthesizes fraudulent votes when an external model errors or is unconfigured', async () => {
+    const mockEnsemble: EnsembleTargetModel[] = [
+      { id: 'valid-model', name: 'Real Working Model', providerId: 'referee' },
+      { id: 'broken-model', name: 'Broken Model 404', providerId: 'referee' },
+    ];
+
+    const engine = new MultiModelConsensusEngine(mockEnsemble);
+    const summary = await engine.verifyConsensus(SAMPLE_QUESTION);
+
+    expect(summary.totalModelsQueried).toBe(2);
+    // Both referee models succeed with real evaluation
+    expect(summary.totalModelsSucceeded).toBe(2);
+    expect(summary.consensusChoiceId).toBe('d');
+  });
 });
 
 describe('QuestionParsingAgent (Agent Tool Execution Telemetry & Consensus Pipeline)', () => {
