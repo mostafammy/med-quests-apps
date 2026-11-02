@@ -33,10 +33,10 @@ export const CopilotTriggerButton: React.FC = () => {
         <span className="absolute -inset-1 rounded-full bg-indigo-400/30 blur-xs -z-10 animate-pulse opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
 
-      <span className="tracking-tight font-extrabold hidden sm:inline">{t.copilot.title}</span>
+      <span className="tracking-tight font-extrabold hidden xl:inline">{t.copilot.title}</span>
 
       <span
-        className={`hidden sm:inline-block font-mono text-[10px] font-black px-1.5 py-0.2 rounded-md ${
+        className={`hidden 2xl:inline-block font-mono text-[10px] font-black px-1.5 py-0.2 rounded-md ${
           isOpen
             ? 'bg-white/20 text-white'
             : 'bg-slate-100 dark:bg-zinc-700 text-slate-500 dark:text-zinc-400'
