@@ -70,6 +70,31 @@ export interface StudioSubmissionRecord {
   reviewerNotes: string | null;
 }
 
+export interface TelemetryOutboxRecord {
+  eventId: string;
+  eventName: string;
+  envelopeJson: string;
+  timestampIso: string;
+  retryCount: number;
+}
+
+export interface QuestionFingerprintRecord {
+  questionId: string;
+  blockId: string;
+  chapterId: string;
+  normalizerVersion: string;
+  stemHash: string;
+  itemHash: string;
+  answerKeyHash: string;
+  minhash: Uint32Array | number[];
+  lshBands: string[];
+  discriminators: any[];
+  embeddingModel: string | null;
+  embeddedAt: string | null;
+  contentVersion: number;
+  updatedAt: string;
+}
+
 class MedQuestsDB extends Dexie {
   questions!: EntityTable<Question, 'id'>;
   attempts!: EntityTable<Attempt, 'id'>;
@@ -83,6 +108,8 @@ class MedQuestsDB extends Dexie {
   bankSyncMeta!: EntityTable<BankSyncMetaRecord, 'blockId'>;
   studioSubmissions!: EntityTable<StudioSubmissionRecord, 'ticketId'>;
   aiModelMetrics!: EntityTable<AiModelMetricRecord, 'id'>;
+  telemetryOutbox!: EntityTable<TelemetryOutboxRecord, 'eventId'>;
+  questionFingerprints!: EntityTable<QuestionFingerprintRecord, 'questionId'>;
 
   constructor() {
     super('MedQuestsDB');
@@ -115,6 +142,14 @@ class MedQuestsDB extends Dexie {
 
     this.version(6).stores({
       aiModelMetrics: 'id, providerId, modelId, latencyMs, timestamp, status',
+    });
+
+    this.version(7).stores({
+      telemetryOutbox: 'eventId, timestampIso',
+    });
+
+    this.version(8).stores({
+      questionFingerprints: 'questionId, blockId, chapterId, stemHash, itemHash, answerKeyHash, contentVersion',
     });
   }
 }
