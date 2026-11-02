@@ -70,7 +70,7 @@ export const Shell: React.FC = () => {
               <span className="font-extrabold text-slate-900 dark:text-zinc-50 tracking-tight text-base sm:text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                 Med Quests
               </span>
-              <span className="hidden xl:inline-block ml-2 rtl:ml-0 rtl:mr-2 text-[10px] uppercase tracking-wider font-extrabold bg-blue-500/10 dark:bg-blue-400/10 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-full border border-blue-400/20 backdrop-blur-md">
+              <span className="hidden 2xl:inline-block ml-2 rtl:ml-0 rtl:mr-2 text-[10px] uppercase tracking-wider font-extrabold bg-blue-500/10 dark:bg-blue-400/10 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 rounded-full border border-blue-400/20 backdrop-blur-md">
                 {t.common.examPrepBadge}
               </span>
             </div>
@@ -80,7 +80,7 @@ export const Shell: React.FC = () => {
           <DesktopNavBar isAdmin={isAdmin} t={t} />
 
           {/* Right Header: Identity & Edge Pill, AI Co-Pilot, Theme Switcher & Block Switcher */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 min-w-0 shrink-0">
             {/* Bilingual Language Switcher */}
             <LocaleToggle />
 
@@ -94,9 +94,7 @@ export const Shell: React.FC = () => {
             <ThemeToggle />
 
             {/* Question Bank Status & Actions Capsule - Available to all users across every screen */}
-            <div className="hidden sm:inline-block">
-              <QuestionBankStatusPill />
-            </div>
+            <QuestionBankStatusPill />
           </div>
         </div>
       </header>
