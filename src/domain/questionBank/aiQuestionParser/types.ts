@@ -7,6 +7,7 @@
 import type { Question, ChoiceId, SubjectId, ChapterId } from '../../model/types.ts';
 import type { CloudProviderId } from '../../ai/settings.ts';
 import type { TaxonomyClassificationResult } from '../../taxonomy/CurriculumClassificationAgent.ts';
+import type { DuplicationVerdict } from '../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
 
 export type QuestionStemMode = 'verbatim' | 'vignette';
 
@@ -119,6 +120,10 @@ export interface ParsedQuestionItem {
   readonly taxonomyClassification?: TaxonomyClassificationResult;
   /** Multi-Model Cross-Examination Consensus Audit (if run) */
   readonly consensusSummary?: MultiModelConsensusSummary;
+  /** Question Duplication Detection Engine Verdict & Candidates */
+  readonly qddVerdict?: DuplicationVerdict;
+  /** Whether duplication checking is actively computing */
+  readonly isCheckingDuplication?: boolean;
 }
 
 export interface ParseResultSummary {
