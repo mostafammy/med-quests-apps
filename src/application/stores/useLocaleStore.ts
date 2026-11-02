@@ -11,6 +11,7 @@ import { create } from 'zustand';
 import type { PlatformLocale, TextDirection, TranslationDictionary } from '../../domain/i18n/types.ts';
 import { enDictionary } from '../../domain/i18n/dictionaries/en.ts';
 import { arDictionary } from '../../domain/i18n/dictionaries/ar.ts';
+import { analytics } from '../../infrastructure/analytics/medQuestsAnalyticsFacade.ts';
 
 const DICTIONARIES: Record<PlatformLocale, TranslationDictionary> = {
   en: enDictionary,
@@ -53,10 +54,17 @@ export const useLocaleStore = create<LocaleState>((set, get) => ({
   t: DICTIONARIES[initialLocale],
 
   setLocale: (locale: PlatformLocale) => {
+    const prev = get().locale;
     const dir: TextDirection = locale === 'ar' ? 'rtl' : 'ltr';
     try {
       localStorage.setItem('mq_locale', locale);
     } catch {}
+
+    analytics.capture('ux:preference_changed', {
+      preference_type: 'locale',
+      previous_value: prev,
+      next_value: locale,
+    });
 
     applyDocumentLocale(locale, dir);
 
