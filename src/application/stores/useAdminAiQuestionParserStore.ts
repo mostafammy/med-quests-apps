@@ -12,7 +12,8 @@ import type { CloudProviderId } from '../../domain/ai/settings.ts';
 import type { ChoiceId, Question } from '../../domain/model/types.ts';
 import { QuestionParsingAgent } from '../../domain/questionBank/aiQuestionParser/QuestionParsingAgent.ts';
 import { CrossModelVerificationPromptBuilder } from '../../domain/questionBank/aiQuestionParser/CrossModelVerificationPromptBuilder.ts';
-import type { ParsedQuestionItem, QuestionStemMode } from '../../domain/questionBank/aiQuestionParser/types.ts';
+import type { ParsedQuestionItem, QuestionStemMode, AgentExecutionTelemetry } from '../../domain/questionBank/aiQuestionParser/types.ts';
+import { multiModelConsensusEngine } from '../../domain/questionBank/aiQuestionParser/MultiModelConsensusEngine.ts';
 import { curriculumTaxonomyRegistry } from '../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
 import { useAuthStore } from './useAuthStore.ts';
 import { useBankGovernanceStore } from './useBankGovernanceStore.ts';
@@ -26,9 +27,13 @@ interface AdminAiQuestionParserStoreState {
   targetSubjectId: string;
   targetChapterId: string;
   stemMode: QuestionStemMode;
+  enableConsensusCheck: boolean;
 
   // Parsing & State
   isParsing: boolean;
+  agentTelemetry: AgentExecutionTelemetry | null;
+  isVerifyingConsensusIndex: number | null;
+  abortController: AbortController | null;
   parsedQuestions: ParsedQuestionItem[];
   selectedTempIds: Set<string>;
   error: string | null;
@@ -39,8 +44,11 @@ interface AdminAiQuestionParserStoreState {
   setRawInputText: (text: string) => void;
   setSelectedModel: (provider: CloudProviderId, modelId: string) => void;
   setStemMode: (mode: QuestionStemMode) => void;
+  setEnableConsensusCheck: (enable: boolean) => void;
   setTargetTaxonomy: (subjectId: string, chapterId: string) => void;
   parseRawQuestions: () => Promise<void>;
+  abortCurrentExecution: () => void;
+  runSingleQuestionConsensus: (index: number) => Promise<void>;
   toggleQuestionSelection: (tempId: string) => void;
   selectAll: (select: boolean) => void;
   updateQuestionStem: (index: number, stem: string) => void;
@@ -66,8 +74,12 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
   targetSubjectId: 'auto',
   targetChapterId: 'auto',
   stemMode: 'verbatim',
+  enableConsensusCheck: false,
 
   isParsing: false,
+  agentTelemetry: null,
+  isVerifyingConsensusIndex: null,
+  abortController: null,
   parsedQuestions: [],
   selectedTempIds: new Set(),
   error: null,
@@ -81,32 +93,83 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
 
   setStemMode: (stemMode) => set({ stemMode }),
 
+  setEnableConsensusCheck: (enableConsensusCheck) => set({ enableConsensusCheck }),
+
   setTargetTaxonomy: (targetSubjectId, targetChapterId) =>
     set({ targetSubjectId, targetChapterId }),
 
+  abortCurrentExecution: () => {
+    const { abortController } = get();
+    if (abortController) {
+      abortController.abort();
+      set({
+        abortController: null,
+        isParsing: false,
+        error: 'Execution cancelled by administrator.',
+      });
+    }
+  },
+
+  runSingleQuestionConsensus: async (index: number) => {
+    const list = [...get().parsedQuestions];
+    const target = list[index];
+    if (!target) return;
+
+    set({ isVerifyingConsensusIndex: index });
+
+    try {
+      const consensus = await multiModelConsensusEngine.verifyConsensus(
+        target.question,
+        get().selectedModelId
+      );
+      list[index] = {
+        ...target,
+        consensusSummary: consensus,
+      };
+      set({ parsedQuestions: list, isVerifyingConsensusIndex: null });
+    } catch {
+      set({ isVerifyingConsensusIndex: null });
+    }
+  },
+
   parseRawQuestions: async () => {
-    const { rawInputText, selectedProvider, selectedModelId, targetSubjectId, targetChapterId, stemMode } = get();
+    const {
+      rawInputText,
+      selectedProvider,
+      selectedModelId,
+      targetSubjectId,
+      targetChapterId,
+      stemMode,
+      enableConsensusCheck,
+    } = get();
 
     if (!rawInputText.trim()) {
       set({ error: 'Please enter or paste question text before initiating AI parsing.' });
       return;
     }
 
-    set({ isParsing: true, error: null, commitFeedback: null });
+    const controller = new AbortController();
+    set({ isParsing: true, error: null, commitFeedback: null, abortController: controller });
 
     try {
-      const result = await parsingAgent.parseRawQuestions({
-        rawText: rawInputText,
-        providerId: selectedProvider,
-        modelId: selectedModelId,
-        stemMode,
-        targetSubjectId: targetSubjectId === 'all' || targetSubjectId === 'auto' ? undefined : targetSubjectId,
-        targetChapterId: targetChapterId === 'all' || targetChapterId === 'auto' ? undefined : targetChapterId,
-      });
+      const result = await parsingAgent.parseRawQuestions(
+        {
+          rawText: rawInputText,
+          providerId: selectedProvider,
+          modelId: selectedModelId,
+          stemMode,
+          enableConsensusCheck,
+          targetSubjectId: targetSubjectId === 'all' || targetSubjectId === 'auto' ? undefined : targetSubjectId,
+          targetChapterId: targetChapterId === 'all' || targetChapterId === 'auto' ? undefined : targetChapterId,
+          onTelemetryUpdate: (agentTelemetry) => set({ agentTelemetry }),
+        },
+        controller.signal
+      );
 
       if (result.items.length === 0) {
         set({
           isParsing: false,
+          abortController: null,
           error: 'Could not extract valid question structure from input. Check format and try again.',
         });
         return;
@@ -115,14 +178,20 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       const allIds = new Set(result.items.map((i) => i.tempId));
       set({
         isParsing: false,
+        abortController: null,
         parsedQuestions: [...result.items],
         selectedTempIds: allIds,
       });
     } catch (err: any) {
-      set({
-        isParsing: false,
-        error: err.message || 'An unexpected error occurred while parsing questions.',
-      });
+      if (err?.name === 'AbortError') {
+        set({ isParsing: false, abortController: null, error: 'Execution halted by administrator.' });
+      } else {
+        set({
+          isParsing: false,
+          abortController: null,
+          error: `Parsing failed: ${err?.message || 'Unknown processing error'}`,
+        });
+      }
     }
   },
 

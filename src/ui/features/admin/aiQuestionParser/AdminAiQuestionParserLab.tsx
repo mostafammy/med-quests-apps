@@ -36,6 +36,11 @@ import {
   Layers,
   ArrowRight,
   RotateCcw,
+  Scale,
+  Clock,
+  Activity,
+  Loader2,
+  StopCircle,
 } from 'lucide-react';
 import { useAuthStore } from '../../../../application/stores/useAuthStore.ts';
 import { useAdminAiQuestionParserStore } from '../../../../application/stores/useAdminAiQuestionParserStore.ts';
@@ -155,6 +160,12 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     stemMode,
     setStemMode,
     toggleStemFormat,
+    enableConsensusCheck,
+    setEnableConsensusCheck,
+    agentTelemetry,
+    isVerifyingConsensusIndex,
+    abortCurrentExecution,
+    runSingleQuestionConsensus,
     isParsing,
     parsedQuestions,
     selectedTempIds,
@@ -508,6 +519,57 @@ export const AdminAiQuestionParserLab: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Section 4: Multi-Model Consensus Verification Policy */}
+        <div className="p-4 rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white dark:bg-zinc-800/60 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                Multi-Model Accuracy Check
+              </span>
+              <span
+                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                  enableConsensusCheck
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                    : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20'
+                }`}
+              >
+                {enableConsensusCheck ? 'Multi-Model Quorum Active' : 'Single Engine Pass'}
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+              {enableConsensusCheck
+                ? 'Concurrently queries Gemini, Claude 3.7, DeepSeek R1, and Referee to cross-verify answers and detect hallucinations.'
+                : 'Fast parsing with primary model. You can still cross-examine individual questions on demand in the inspection queue.'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/60 shrink-0">
+            <button
+              type="button"
+              onClick={() => setEnableConsensusCheck(false)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                !enableConsensusCheck
+                  ? 'bg-white dark:bg-zinc-700 text-purple-600 dark:text-purple-300 shadow-xs'
+                  : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+              }`}
+            >
+              ⚡ Fast (Single Engine)
+            </button>
+            <button
+              type="button"
+              onClick={() => setEnableConsensusCheck(true)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                enableConsensusCheck
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+              }`}
+            >
+              <Scale className="w-3.5 h-3.5" />
+              <span>⚖️ Multi-Model Ensemble</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* DIRECT RAW TEXT INPUT CHAMBER */}
@@ -545,20 +607,138 @@ export const AdminAiQuestionParserLab: React.FC = () => {
             <HelpCircle className="w-3.5 h-3.5" />
             <span>
               The AI will format into 4-choice SBAs, deduce missing keys, assign curriculum chapters,
-              and build cross-examination prompts.
+              and execute multi-model cross-examinations.
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={parseRawQuestions}
-            disabled={isParsing || !rawInputText.trim()}
-            className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:opacity-95 shadow-md shadow-purple-500/25 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>{isParsing ? 'Executing AI Medical Analysis...' : 'Parse & Format Questions'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {isParsing && (
+              <button
+                type="button"
+                onClick={abortCurrentExecution}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 hover:bg-rose-100 transition-all cursor-pointer"
+              >
+                <StopCircle className="w-4 h-4 text-rose-500 animate-pulse" />
+                <span>Cancel Execution</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={parseRawQuestions}
+              disabled={isParsing || !rawInputText.trim()}
+              className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:opacity-95 shadow-md shadow-purple-500/25 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>
+                {isParsing
+                  ? agentTelemetry?.activeToolName
+                    ? `Running: ${agentTelemetry.activeToolName}...`
+                    : 'Executing AI Medical Analysis...'
+                  : 'Parse & Format Questions'}
+              </span>
+            </button>
+          </div>
         </div>
+
+        {/* LIVE AGENT ACTIVITY & TOOL PIPELINE STEPPER */}
+        {agentTelemetry && (
+          <div className="p-5 rounded-2xl border border-purple-500/25 bg-gradient-to-br from-purple-500/5 via-indigo-500/5 to-pink-500/5 dark:from-purple-950/20 dark:via-zinc-900/60 dark:to-zinc-950/60 backdrop-blur-xl shadow-md space-y-4 animate-in fade-in duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-purple-500/10 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                  <Activity className={`w-4 h-4 ${agentTelemetry.isRunning ? 'animate-pulse text-purple-600' : ''}`} />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                    <span>Active Agent Orchestration Telemetry</span>
+                    {agentTelemetry.isRunning ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">
+                        <Loader2 className="w-3 h-3 animate-spin" /> In Progress
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                        <CheckCircle2 className="w-3 h-3" /> Pipeline Completed
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    Executing ordered tool chain: tokenization, curriculum taxonomy, clinical reasoning, and multi-model consensus.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] font-mono text-zinc-400 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>{(agentTelemetry.elapsedMs / 1000).toFixed(1)}s elapsed</span>
+                </span>
+                {agentTelemetry.isRunning && (
+                  <button
+                    type="button"
+                    onClick={abortCurrentExecution}
+                    className="inline-flex items-center gap-1 px-3 py-1 rounded-xl text-xs font-semibold text-rose-600 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 hover:bg-rose-100 transition-all cursor-pointer"
+                  >
+                    <StopCircle className="w-3.5 h-3.5 text-rose-500" />
+                    <span>Cancel</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Stepper Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
+              {agentTelemetry.steps.map((step, stepIdx) => {
+                const isRunning = step.status === 'running';
+                const isDone = step.status === 'completed';
+                const isSkipped = step.status === 'skipped';
+                const isFailed = step.status === 'failed';
+
+                return (
+                  <div
+                    key={step.id}
+                    className={`p-3 rounded-xl border transition-all text-xs flex flex-col justify-between space-y-1.5 ${
+                      isRunning
+                        ? 'bg-purple-500/10 border-purple-500/40 shadow-xs ring-1 ring-purple-500/20'
+                        : isDone
+                        ? 'bg-white/80 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700/60'
+                        : isSkipped
+                        ? 'bg-zinc-100/50 dark:bg-zinc-800/20 border-zinc-200/40 dark:border-zinc-800/40 opacity-60'
+                        : isFailed
+                        ? 'bg-rose-500/10 border-rose-500/30'
+                        : 'bg-zinc-50 dark:bg-zinc-900/40 border-zinc-200/50 dark:border-zinc-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold font-mono text-zinc-400">
+                        0{stepIdx + 1}
+                      </span>
+                      {isRunning && <Loader2 className="w-3 h-3 text-purple-600 animate-spin" />}
+                      {isDone && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                      {isSkipped && <span className="text-[9px] text-zinc-400">Skipped</span>}
+                      {isFailed && <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />}
+                    </div>
+
+                    <div>
+                      <h4 className="text-[11px] font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
+                        {step.label}
+                      </h4>
+                      <p className="text-[10px] text-zinc-500 dark:text-zinc-400 line-clamp-2 mt-0.5">
+                        {step.detail || step.description}
+                      </p>
+                    </div>
+
+                    {step.durationMs !== undefined && (
+                      <span className="text-[9px] font-mono text-zinc-400">
+                        {step.durationMs}ms
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
@@ -1055,6 +1235,117 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                         )}
                       </div>
                     )}
+
+                    {/* MULTI-MODEL CONSENSUS & ACCURACY AUDIT PANEL */}
+                    <div className="pt-2">
+                      {item.consensusSummary ? (
+                        <div className="p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-800/40 space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <Scale className="w-4 h-4 text-purple-500" />
+                              <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                                Multi-Model Quorum Consensus
+                              </span>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                  item.consensusSummary.consensusVerdict === 'unanimous_agreement'
+                                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
+                                    : item.consensusSummary.consensusVerdict === 'majority_consensus'
+                                    ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25'
+                                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25'
+                                }`}
+                              >
+                                {item.consensusSummary.consensusVerdict === 'unanimous_agreement' && '✅ 100% Unanimous Agreement'}
+                                {item.consensusSummary.consensusVerdict === 'majority_consensus' && `✨ Majority Quorum (${Math.round(item.consensusSummary.agreementRatio * 100)}%)`}
+                                {item.consensusSummary.consensusVerdict === 'discrepancy_detected' && '⚠️ Model Discrepancy Detected'}
+                                {item.consensusSummary.consensusVerdict === 'insufficient_quorum' && 'Quorum Undetermined'}
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => runSingleQuestionConsensus(idx)}
+                              disabled={isVerifyingConsensusIndex === idx}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              <RotateCcw className={`w-3 h-3 ${isVerifyingConsensusIndex === idx ? 'animate-spin' : ''}`} />
+                              <span>{isVerifyingConsensusIndex === idx ? 'Re-checking Quorum...' : 'Re-verify with Ensemble'}</span>
+                            </button>
+                          </div>
+
+                          <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                            {item.consensusSummary.consensusRationale}
+                          </p>
+
+                          {/* Individual Model Cards Grid */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-1">
+                            {item.consensusSummary.modelVerdicts.map((v) => {
+                              const isConsensusWinner = v.selectedChoiceId === item.consensusSummary?.consensusChoiceId;
+                              return (
+                                <div
+                                  key={v.modelId}
+                                  className={`p-2.5 rounded-xl border text-xs flex flex-col justify-between space-y-1 ${
+                                    isConsensusWinner
+                                      ? 'bg-white dark:bg-zinc-800/90 border-zinc-200 dark:border-zinc-700/80 shadow-2xs'
+                                      : 'bg-amber-500/5 dark:bg-amber-950/20 border-amber-500/30'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300 truncate max-w-[120px]">
+                                      {v.modelName}
+                                    </span>
+                                    <span
+                                      className={`px-1.5 py-0.2 rounded text-[10px] font-extrabold ${
+                                        isConsensusWinner
+                                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                          : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                      }`}
+                                    >
+                                      Key: ({v.selectedChoiceId.toUpperCase()})
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 line-clamp-2">
+                                    {v.clinicalRationale}
+                                  </p>
+                                  <div className="flex items-center justify-between text-[9px] text-zinc-400 pt-1 font-mono">
+                                    <span>Conf: {v.confidenceScore}%</span>
+                                    <span>{v.latencyMs}ms</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        /* On-Demand Double Check Button */
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white/50 dark:bg-zinc-800/30">
+                          <div className="flex items-center gap-2">
+                            <Scale className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                            <span className="text-xs text-zinc-600 dark:text-zinc-300">
+                              Double-check answer accuracy across independent AI models before approving?
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => runSingleQuestionConsensus(idx)}
+                            disabled={isVerifyingConsensusIndex === idx}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-purple-600 dark:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                          >
+                            {isVerifyingConsensusIndex === idx ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>Running Quorum...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Scale className="w-3.5 h-3.5" />
+                                <span>Double Check with Ensemble</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
