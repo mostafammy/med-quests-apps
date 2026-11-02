@@ -105,6 +105,8 @@ describe('CurriculumClassificationAgent (Auto-Classification & Gap Detection)', 
       'Atrial septation involves sequential growth of septum primum and septum secundum.'
     );
 
+    expect(result.blockId).toBe('cvs');
+    expect(result.blockName).toContain('Cardiovascular System');
     expect(result.subjectId).toBe('anatomy');
     expect(result.chapterId).toBe('cvs-ana-heart-dev');
     expect(result.isNewDomainSuggested).toBe(false);
