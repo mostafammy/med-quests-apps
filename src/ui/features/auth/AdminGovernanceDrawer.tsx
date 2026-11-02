@@ -32,6 +32,7 @@ import {
 import { QuestionBankGovernancePanel } from '../admin/QuestionBankGovernancePanel.tsx';
 import { AdminAccuracyAuditCenter } from '../admin/accuracyAudit/AdminAccuracyAuditCenter.tsx';
 import { AdminAiQuestionParserLab } from '../admin/aiQuestionParser/AdminAiQuestionParserLab.tsx';
+import { LiveEdgeObservabilityPortal } from '../admin/observability/LiveEdgeObservabilityPortal.tsx';
 import {
   useAuthStore,
   type GovernanceViewTab,
@@ -352,6 +353,12 @@ export const AdminGovernanceDrawer: React.FC = () => {
           {(
             [
               {
+                id: 'cloud-observability',
+                label: 'Live Edge & Cohort',
+                icon: Activity,
+                badge: '100% SLA',
+              },
+              {
                 id: 'network-telemetry',
                 label: 'Live Edge Network & IPs',
                 icon: Globe,
@@ -420,6 +427,13 @@ export const AdminGovernanceDrawer: React.FC = () => {
 
         {/* Body Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {/* ========================================================= */}
+          {/* TAB PREMIER: LIVE CLOUDFLARE EDGE & COHORT OBSERVABILITY   */}
+          {/* ========================================================= */}
+          {activeGovernanceTab === 'cloud-observability' && (
+            <LiveEdgeObservabilityPortal />
+          )}
+
           {/* ========================================================= */}
           {/* TAB 0: LIVE EDGE NETWORK, IPS & SECURITY FORENSICS         */}
           {/* ========================================================= */}
