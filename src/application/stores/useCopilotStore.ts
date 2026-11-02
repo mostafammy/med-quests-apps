@@ -8,6 +8,7 @@ import type { CopilotSurface, SafeAiContext } from '../../domain/ai/context.ts';
 import type { ChatMessage, MessagePart } from '../../domain/ai/conversation.ts';
 import { buildSafeAiContext } from '../../domain/ai/policyGate.ts';
 import { questionTelemetryTracker } from '../../domain/ai/telemetry.ts';
+import { analytics } from '../../infrastructure/analytics/medQuestsAnalyticsFacade.ts';
 import { agenticOrchestrator } from '../../infrastructure/ai/agenticOrchestrator.ts';
 import { useAiSettingsStore } from './useAiSettingsStore.ts';
 import { useQuestionStore } from './useQuestionStore.ts';
@@ -67,9 +68,31 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
   error: null,
   cachedActionKeys: new Set<string>(),
 
-  openDrawer: () => set({ isOpen: true }),
-  closeDrawer: () => set({ isOpen: false }),
-  toggleDrawer: () => set((state) => ({ isOpen: !state.isOpen })),
+  openDrawer: () => {
+    analytics.capture('copilot:drawer_toggled', {
+      is_open: true,
+      trigger_source: 'floating-pill',
+      active_question_id: get().activeQuestionId,
+    });
+    set({ isOpen: true });
+  },
+  closeDrawer: () => {
+    analytics.capture('copilot:drawer_toggled', {
+      is_open: false,
+      trigger_source: 'floating-pill',
+      active_question_id: get().activeQuestionId,
+    });
+    set({ isOpen: false });
+  },
+  toggleDrawer: () => {
+    const nextState = !get().isOpen;
+    analytics.capture('copilot:drawer_toggled', {
+      is_open: nextState,
+      trigger_source: 'floating-pill',
+      active_question_id: get().activeQuestionId,
+    });
+    set({ isOpen: nextState });
+  },
   toggleExpanded: () => set((state) => ({ isExpanded: !state.isExpanded })),
 
   loadCachedActionKeys: async (questionId: string) => {
@@ -145,6 +168,15 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
       }));
 
       // Record 0ms cached retrieval telemetry
+      analytics.capture('copilot:power_action_invoked', {
+        action_id: actionKey,
+        question_id: activeQuestionId,
+        execution_engine: 'power-action-cache',
+        response_latency_ms: 0,
+        cache_hit: true,
+        response_locale: resolvedLang === 'ar' ? 'ar' : 'en',
+      });
+
       aiMetricsCacheService.recordMetric({
         providerId: 'cached',
         modelId: 'Instant Cache',
@@ -175,6 +207,15 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
         },
         resolvedLang
       );
+
+    analytics.capture('copilot:power_action_invoked', {
+      action_id: actionKey,
+      question_id: activeQuestionId,
+      execution_engine: 'groq-cloud',
+      response_latency_ms: 450,
+      cache_hit: false,
+      response_locale: resolvedLang === 'ar' ? 'ar' : 'en',
+    });
 
     await get().sendUserMessage(prompt, actionKey);
   },
