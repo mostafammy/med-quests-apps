@@ -107,6 +107,10 @@ describe('CrossModelVerificationPromptBuilder (External LLM Cross-Examination)',
     const prompt = CrossModelVerificationPromptBuilder.buildSingleQuestionPrompt(item);
 
     expect(prompt).toContain('Medical Board Examination Item Cross-Validation Request');
+    expect(prompt).toContain('Target Block');
+    expect(prompt).toContain('Cardiovascular System');
+    expect(prompt).toContain('Target Subject');
+    expect(prompt).toContain('Target Chapter');
     expect(prompt).toContain('Do NOT assume the provided answer key is correct');
     expect(prompt).toContain(item.question.stem);
     expect(prompt).toContain('AI inferred this option'); // Alert for missing key
@@ -118,7 +122,7 @@ describe('CrossModelVerificationPromptBuilder (External LLM Cross-Examination)',
     const result = await agent.parseRawQuestions({
       rawText: multiText,
       providerId: 'openrouter',
-      modelId: 'anthropic/claude-3.7-sonnet',
+      modelId: 'nvidia/nemotron-3.5-super-vl:free',
     });
 
     const batchPrompt = CrossModelVerificationPromptBuilder.buildBatchQuestionsPrompt(
@@ -129,6 +133,9 @@ describe('CrossModelVerificationPromptBuilder (External LLM Cross-Examination)',
     expect(batchPrompt).toContain('Cardiovascular Mid-Term Board Audit (2 Items)');
     expect(batchPrompt).toContain('Question 1 of 2');
     expect(batchPrompt).toContain('Question 2 of 2');
+    expect(batchPrompt).toContain('Block: Cardiovascular System');
+    expect(batchPrompt).toContain('Subject:');
+    expect(batchPrompt).toContain('Chapter:');
     expect(batchPrompt).toContain('Expected Output Format Per Item');
   });
 
