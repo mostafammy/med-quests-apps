@@ -62,6 +62,12 @@ const AUDIT_MODEL_OPTIONS: Array<{
     badge: 'Ultra-Fast Complex Analysis',
   },
   {
+    providerId: 'gemini',
+    modelId: 'gemini-3.5-flash-lite',
+    name: 'Google Gemini 3.5 Flash-Lite',
+    badge: 'Ultra-Fast Verification (<100ms)',
+  },
+  {
     providerId: 'groq',
     modelId: 'openai/gpt-oss-20b',
     name: 'Groq GPT-OSS 20B',
@@ -69,15 +75,15 @@ const AUDIT_MODEL_OPTIONS: Array<{
   },
   {
     providerId: 'openrouter',
-    modelId: 'anthropic/claude-3.7-sonnet',
-    name: 'Claude 3.7 Sonnet (via OpenRouter)',
-    badge: 'Medical Benchmark Leader',
+    modelId: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+    name: 'Nemotron 3 Ultra 550B (via OpenRouter)',
+    badge: '550B Clinical Reasoning',
   },
   {
     providerId: 'openrouter',
-    modelId: 'deepseek/deepseek-r1',
-    name: 'DeepSeek R1 (via OpenRouter)',
-    badge: 'Clinical Chain-of-Thought',
+    modelId: 'nvidia/nemotron-3.5-super-vl:free',
+    name: 'Nemotron 3.5 Super VL (via OpenRouter)',
+    badge: 'Clinical Logic Specialist',
   },
 ];
 
