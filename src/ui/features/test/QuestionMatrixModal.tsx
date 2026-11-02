@@ -4,7 +4,8 @@ import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
 import { 
   X, 
   Flag, 
-  HelpCircle
+  HelpCircle,
+  CheckCircle2
 } from 'lucide-react';
 
 interface QuestionMatrixModalProps {
@@ -18,6 +19,7 @@ interface QuestionMatrixModalProps {
   isExamMode: boolean;
   onSelectIndex?: (index: number) => void;
   onSelectQuestion?: (index: number) => void;
+  onFinishSession?: () => void;
 }
 
 type FilterTab = 'all' | 'unanswered' | 'answered' | 'flagged';
@@ -33,6 +35,7 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
   isExamMode,
   onSelectIndex,
   onSelectQuestion,
+  onFinishSession,
 }) => {
   const { t } = useLocaleStore();
   const [filter, setFilter] = useState<FilterTab>('all');
@@ -235,7 +238,7 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
           )}
         </div>
 
-        {/* Apple Sheet Footer: Legend & Close */}
+        {/* Apple Sheet Footer: Legend & Finish / Close */}
         <div className="p-4 bg-slate-50 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center space-x-1 rtl:space-x-reverse">
@@ -269,12 +272,28 @@ export const QuestionMatrixModal: React.FC<QuestionMatrixModalProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="py-1.5 px-4 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 rounded-xl font-bold transition-all cursor-pointer"
-          >
-            {t.common.close}
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            {onFinishSession && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onFinishSession();
+                }}
+                className="flex-1 sm:flex-none py-2 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/20 transition-all cursor-pointer apple-tap"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{isExamMode ? t.test.player.submitExam : t.test.player.finishPractice}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="py-2 px-4 bg-slate-200/80 hover:bg-slate-300/80 text-slate-800 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 rounded-xl font-bold transition-all cursor-pointer apple-tap"
+            >
+              {t.common.close}
+            </button>
+          </div>
         </div>
       </div>
     </div>
