@@ -19,9 +19,22 @@ import {
   bindAdaptiveCompositorAttributes,
 } from '../../infrastructure/auth/clientCapabilityProbe.ts';
 import type { ProgressSyncSummary } from '../../../specs/003-edge-auth-adaptive-telemetry/contracts/auth-telemetry-ports.ts';
+import { analytics } from '../../infrastructure/analytics/medQuestsAnalyticsFacade.ts';
+
+function syncAnalyticsIdentity(state: AuthState): void {
+  if (state.status === 'authenticated-active') {
+    analytics.identifyAuthenticatedUser({
+      userId: state.user.id,
+      role: state.user.role,
+      universityCohort: state.user.universityName ?? undefined,
+      accountStatus: 'active',
+    });
+  }
+}
 
 export type AuthModalTab = 'sign-in' | 'security-devices' | 'hardware-tier';
 export type GovernanceViewTab =
+  | 'cloud-observability'
   | 'network-telemetry'
   | 'cohort-analytics'
   | 'user-directory'
@@ -93,7 +106,7 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
   isModalOpen: false,
   activeModalTab: 'sign-in',
   isGovernanceDrawerOpen: false,
-  activeGovernanceTab: 'network-telemetry',
+  activeGovernanceTab: 'cloud-observability',
   managedUsers: edgeAuthGateway.getManagedUsers(),
   selectedManagedUserId: edgeAuthGateway.getManagedUsers()[0]?.profile.id ?? null,
   auditLogs: edgeAuthGateway.getAuditLogs(),
@@ -156,6 +169,7 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
       const result = await edgeAuthGateway.revalidateEdgeSession();
       if (result.ok) {
         const managedUsers = edgeAuthGateway.getManagedUsers();
+        syncAnalyticsIdentity(result.value);
         set({ authState: result.value, managedUsers, isRevalidating: false });
         if (
           result.value.status === 'authenticated-active' &&
@@ -200,7 +214,7 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
     set({ isModalOpen: false });
   },
 
-  openGovernanceDrawer: (tab = 'cohort-analytics') => {
+  openGovernanceDrawer: (tab = 'cloud-observability') => {
     const managedUsers = edgeAuthGateway.getManagedUsers();
     const auditLogs = edgeAuthGateway.getAuditLogs();
     set((state) => ({
@@ -268,6 +282,7 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
 
     if (result.ok) {
       const managedUsers = edgeAuthGateway.getManagedUsers();
+      syncAnalyticsIdentity(result.value.state);
       set({
         authState: result.value.state,
         syncSummary: result.value.syncSummary,
@@ -339,6 +354,7 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
 
       if (result.ok) {
         const managedUsers = edgeAuthGateway.getManagedUsers();
+        syncAnalyticsIdentity(result.value.state);
         set({
           authState: result.value.state,
           syncSummary: result.value.syncSummary,
@@ -404,6 +420,7 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
 
       if (result.ok) {
         const managedUsers = edgeAuthGateway.getManagedUsers();
+        syncAnalyticsIdentity(result.value.state);
         set({
           authState: result.value.state,
           syncSummary: result.value.syncSummary,
@@ -455,6 +472,7 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
 
       if (result.ok) {
         const managedUsers = edgeAuthGateway.getManagedUsers();
+        syncAnalyticsIdentity(result.value.state);
         set({
           authState: result.value.state,
           syncSummary: result.value.syncSummary,
@@ -506,6 +524,7 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
 
     if (result.ok) {
       const managedUsers = edgeAuthGateway.getManagedUsers();
+      syncAnalyticsIdentity(result.value.state);
       set({
         authState: result.value.state,
         syncSummary: result.value.syncSummary,
@@ -539,6 +558,7 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
   signOut: async () => {
     const result = await edgeAuthGateway.signOut();
     if (result.ok) {
+      analytics.resetIdentityOnSignOut();
       set({
         authState: result.value,
         isModalOpen: false,
