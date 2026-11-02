@@ -17,6 +17,8 @@ import {
 } from './CurriculumTaxonomyRegistry.ts';
 
 export interface TaxonomyClassificationResult {
+  readonly blockId: string;
+  readonly blockName: string;
   readonly subjectId: SubjectId;
   readonly subjectName: string;
   readonly chapterId: ChapterId;
@@ -41,6 +43,19 @@ export class CurriculumClassificationAgent {
   constructor(
     private readonly taxonomyRegistry: ICurriculumTaxonomyRegistry = CurriculumTaxonomyRegistry.getInstance()
   ) {}
+
+  private createResult(
+    params: Omit<TaxonomyClassificationResult, 'blockId' | 'blockName'>
+  ): TaxonomyClassificationResult {
+    const block = this.taxonomyRegistry.getTaxonomy().block;
+    return {
+      blockId: block?.id || 'cvs',
+      blockName: block
+        ? `${block.name} (${block.shortName || 'CVS'}) - ${block.code || 'Block 206'}`
+        : 'Cardiovascular System (CVS) - Block 206',
+      ...params,
+    };
+  }
 
   /**
    * Classifies a question into the optimal Subject and Chapter,
@@ -99,7 +114,7 @@ export class CurriculumClassificationAgent {
 
     const isPharma = pharmaTerms.some((t) => text.includes(t));
     if (isPharma && !hasPharmacologySubject) {
-      return {
+      return this.createResult({
         subjectId: 'pharmacology',
         subjectName: 'CVS Pharmacology (Proposed)',
         chapterId: 'cvs-pha-cardiac-drugs',
@@ -118,7 +133,7 @@ export class CurriculumClassificationAgent {
           subjectId: 'pharmacology',
           rationale: 'Covers autonomic receptor ligands, antiarrhythmic classes I-IV, and heart failure medications.',
         },
-      };
+      });
     }
 
     // Pathology triggers
@@ -137,7 +152,7 @@ export class CurriculumClassificationAgent {
 
     const isPathology = pathologyTerms.some((t) => text.includes(t));
     if (isPathology && !hasPathologySubject) {
-      return {
+      return this.createResult({
         subjectId: 'pathology',
         subjectName: 'CVS Pathology (Proposed)',
         chapterId: 'cvs-pat-ischemic-aortic',
@@ -156,7 +171,7 @@ export class CurriculumClassificationAgent {
           subjectId: 'pathology',
           rationale: 'Integrates acute coronary syndromes, infarction morphology, and acute aortic syndromes.',
         },
-      };
+      });
     }
 
     return null;
@@ -201,7 +216,7 @@ export class CurriculumClassificationAgent {
         const chosenChap = phaChapters.find((c) => c.id === 'cvs-pha-cardiac-drugs') || phaChapters[0];
         const subj = subjects.find((s) => s.id === 'pharmacology');
         if (subj && chosenChap) {
-          return {
+          return this.createResult({
             subjectId: subj.id,
             subjectName: subj.name,
             chapterId: chosenChap.id,
@@ -209,7 +224,7 @@ export class CurriculumClassificationAgent {
             confidenceScore: 95,
             rationale: 'Question evaluates cardiovascular drug mechanisms within the registered Pharmacology curriculum.',
             isNewDomainSuggested: false,
-          };
+          });
         }
       }
     }
@@ -232,7 +247,7 @@ export class CurriculumClassificationAgent {
         const chosenChap = patChapters.find((c) => c.id === 'cvs-pat-ischemic-aortic') || patChapters[0];
         const subj = subjects.find((s) => s.id === 'pathology');
         if (subj && chosenChap) {
-          return {
+          return this.createResult({
             subjectId: subj.id,
             subjectName: subj.name,
             chapterId: chosenChap.id,
@@ -240,7 +255,7 @@ export class CurriculumClassificationAgent {
             confidenceScore: 94,
             rationale: 'Question evaluates cardiovascular pathology within the registered Pathology curriculum.',
             isNewDomainSuggested: false,
-          };
+          });
         }
       }
     }
@@ -257,7 +272,7 @@ export class CurriculumClassificationAgent {
     ) {
       const devChap = chapters.find((c) => c.id === 'cvs-ana-heart-dev') || chapters[0];
       const subj = subjects.find((s) => s.id === devChap.subjectId) || subjects[0];
-      return {
+      return this.createResult({
         subjectId: subj.id,
         subjectName: subj.name,
         chapterId: devChap.id,
@@ -265,7 +280,7 @@ export class CurriculumClassificationAgent {
         confidenceScore: 97,
         rationale: 'Direct correlation with cardiovascular embryological development and congenital septation.',
         isNewDomainSuggested: false,
-      };
+      });
     }
 
     if (
@@ -277,7 +292,7 @@ export class CurriculumClassificationAgent {
     ) {
       const fetalChap = chapters.find((c) => c.id === 'cvs-ana-fetal-circ-bv') || chapters[0];
       const subj = subjects.find((s) => s.id === fetalChap.subjectId) || subjects[0];
-      return {
+      return this.createResult({
         subjectId: subj.id,
         subjectName: subj.name,
         chapterId: fetalChap.id,
@@ -285,7 +300,7 @@ export class CurriculumClassificationAgent {
         confidenceScore: 95,
         rationale: 'Direct alignment with fetal circulation and vascular arch branch development.',
         isNewDomainSuggested: false,
-      };
+      });
     }
 
     if (
@@ -299,7 +314,7 @@ export class CurriculumClassificationAgent {
     ) {
       const grossChap = chapters.find((c) => c.id === 'cvs-ana-heart-mediastinum') || chapters[0];
       const subj = subjects.find((s) => s.id === grossChap.subjectId) || subjects[0];
-      return {
+      return this.createResult({
         subjectId: subj.id,
         subjectName: subj.name,
         chapterId: grossChap.id,
@@ -307,7 +322,7 @@ export class CurriculumClassificationAgent {
         confidenceScore: 94,
         rationale: 'Question evaluates gross cardiac anatomy, mediastinal structures, and coronary anatomy.',
         isNewDomainSuggested: false,
-      };
+      });
     }
 
     // Histology
@@ -326,7 +341,7 @@ export class CurriculumClassificationAgent {
         chapters.find((c) => (isVessel ? c.id === 'cvs-his-blood-vessels' : c.id === 'cvs-his-heart')) ||
         chapters[0];
       const subj = subjects.find((s) => s.id === histChap.subjectId) || subjects[0];
-      return {
+      return this.createResult({
         subjectId: subj.id,
         subjectName: subj.name,
         chapterId: histChap.id,
@@ -334,7 +349,7 @@ export class CurriculumClassificationAgent {
         confidenceScore: 96,
         rationale: 'Evaluates microscopic tissue architecture and specialized vascular histology.',
         isNewDomainSuggested: false,
-      };
+      });
     }
 
     // Microbiology
@@ -358,7 +373,7 @@ export class CurriculumClassificationAgent {
       }
       const finalChap = micChap || chapters[0];
       const subj = subjects.find((s) => s.id === finalChap.subjectId) || subjects[0];
-      return {
+      return this.createResult({
         subjectId: subj.id,
         subjectName: subj.name,
         chapterId: finalChap.id,
@@ -366,7 +381,7 @@ export class CurriculumClassificationAgent {
         confidenceScore: 95,
         rationale: 'Question evaluates cardiovascular infectious diseases and post-streptococcal sequelae.',
         isNewDomainSuggested: false,
-      };
+      });
     }
 
     // Physiology
@@ -382,7 +397,7 @@ export class CurriculumClassificationAgent {
     ) {
       const elecChap = chapters.find((c) => c.id === 'cvs-phy-electrophysiology') || chapters[0];
       const subj = subjects.find((s) => s.id === elecChap.subjectId) || subjects[0];
-      return {
+      return this.createResult({
         subjectId: subj.id,
         subjectName: subj.name,
         chapterId: elecChap.id,
@@ -390,7 +405,7 @@ export class CurriculumClassificationAgent {
         confidenceScore: 96,
         rationale: 'Cardiovascular electrophysiology, nodal automaticity, and action potential kinetics.',
         isNewDomainSuggested: false,
-      };
+      });
     }
 
     if (
@@ -407,7 +422,7 @@ export class CurriculumClassificationAgent {
     ) {
       const cycleChap = chapters.find((c) => c.id === 'cvs-phy-cardiac-cycle') || chapters[0];
       const subj = subjects.find((s) => s.id === cycleChap.subjectId) || subjects[0];
-      return {
+      return this.createResult({
         subjectId: subj.id,
         subjectName: subj.name,
         chapterId: cycleChap.id,
@@ -415,13 +430,13 @@ export class CurriculumClassificationAgent {
         confidenceScore: 94,
         rationale: 'Valve mechanics, cardiac cycle phases, and heart sound auscultation.',
         isNewDomainSuggested: false,
-      };
+      });
     }
 
     // Default to Hemodynamics & BP Regulation
     const bpChap = chapters.find((c) => c.id === 'cvs-phy-hemodynamics-bp') || chapters[0];
     const subj = subjects.find((s) => s.id === bpChap.subjectId) || subjects[0];
-    return {
+    return this.createResult({
       subjectId: subj.id,
       subjectName: subj.name,
       chapterId: bpChap.id,
@@ -429,7 +444,7 @@ export class CurriculumClassificationAgent {
       confidenceScore: 88,
       rationale: 'Hemodynamic regulation, vascular resistance, and blood pressure reflex physiology.',
       isNewDomainSuggested: false,
-    };
+    });
   }
 }
 
