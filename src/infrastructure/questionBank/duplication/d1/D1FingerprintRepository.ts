@@ -61,10 +61,11 @@ export class D1FingerprintRepository implements IFingerprintRepository {
       minhashBytes = new Uint8Array(row.minhash as any);
     }
 
+    const alignedCopy = minhashBytes.slice();
     const minhashUint32 = new Uint32Array(
-      minhashBytes.buffer,
-      minhashBytes.byteOffset,
-      minhashBytes.byteLength / 4
+      alignedCopy.buffer,
+      0,
+      Math.floor(alignedCopy.byteLength / 4)
     );
 
     return {
@@ -204,21 +205,25 @@ export class D1FingerprintRepository implements IFingerprintRepository {
         fingerprint.contentVersion
       ).run();
 
-      // Upsert LSH bands
+      // Upsert LSH bands in a single batched multi-row INSERT statement
       if (fingerprint.lshBands.length > 0) {
         await this.db
           .prepare('DELETE FROM question_lsh_bands WHERE question_id = ?')
           .bind(fingerprint.questionId)
           .run();
 
+        const valuePlaceholders = fingerprint.lshBands.map(() => '(?, ?, ?)').join(', ');
+        const bandParams: unknown[] = [];
         for (const bk of fingerprint.lshBands) {
-          await this.db
-            .prepare(
-              'INSERT OR IGNORE INTO question_lsh_bands (question_id, block_id, band_key) VALUES (?, ?, ?)'
-            )
-            .bind(fingerprint.questionId, fingerprint.blockId, bk)
-            .run();
+          bandParams.push(fingerprint.questionId, fingerprint.blockId, bk);
         }
+
+        await this.db
+          .prepare(
+            `INSERT OR IGNORE INTO question_lsh_bands (question_id, block_id, band_key) VALUES ${valuePlaceholders}`
+          )
+          .bind(...bandParams)
+          .run();
       }
 
       return ok(undefined);

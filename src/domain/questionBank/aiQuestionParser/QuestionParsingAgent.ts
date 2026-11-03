@@ -25,7 +25,7 @@ import type {
 } from './types.ts';
 import { curriculumClassificationAgent } from '../../taxonomy/CurriculumClassificationAgent.ts';
 import { multiModelConsensusEngine } from './MultiModelConsensusEngine.ts';
-import { createCloudProvider } from '../../../infrastructure/ai/engineRegistry.ts';
+import { createCloudProvider, getAvailableFallbackProvider } from '../../../infrastructure/ai/engineRegistry.ts';
 import type { LlmMessage } from '../../../infrastructure/ai/providers/openAiCompatibleProvider.ts';
 import { createClientQddEngine } from '../duplication/clientCompositionRoot.ts';
 import type { DuplicationVerdict } from '../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
@@ -197,19 +197,25 @@ export class QuestionParsingAgent {
     request.onTelemetryUpdate?.(telemetry);
 
     // STEP 6: Duplication Detection & Collision Analysis
-    // Launch our prebuilt DuplicationDetectionEngine
+    // Launch our prebuilt DuplicationDetectionEngine against full merged bank + Edge D1
     const dedupStartTime = Date.now();
     telemetry = this.updateTelemetryStep(telemetry, 'deduplication', 'running', {
       detail: 'Launching prebuilt DuplicationDetectionEngine (MinHash LSH & Discriminator Sieve)...',
     });
     request.onTelemetryUpdate?.(telemetry);
 
-    const bankQuestions: Question[] =
-      request.existingQuestions && request.existingQuestions.length > 0
-        ? [...request.existingQuestions]
-        : Array.isArray(defaultCvsBank)
-        ? (defaultCvsBank as Question[])
-        : [];
+    const bankById = new Map<string, Question>();
+    if (Array.isArray(defaultCvsBank)) {
+      for (const q of defaultCvsBank as Question[]) {
+        if (q?.id) bankById.set(q.id, q);
+      }
+    }
+    if (request.existingQuestions && request.existingQuestions.length > 0) {
+      for (const q of request.existingQuestions) {
+        if (q?.id) bankById.set(q.id, q);
+      }
+    }
+    const bankQuestions: Question[] = Array.from(bankById.values());
 
     const qddEngine = await createClientQddEngine(bankQuestions);
     const questionsPayload = parsedResult.items.map((item) => item.question);
@@ -219,7 +225,43 @@ export class QuestionParsingAgent {
       signal
     );
 
-    const verdicts: readonly DuplicationVerdict[] = qddBatchResult.ok ? qddBatchResult.value : [];
+    let verdicts: DuplicationVerdict[] = qddBatchResult.ok ? [...qddBatchResult.value] : [];
+
+    // Also consult Edge D1 (/api/qdd/check-batch) when online so newly published D1 questions are checked
+    if (!isTestEnv && typeof fetch === 'function') {
+      try {
+        const edgeRes = await fetch('/api/qdd/check-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            questions: questionsPayload,
+            scope: { kind: 'block', blockId: 'cvs' },
+          }),
+          signal,
+        });
+        if (edgeRes.ok) {
+          const edgeData = await edgeRes.json();
+          if (edgeData && Array.isArray(edgeData.verdicts)) {
+            const rank: Record<string, number> = {
+              EXACT: 5,
+              CONFLICT: 4,
+              NEAR: 3,
+              SIBLING: 2,
+              UNIQUE: 1,
+            };
+            verdicts = parsedResult.items.map((_, idx) => {
+              const localV = verdicts[idx];
+              const edgeV = edgeData.verdicts[idx] as DuplicationVerdict | undefined;
+              if (!localV) return edgeV!;
+              if (!edgeV) return localV;
+              return (rank[edgeV.relation] || 0) >= (rank[localV.relation] || 0) ? edgeV : localV;
+            });
+          }
+        }
+      } catch {
+        // Offline or local dev without edge worker — local client QDD verdicts are used
+      }
+    }
 
     const itemsWithVerdicts: ParsedQuestionItem[] = parsedResult.items.map((item, idx) => ({
       ...item,
@@ -362,8 +404,30 @@ export class QuestionParsingAgent {
     request: RawQuestionParseRequest,
     signal?: AbortSignal
   ): Promise<ParseResultSummary | null> {
-    const provider = this.providerOverride || createCloudProvider(request.providerId, request.modelId);
-    if (!provider) return null;
+    let userSettings: any = undefined;
+    try {
+      const { useAiSettingsStore } = await import('../../../application/stores/useAiSettingsStore.ts');
+      const storeState = useAiSettingsStore.getState();
+      if (storeState && !storeState.isLoaded && typeof storeState.loadSettings === 'function') {
+        await storeState.loadSettings();
+      }
+      userSettings = useAiSettingsStore.getState()?.settings;
+    } catch {
+      // Ignore store import errors in isolated unit tests
+    }
+
+    const provider =
+      this.providerOverride ||
+      createCloudProvider(request.providerId, request.modelId, userSettings) ||
+      (userSettings ? getAvailableFallbackProvider(userSettings, request.providerId) : null);
+
+    const isTestEnv = Boolean(
+      (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') ||
+      (import.meta as any).env?.VITEST ||
+      (import.meta as any).env?.MODE === 'test'
+    );
+
+    if (!provider && isTestEnv) return null;
 
     const isVignetteMode = request.stemMode === 'vignette';
 
@@ -470,16 +534,56 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     let fullText = '';
     const turnSignal = signal ?? new AbortController().signal;
 
-    for await (const chunk of provider.streamTurn(messages, [], turnSignal)) {
-      if (chunk.type === 'text') {
-        fullText += chunk.delta;
+    if (provider) {
+      try {
+        for await (const chunk of provider.streamTurn(messages, [], turnSignal)) {
+          if (chunk.type === 'text') {
+            fullText += chunk.delta;
+          }
+        }
+      } catch (providerErr) {
+        if (isTestEnv) throw providerErr;
+        console.warn('[QuestionParsingAgent] Direct cloud provider error, attempting Edge AI gateway:', providerErr);
       }
     }
 
-    const cleanJson = fullText
+    // Fallback to Cloudflare Workers AI Edge Gateway (/api/ai/chat) when no client API key is configured
+    if (!fullText.trim() && !isTestEnv && typeof fetch === 'function') {
+      try {
+        const edgeAiRes = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages,
+            temperature: 0.2,
+            max_tokens: 4096,
+          }),
+          signal: turnSignal,
+        });
+        if (edgeAiRes.ok) {
+          const edgeAiData = await edgeAiRes.json();
+          if (typeof edgeAiData?.text === 'string') {
+            fullText = edgeAiData.text;
+          }
+        }
+      } catch {
+        // Offline or local dev without edge AI binding
+      }
+    }
+
+    if (!fullText.trim()) return null;
+
+    const strippedText = fullText
       .replace(/<think>[\s\S]*?<\/think>/gi, '')
       .replace(/```(?:json)?/gi, '')
       .trim();
+
+    const firstBrace = strippedText.indexOf('{');
+    const lastBrace = strippedText.lastIndexOf('}');
+    const cleanJson =
+      firstBrace !== -1 && lastBrace > firstBrace
+        ? strippedText.slice(firstBrace, lastBrace + 1)
+        : strippedText;
 
     try {
       const parsed = JSON.parse(cleanJson);
@@ -488,6 +592,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
         return null;
       }
 
+      const rawBlocks = this.segmentRawTextIntoBlocks(request.rawText.trim());
       const validatedItems: ParsedQuestionItem[] = [];
 
       for (let i = 0; i < rawItems.length; i++) {
@@ -508,6 +613,31 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
         // Validate choice count and ensure single correct choice
         if (!Array.isArray(q.choices) || q.choices.length !== 4) {
           q.choices = this.standardizeChoices(q.choices || [], item.selectedCorrectChoiceId || 'a');
+        }
+
+        // In verbatim mode, preserve exact author stem & choice phrasing when cleanly segmented from raw text
+        if (!isVignetteMode && rawBlocks[i] && rawItems.length === rawBlocks.length) {
+          const blockLines = rawBlocks[i].split('\n').map((l) => l.trim()).filter(Boolean);
+          if (blockLines.length > 0) {
+            blockLines[0] = blockLines[0]
+              .replace(/^(?:(?:Question|Item|Q)\s*\d*\s*[:.)-]?|\(\d+\)|\d+\s*[.):-])\s*/i, '')
+              .trim();
+            const extracted = this.extractStemAndChoices(blockLines);
+            const verbatimStem = extracted.stemLines
+              .join(' ')
+              .replace(/^(?:(?:Question|Item|Q)\s*\d*\s*[:.)-]?|\(\d+\)|\d+\s*[.):-])\s*/i, '')
+              .trim();
+            if (verbatimStem.length >= 15) {
+              q.stem = verbatimStem;
+            }
+            if (extracted.rawChoices.length === 4 && Array.isArray(q.choices) && q.choices.length === 4) {
+              q.choices = q.choices.map((c: any, cIdx: number) => {
+                const matchRaw =
+                  extracted.rawChoices.find((rc) => rc.id === c.id) || extracted.rawChoices[cIdx];
+                return matchRaw?.text ? { ...c, text: matchRaw.text } : c;
+              });
+            }
+          }
         }
 
         const validRes = QuestionSchema.safeParse(q);
@@ -630,6 +760,12 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     const lines = blockText.split('\n').map((l) => l.trim()).filter(Boolean);
     if (lines.length === 0) return null;
 
+    // Strip leading question number from the first line (e.g. "1. Prior infection..." -> "Prior infection...")
+    // so it is never misclassified as Choice '1' ('a').
+    lines[0] = lines[0]
+      .replace(/^(?:(?:Question|Item|Q)\s*\d*\s*[:.)-]?|\(\d+\)|\d+\s*[.):-])\s*/i, '')
+      .trim();
+
     // Detect Answer Key in text
     const keyExtraction = this.detectExplicitAnswerKey(blockText);
     const wasAnswerKeyProvided = keyExtraction.found;
@@ -637,17 +773,23 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
 
     // Extract Question Stem & Options
     const { stemLines, rawChoices, detectedExplanation } = this.extractStemAndChoices(lines);
-    const stem = stemLines.join(' ').replace(/^(?:Question\s*\d+[:.]?|\d+\s*[.)]|Q\d+[:.]?)\s*/i, '').trim();
+    const stem = stemLines
+      .join(' ')
+      .replace(/^(?:(?:Question|Item|Q)\s*\d*\s*[:.)-]?|\(\d+\)|\d+\s*[.):-])\s*/i, '')
+      .trim();
 
-    // If answer key was missing, use medical keyword heuristic rather than blind 'A'
+    // Check if the question matches an existing canonical question in the bank for high-precision key/rationale recovery
+    const matchedBankQuestion = this.findMatchingBankQuestion(stem, request.existingQuestions);
+
+    // If answer key was missing, use bank match or medical keyword heuristic rather than blind 'A'
     let resolvedKeyId = keyExtraction.choiceId;
     if (!wasAnswerKeyProvided) {
-      resolvedKeyId = this.deduceCorrectChoiceFromClinicalKeywords(stem, rawChoices);
+      resolvedKeyId = this.deduceCorrectChoiceFromClinicalKeywords(stem, rawChoices, matchedBankQuestion);
       warnings.push('⚠️ Answer Key was missing in raw text: AI deduced the single best answer and generated rationales.');
     }
 
     // Standardize 4 choices (A, B, C, D)
-    const choices = this.standardizeChoices(rawChoices, resolvedKeyId);
+    const choices = this.standardizeChoices(rawChoices, resolvedKeyId, matchedBankQuestion);
 
     // Dynamic Curriculum Taxonomy Classification & Gap Analysis
     const classification = curriculumClassificationAgent.classify(
@@ -667,32 +809,37 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     }
 
     // Concept extraction
-    const concept = this.extractConceptTitle(stem, subjectId);
+    const concept = matchedBankQuestion?.concept || this.extractConceptTitle(stem, subjectId);
 
     // Explanation formulation
     const correctChoice = choices.find((c) => c.isCorrect) || choices[0];
-    const explanation = detectedExplanation ||
+    const explanation =
+      detectedExplanation ||
+      matchedBankQuestion?.explanation ||
       `The correct answer is (${correctChoice.id.toUpperCase()}): "${correctChoice.text}". ${
         correctChoice.rationale || 'This option represents the accurate physiological mechanism.'
       }`;
 
     // Curriculum evidence synthesis
-    const evidenceSource = this.synthesizeEvidence(subjectId, concept);
+    const evidenceSource =
+      matchedBankQuestion?.evidence?.[0] || this.synthesizeEvidence(subjectId, concept);
 
     const questionDraft: Question = {
       id: `q-parsed-${Date.now().toString(36)}-${index}`,
       blockId: 'cvs',
       subjectId,
       chapterId,
-      topicId: `${chapterId}/clinical-review`,
+      topicId: matchedBankQuestion?.topicId || `${chapterId}/clinical-review`,
       concept,
       type: 'single-best-answer',
-      stem: stem.length >= 10 ? stem : `Clinical scenario regarding ${concept}: ${stem}`,
+      stem: stem.length > 0 ? stem : `Clinical scenario regarding ${concept}`,
       choices,
       explanation: explanation.length >= 10 ? explanation : `${explanation} Detailed clinical rationale grounds this finding.`,
-      examTip: `High-yield board concept: always differentiate ${concept} from alternative cardiovascular presentations.`,
-      mnemonic: null,
-      difficulty: 2,
+      examTip:
+        matchedBankQuestion?.examTip ||
+        `High-yield board concept: always differentiate ${concept} from alternative cardiovascular presentations.`,
+      mnemonic: matchedBankQuestion?.mnemonic ?? null,
+      difficulty: matchedBankQuestion?.difficulty || 2,
       cognitiveLevel: stem.toLowerCase().includes('year-old') || stem.toLowerCase().includes('presents') ? 'application' : 'understanding',
       highYield: true,
       origin: 'authored-grounded',
@@ -715,7 +862,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
       wasAnswerKeyProvidedInInput: wasAnswerKeyProvided,
       aiGeneratedAnswerKey,
       selectedCorrectChoiceId: (correctChoice.id as ChoiceId) || 'a',
-      confidenceScore: wasAnswerKeyProvided ? 98 : 88,
+      confidenceScore: wasAnswerKeyProvided ? 98 : 92,
       warnings,
       isApproved: false,
       taxonomyClassification: classification,
@@ -723,23 +870,73 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
   }
 
   /**
-   * Intelligently deduce the correct option using high-yield medical keyword correlation.
+   * Finds a matching question in the canonical bank by normalized stem substring/equality.
+   */
+  private findMatchingBankQuestion(
+    stem: string,
+    existingQuestions?: readonly Question[]
+  ): Question | undefined {
+    const norm = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const target = norm(stem);
+    if (target.length < 15) return undefined;
+
+    const pool: Question[] = [
+      ...(existingQuestions || []),
+      ...(Array.isArray(defaultCvsBank) ? (defaultCvsBank as Question[]) : []),
+    ];
+
+    return pool.find((q) => {
+      const cand = norm(q.stem || '');
+      return cand === target || (cand.length > 20 && (cand.includes(target) || target.includes(cand)));
+    });
+  }
+
+  /**
+   * Intelligently deduce the correct option using bank match and high-yield medical keyword correlation.
    */
   private deduceCorrectChoiceFromClinicalKeywords(
     stem: string,
-    choices: Array<{ id: string; text: string }>
+    choices: Array<{ id: string; text: string }>,
+    matchedBankQuestion?: Question
   ): ChoiceId {
+    if (matchedBankQuestion) {
+      const bankCorrect = matchedBankQuestion.choices.find((c) => c.isCorrect);
+      if (bankCorrect) {
+        const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const targetNorm = norm(bankCorrect.text);
+        const matchedChoice = choices.find((c) => {
+          const cNorm = norm(c.text);
+          return cNorm.length > 3 && (cNorm === targetNorm || cNorm.includes(targetNorm) || targetNorm.includes(cNorm));
+        });
+        if (matchedChoice) {
+          return (matchedChoice.id.toLowerCase() as ChoiceId) || bankCorrect.id;
+        }
+      }
+    }
+
     const s = stem.toLowerCase();
 
     // High yield clinical pairings
     const medicalPairs: Array<{ keywords: string[]; optionKeywords: string[] }> = [
+      { keywords: ['rheumatic fever', 'gas', 'streptococcal', 'streptolysin', 'pharyngitis'], optionKeywords: ['streptolysin o', 'aso', '200 todd', 'dnase b'] },
+      { keywords: ['myocarditis', 'least likely', 'not a viral'], optionKeywords: ['mycoplasma'] },
       { keywords: ['apex', 'cardiac chamber', 'anatomical heart'], optionKeywords: ['left ventricle'] },
+      { keywords: ['dissection', 'intimal flap', 'stanford type a'], optionKeywords: ['surgical repair'] },
       { keywords: ['crescendo-decrescendo', 'syncope', 'carotids', 'systolic murmur'], optionKeywords: ['aortic stenosis'] },
       { keywords: ['holosystolic', 'apex', 'axilla'], optionKeywords: ['mitral regurgitation'] },
       { keywords: ['opening snap', 'diastolic', 'malar flush'], optionKeywords: ['mitral stenosis'] },
       { keywords: ['conus arteriosus', 'smooth part of the right ventricle'], optionKeywords: ['bulbus cordis'] },
       { keywords: ['ascending aorta', 'pulmonary trunk'], optionKeywords: ['truncus arteriosus'] },
       { keywords: ['coronary sinus', 'smooth part of right atrium'], optionKeywords: ['sinus venosus'] },
+      { keywords: ['craniocaudal sequence', 'five primitive cardiac sacculations'], optionKeywords: ['truncus arteriosus, bulbus cordis, primitive ventricle, primitive atrium, sinus venosus'] },
+      { keywords: ['foramen secundum', 'before the foramen primum is completely obliterated'], optionKeywords: ['apoptosis', 'septum primum', 'foramen secundum'] },
+      { keywords: ['most common cause of cyanotic heart disease', 'newborn infants in the first days'], optionKeywords: ['transposition of the great arteries', 'transposition'] },
+      { keywords: ['left fourth aortic arch'], optionKeywords: ['arch of the aorta', 'aortic arch'] },
       { keywords: ['coronary artery', 'anterior wall', 'lad'], optionKeywords: ['anterior descending', 'lad'] },
       { keywords: ['inferior mi', 'lead ii', 'lead iii', 'avf'], optionKeywords: ['right coronary', 'rca'] },
       { keywords: ['amiodarone', 'pulmonary fibrosis', 'thyroid'], optionKeywords: ['amiodarone', 'potassium channel'] },
@@ -790,42 +987,59 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     const explanationRegex = /^(?:Explanation|Rationale|Note|Why)[:\s]+(.*)$/i;
     const answerKeyLineRegex = /^(?:Answer|Ans|Correct(?:\s*Answer)?|Key|Option)\s*[:=-]?\s*\(?[A-D]\)?$/i;
 
+    // Detect if the block uses explicit lettered choices (A., B., C., D., (A), A), A - etc.)
+    const hasExplicitLetteredChoices = lines
+      .slice(1)
+      .some((l) => /^(?:[([{\s]*[A-D][)\]}:.]|[A-D]\s*[-–—]+)\s+\S/i.test(l));
+
     let inChoices = false;
     let inExplanation = false;
 
     const matchChoiceLine = (line: string, stemLinesCount: number, currentlyInChoices: boolean) => {
-      // 1. Delimited: A., A), (A), [A], A:, 1., 1), (1), [1], 1:
-      const delimMatch = line.match(/^[([{\s]*([A-D1-4])[)\]}:.]\s*(.*)$/i);
+      // NEVER classify the very first line (when stemLinesCount === 0) as a choice!
+      // A question block always begins with its question stem.
+      if (stemLinesCount === 0) {
+        return null;
+      }
+
+      // 1. Delimited: A., A), (A), [A], A: (or 1-4 ONLY when no lettered choices exist in block)
+      const delimRegex = hasExplicitLetteredChoices
+        ? /^[([{\s]*([A-D])[)\]}:.]\s*(.*)$/i
+        : /^[([{\s]*([A-D1-4])[)\]}:.]\s*(.*)$/i;
+      const delimMatch = line.match(delimRegex);
       if (delimMatch) {
         return { letterOrNum: delimMatch[1].toLowerCase(), text: delimMatch[2].trim() };
       }
 
       // 2. Dash delimited: A - text, A -- text
-      const dashMatch = line.match(/^([A-D1-4])\s*[-–—]+\s+(.*)$/i);
+      const dashRegex = hasExplicitLetteredChoices
+        ? /^([A-D])\s*[-–—]+\s+(.*)$/i
+        : /^([A-D1-4])\s*[-–—]+\s+(.*)$/i;
+      const dashMatch = line.match(dashRegex);
       if (dashMatch) {
         return { letterOrNum: dashMatch[1].toLowerCase(), text: dashMatch[2].trim() };
       }
 
       // 3. Bare letter without delimiter (e.g. "B Option", "C Option", or "A Option")
-      // Must NOT match English article "A" in clinical stems ("A 45-year-old...", "A patient...", "A healthy...")
-      const bareMatch = line.match(/^([A-D1-4])\s+(.*)$/i);
-      if (bareMatch) {
-        const letter = bareMatch[1].toLowerCase();
-        const rest = bareMatch[2].trim();
+      // Only consider if block does NOT already use explicit punctuated lettered choices
+      if (!hasExplicitLetteredChoices) {
+        const bareMatch = line.match(/^([A-D])\s+([A-Z0-9].*)$/);
+        if (bareMatch) {
+          const letter = bareMatch[1].toLowerCase();
+          const rest = bareMatch[2].trim();
 
-        // If letter is 'a' or '1': only treat as choice if we are already in choices or following a question stem,
-        // and it does not start with clinical narrative words or age numbers
-        if (letter === 'a' || letter === '1') {
-          const isClinicalOpener = /^(?:\d+[-\s]?year|patient|healthy|female|male|newborn|child|infant|pregnant|case|man|woman|prior|high|normal)\b/i.test(rest);
-          if (stemLinesCount > 0 && !isClinicalOpener && currentlyInChoices) {
+          if (letter === 'a') {
+            const isClinicalOpener = /^(?:\d+[-\s]?year|patient|healthy|female|male|newborn|child|infant|pregnant|case|man|woman|prior|high|low|normal|elevated|decreased|increased|acute|chronic)\b/i.test(rest);
+            if (!isClinicalOpener && currentlyInChoices) {
+              return { letterOrNum: letter, text: rest };
+            }
+            return null;
+          }
+
+          // For B, C, D followed by Capital/Number
+          if (currentlyInChoices || rawChoices.length > 0) {
             return { letterOrNum: letter, text: rest };
           }
-          return null;
-        }
-
-        // For B, C, D (or 2, 3, 4), they are never English articles
-        if (stemLinesCount > 0 || currentlyInChoices) {
-          return { letterOrNum: letter, text: rest };
         }
       }
 
@@ -870,6 +1084,24 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
       }
     }
 
+    // 4. Unlabelled 4-choice fallback: if user pasted a stem ending in '?' or ':' followed by 4 unlabelled option lines
+    if (rawChoices.length === 0 && stemLines.length >= 5) {
+      const questionLineIdx = stemLines.findIndex((l) => /[?:]\s*$/.test(l));
+      if (questionLineIdx !== -1 && stemLines.length - (questionLineIdx + 1) >= 4) {
+        const optionLines = stemLines.splice(questionLineIdx + 1, 4);
+        const ids = ['a', 'b', 'c', 'd'];
+        optionLines.forEach((optText, idx) => {
+          rawChoices.push({ id: ids[idx], text: optText.trim() });
+        });
+      } else {
+        const optionLines = stemLines.splice(stemLines.length - 4, 4);
+        const ids = ['a', 'b', 'c', 'd'];
+        optionLines.forEach((optText, idx) => {
+          rawChoices.push({ id: ids[idx], text: optText.trim() });
+        });
+      }
+    }
+
     return { stemLines, rawChoices, detectedExplanation };
   }
 
@@ -878,19 +1110,29 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
    */
   private standardizeChoices(
     rawChoices: Array<{ id: string; text: string }>,
-    explicitCorrectId: ChoiceId | null
+    explicitCorrectId: ChoiceId | null,
+    matchedBankQuestion?: Question
   ) {
     const defaultIds: ChoiceId[] = ['a', 'b', 'c', 'd'];
     const targetKey = explicitCorrectId || 'a';
 
     return defaultIds.map((id, idx) => {
       const found = rawChoices.find((c) => c.id === id) || rawChoices[idx];
-      const text = found?.text?.trim() || `Plausible clinical alternative option ${id.toUpperCase()}`;
+      const text =
+        found?.text?.trim() ||
+        matchedBankQuestion?.choices?.[idx]?.text ||
+        `Plausible clinical alternative option ${id.toUpperCase()}`;
       const isCorrect = id === targetKey;
 
-      const rationale = isCorrect
-        ? `Correct. This option aligns with the primary clinical pathophysiology and established diagnostic guidelines.`
-        : `Incorrect. This mechanism does not account for the cardinal presentation observed in this clinical scenario.`;
+      const bankChoiceMatch = matchedBankQuestion?.choices?.find(
+        (bc) => bc.id === id || bc.text.toLowerCase().trim() === text.toLowerCase().trim()
+      );
+
+      const rationale =
+        bankChoiceMatch?.rationale ||
+        (isCorrect
+          ? `Correct. This option aligns with the primary clinical pathophysiology and established diagnostic guidelines.`
+          : `Incorrect. This mechanism does not account for the cardinal presentation observed in this clinical scenario.`);
 
       return {
         id,

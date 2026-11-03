@@ -72,6 +72,38 @@ interface AdminAiQuestionParserStoreState {
 
 const parsingAgent = new QuestionParsingAgent();
 
+function getMergedBankQuestions(): Question[] {
+  const byId = new Map<string, Question>();
+  if (Array.isArray(defaultCvsBank)) {
+    for (const q of defaultCvsBank as Question[]) {
+      if (q?.id) byId.set(q.id, q);
+    }
+  }
+  const storeQuestions = useQuestionStore.getState().questions || [];
+  for (const q of storeQuestions) {
+    if (q?.id) byId.set(q.id, q);
+  }
+  const govQuestions = (useBankGovernanceStore.getState() as any)?.canonicalQuestions || [];
+  for (const q of govQuestions) {
+    if (q?.id) byId.set(q.id, q);
+  }
+  return Array.from(byId.values());
+}
+
+const VERDICT_RANK: Record<string, number> = {
+  EXACT: 5,
+  CONFLICT: 4,
+  NEAR: 3,
+  SIBLING: 2,
+  UNIQUE: 1,
+};
+
+function pickStrongerVerdict(a: any, b: any): any {
+  if (!a) return b;
+  if (!b) return a;
+  return (VERDICT_RANK[b.relation] || 0) >= (VERDICT_RANK[a.relation] || 0) ? b : a;
+}
+
 export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreState>((set, get) => ({
   rawInputText: '',
   selectedProvider: 'gemini',
@@ -158,13 +190,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
     set({ isParsing: true, error: null, commitFeedback: null, abortController: controller });
 
     try {
-      const storeQuestions = useQuestionStore.getState().questions;
-      const bankQuestions: Question[] =
-        storeQuestions.length > 0
-          ? storeQuestions
-          : Array.isArray(defaultCvsBank)
-          ? (defaultCvsBank as Question[])
-          : [];
+      const bankQuestions = getMergedBankQuestions();
 
       const result = await parsingAgent.parseRawQuestions(
         {
@@ -230,6 +256,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       });
     }
 
+    let edgeVerdicts: any[] = [];
     try {
       const questionsPayload = parsedQuestions.map((q) => q.question);
       const res = await fetch('/api/qdd/check-batch', {
@@ -244,46 +271,34 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       if (res.ok) {
         const data = await res.json();
         if (data && Array.isArray(data.verdicts)) {
-          const updated = get().parsedQuestions.map((item, idx) => ({
-            ...item,
-            qddVerdict: data.verdicts[idx] || item.qddVerdict,
-            isCheckingDuplication: false,
-          }));
-          set({ parsedQuestions: updated, isCheckingDuplication: false });
-          return;
+          edgeVerdicts = data.verdicts;
         }
       }
     } catch {
       // Network or offline fallback
     }
 
-    // Graceful offline & in-browser fallback: launch prebuilt DuplicationDetectionEngine
+    // Launch prebuilt DuplicationDetectionEngine against merged local + governed bank
     try {
-      const storeQuestions = useQuestionStore.getState().questions;
-      const bankQuestions: Question[] =
-        storeQuestions.length > 0
-          ? storeQuestions
-          : Array.isArray(defaultCvsBank)
-          ? (defaultCvsBank as Question[])
-          : [];
-
+      const bankQuestions = getMergedBankQuestions();
       const engine = await createClientQddEngine(bankQuestions);
       const current = get().parsedQuestions;
       const questionsPayload = current.map((q) => q.question);
       const res = await engine.checkBatch(questionsPayload, { kind: 'block', blockId: 'cvs' });
+      const clientVerdicts = res.ok ? res.value : [];
 
-      if (res.ok) {
-        const updated = current.map((item, idx) => ({
-          ...item,
-          qddVerdict: res.value[idx] || item.qddVerdict,
-          isCheckingDuplication: false,
-        }));
-        set({ parsedQuestions: updated, isCheckingDuplication: false });
-      }
+      const updated = current.map((item, idx) => ({
+        ...item,
+        qddVerdict:
+          pickStrongerVerdict(clientVerdicts[idx], edgeVerdicts[idx]) || item.qddVerdict,
+        isCheckingDuplication: false,
+      }));
+      set({ parsedQuestions: updated, isCheckingDuplication: false });
     } catch (fallbackErr) {
       console.error('[useAdminAiQuestionParserStore] Prebuilt QDD check failed:', fallbackErr);
-      const reset = get().parsedQuestions.map((q) => ({
+      const reset = get().parsedQuestions.map((q, idx) => ({
         ...q,
+        qddVerdict: edgeVerdicts[idx] || q.qddVerdict,
         isCheckingDuplication: false,
       }));
       set({ parsedQuestions: reset, isCheckingDuplication: false });

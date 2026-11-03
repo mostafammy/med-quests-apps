@@ -5,7 +5,7 @@
 
 import { z } from 'zod';
 import { QuestionSchema } from '../../domain/model/types.ts';
-import { createWorkerQddEngine } from '../qdd/compositionRoot.ts';
+import { createWorkerQddEngine, syncMissingD1Fingerprints } from '../qdd/compositionRoot.ts';
 import { D1AuditJobRepository } from '../../infrastructure/questionBank/duplication/d1/D1AuditJobRepository.ts';
 import { QddTelemetrySink } from '../../infrastructure/questionBank/duplication/telemetry/QddTelemetrySink.ts';
 import type { DuplicationVerdict } from '../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
@@ -89,6 +89,7 @@ export async function handleQddRoutes(
         );
       }
 
+      await syncMissingD1Fingerprints(env.MED_QUESTS_DB);
       const engine = createWorkerQddEngine(env.MED_QUESTS_DB);
       const scope = parsed.data.scope as any;
       const res = await engine.check(parsed.data.question as any, scope, 'edge-authoritative');
@@ -130,6 +131,7 @@ export async function handleQddRoutes(
         );
       }
 
+      await syncMissingD1Fingerprints(env.MED_QUESTS_DB);
       const engine = createWorkerQddEngine(env.MED_QUESTS_DB);
       const scope = parsed.data.scope as any;
       const res = await engine.checkBatch(parsed.data.questions as any, scope);
@@ -163,6 +165,7 @@ export async function handleQddRoutes(
       const body = await request.json().catch(() => ({}));
       const blockId = body.blockId || 'cvs';
       const startedBy = body.startedBy || 'admin';
+      await syncMissingD1Fingerprints(env.MED_QUESTS_DB);
       const repo = new D1AuditJobRepository(env.MED_QUESTS_DB);
       const job = await repo.createJob(blockId, startedBy);
       return new Response(JSON.stringify(job), {

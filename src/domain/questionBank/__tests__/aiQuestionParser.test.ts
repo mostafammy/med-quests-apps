@@ -192,6 +192,68 @@ describe('QuestionParsingAgent (AI Ingestion & Normalization)', () => {
     expect(item.qddVerdict?.decision).toBe('REVIEW');
     expect(item.qddVerdict?.candidates[0].matchedQuestionId).toBe('q-bank-conflict-1');
   });
+
+  it('preserves numbered stems (e.g. "1. Prior infection with GAS...") without shifting stem into Choice A, deduces Choice D, and detects EXACT duplicate', async () => {
+    const gasQuestionInBank: Question = {
+      id: 'q-parsed-1701987600000-1',
+      blockId: 'cvs',
+      subjectId: 'microbiology',
+      chapterId: 'cvs-mic-rheumatic-fever',
+      topicId: 'cvs-mic-rheumatic-fever/clinical-review',
+      concept: 'Acute Rheumatic Fever Serology',
+      type: 'single-best-answer',
+      stem: 'Prior infection with GAS can be demonstrated in patients with acute rheumatic fever by which one of the following?',
+      choices: [
+        { id: 'a', text: 'Blood culture.', isCorrect: false, rationale: 'Blood cultures are negative.' },
+        { id: 'b', text: 'Culture of a heart valve in a patient with carditis.', isCorrect: false, rationale: 'Valve cultures are negative.' },
+        { id: 'c', text: 'A high titer of antibody against the hyaluronic acid capsule.', isCorrect: false, rationale: 'Hyaluronic acid capsule is non-immunogenic.' },
+        { id: 'd', text: 'A high titer of antibody against streptolysin O.', isCorrect: true, rationale: 'ASO titer confirms preceding GAS infection.' },
+      ],
+      explanation: 'ASO titer confirms preceding GAS infection.',
+      mnemonic: null,
+      examTip: 'ASO is confirmatory.',
+      difficulty: 2,
+      cognitiveLevel: 'understanding',
+      highYield: true,
+      origin: 'authored-grounded',
+      evidence: [],
+      status: 'active',
+      bankVersion: 1,
+    };
+
+    const numberedRawInput = `1. Prior infection with GAS can be demonstrated in patients with acute rheumatic fever by which one of the following?
+A. Blood culture.
+B. Culture of a heart valve in a patient with carditis.
+C. A high titer of antibody against the hyaluronic acid capsule.
+D. A high titer of antibody against streptolysin O.`;
+
+    const result = await agent.parseRawQuestions({
+      rawText: numberedRawInput,
+      providerId: 'gemini',
+      modelId: 'gemini-2.5-flash',
+      existingQuestions: [gasQuestionInBank],
+    });
+
+    expect(result.items).toHaveLength(1);
+    const item = result.items[0];
+
+    // Stem must NOT be replaced with "Clinical scenario regarding..." or shifted into Choice A
+    expect(item.question.stem).toBe(
+      'Prior infection with GAS can be demonstrated in patients with acute rheumatic fever by which one of the following?'
+    );
+    expect(item.question.choices[0].text).toBe('Blood culture.');
+    expect(item.question.choices[1].text).toBe('Culture of a heart valve in a patient with carditis.');
+    expect(item.question.choices[2].text).toBe('A high titer of antibody against the hyaluronic acid capsule.');
+    expect(item.question.choices[3].text).toBe('A high titer of antibody against streptolysin O.');
+    expect(item.selectedCorrectChoiceId).toBe('d');
+    expect(item.question.choices[3].isCorrect).toBe(true);
+
+    // Must be flagged as EXACT duplicate of q-parsed-1701987600000-1
+    expect(item.qddVerdict).toBeDefined();
+    expect(item.qddVerdict?.relation).toBe('EXACT');
+    expect(item.qddVerdict?.decision).toBe('BLOCK');
+    expect(item.qddVerdict?.candidates[0].matchedQuestionId).toBe('q-parsed-1701987600000-1');
+  });
 });
 
 describe('CrossModelVerificationPromptBuilder (External LLM Cross-Examination)', () => {

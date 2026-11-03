@@ -17,7 +17,7 @@ import type { Question } from '../domain/model/types.ts';
 import type { GovernedQuestion } from '../../specs/005-global-question-bank-governance/contracts/question-bank-governance-ports.ts';
 import { EdgeObservabilitySnapshotBuilder } from '../domain/observability/edgeObservabilityEngine.ts';
 import { handleQddRoutes } from './routes/qdd.ts';
-import { createWorkerQddEngine } from './qdd/compositionRoot.ts';
+import { createWorkerQddEngine, upsertQuestionFingerprintToD1 } from './qdd/compositionRoot.ts';
 
 export interface Env {
   CLOUDFLARE_API_TOKEN?: string;
@@ -152,6 +152,53 @@ export default {
     if (url.pathname.startsWith('/api/qdd')) {
       const qddRes = await handleQddRoutes(request, env, url);
       if (qddRes) return qddRes;
+    }
+
+    // Edge AI Inference Gateway (/api/ai/chat) via Cloudflare Workers AI
+    if (url.pathname === '/api/ai/chat' && request.method === 'POST') {
+      if (!env.AI || typeof env.AI.run !== 'function') {
+        return jsonError('Workers AI binding is unavailable in this environment.', 503);
+      }
+      try {
+        const body = (await request.json()) as {
+          messages?: Array<{ role: string; content: string }>;
+          temperature?: number;
+          max_tokens?: number;
+        };
+        if (!Array.isArray(body.messages) || body.messages.length === 0) {
+          return jsonError('messages array is required.', 400);
+        }
+
+        const aiPayload = {
+          messages: body.messages,
+          temperature: typeof body.temperature === 'number' ? body.temperature : 0.2,
+          max_tokens: typeof body.max_tokens === 'number' ? body.max_tokens : 4096,
+        };
+
+        let result: any;
+        try {
+          result = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', aiPayload);
+        } catch {
+          result = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', aiPayload);
+        }
+
+        const text =
+          typeof result?.response === 'string'
+            ? result.response
+            : typeof result?.choices?.[0]?.message?.content === 'string'
+            ? result.choices[0].message.content
+            : JSON.stringify(result);
+
+        return new Response(
+          JSON.stringify({
+            text,
+            model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      } catch (err: any) {
+        return jsonError(`Edge AI inference failed: ${err?.message || String(err)}`, 500);
+      }
     }
 
     // 1. Session Revalidation & Live Device Telemetry Sync Endpoint (/api/auth/session)
@@ -1676,6 +1723,8 @@ export default {
                 createdAt: subRow.submitted_at,
                 updatedAt: nowIso,
               };
+
+              await upsertQuestionFingerprintToD1(env.MED_QUESTS_DB, mergedQ);
             }
 
             // 3. Append to editorial audit log
@@ -1977,6 +2026,8 @@ export default {
               createdAt: nowIso,
               updatedAt: nowIso,
             });
+
+            await upsertQuestionFingerprintToD1(env.MED_QUESTS_DB, q);
           }
 
           await env.MED_QUESTS_DB.prepare(
@@ -2139,6 +2190,8 @@ export default {
               questionId
             )
             .run();
+
+          await upsertQuestionFingerprintToD1(env.MED_QUESTS_DB, merged);
 
           const auditEntry = {
             id: `audit-${Date.now()}`,
