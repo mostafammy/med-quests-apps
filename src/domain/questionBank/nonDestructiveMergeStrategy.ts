@@ -133,6 +133,14 @@ export class NonDestructiveBankMergeStrategy implements IQuestionMergeStrategy {
           }
         }
 
+        // Version Monotonicity Guard:
+        // If the local question has a higher bankVersion than incoming (e.g. Local is v2 with rebalanced choices,
+        // incoming is an un-migrated v1 payload), incoming is an obsolete predecessor and must NOT overwrite
+        // or flag newer local canonical questions as edited!
+        if ((existingById.bankVersion || 1) > (incoming.bankVersion || 1)) {
+          continue;
+        }
+
         const changedFields = NonDestructiveBankMergeStrategy.computeChangedFields(
           existingById,
           incoming
@@ -167,6 +175,10 @@ export class NonDestructiveBankMergeStrategy implements IQuestionMergeStrategy {
         }
       } else if (existingByHash) {
         // Reconciled by stemHash
+        if ((existingByHash.bankVersion || 1) > (incoming.bankVersion || 1)) {
+          continue;
+        }
+
         const changedFields = NonDestructiveBankMergeStrategy.computeChangedFields(
           existingByHash,
           incoming
@@ -354,6 +366,13 @@ export class NonDestructiveBankMergeStrategy implements IQuestionMergeStrategy {
       const existingByHash = existingIdByHash ? resultMap.get(existingIdByHash) : undefined;
 
       if (existingById) {
+        // Version Monotonicity Guard:
+        // Do not downgrade a newer local item to an older incoming version (e.g. Local v2 vs incoming v1)
+        if ((existingById.bankVersion || 1) > (incoming.bankVersion || 1)) {
+          resultMap.set(existingById.id, existingById);
+          continue;
+        }
+
         const existingHash =
           existingById.stemHash || QuestionCanonicalHasher.computeStemHashSync(existingById.stem);
         const isSameContent = existingHash === incomingHash;
@@ -453,6 +472,11 @@ export class NonDestructiveBankMergeStrategy implements IQuestionMergeStrategy {
         }
       } else if (existingByHash) {
         // Different ID, but EXACT SAME clinical stemHash!
+        if ((existingByHash.bankVersion || 1) > (incoming.bankVersion || 1)) {
+          // Do not downgrade a newer local item to an older incoming version
+          continue;
+        }
+
         if (
           existingByHash.provenanceScope === 'submitted-pending' ||
           existingByHash.provenanceScope === 'local-custom' ||
