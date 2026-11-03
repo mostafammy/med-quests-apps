@@ -648,6 +648,99 @@ describe('QuestionSpecificationBuilder & computeGlobalBankKpis', () => {
     expect(Number(preview.rawDelta.revision)).toBe(7);
   });
 
+  it('strictly protects bankVersion monotonicity and never flags phantom edits when local questions are v2 and incoming is obsolete v1', () => {
+    const mergeStrategy = new NonDestructiveBankMergeStrategy();
+
+    // Local question upgraded to bankVersion 2 with rebalanced choices
+    const localV2Question: GovernedQuestion = {
+      ...SAMPLE_QUESTION,
+      id: 'q-cvs-ana-001',
+      concept: 'Primitive Heart Tube Sacculations',
+      bankVersion: 2,
+      choices: [
+        { id: 'a', text: 'Option A (Rebalanced)', isCorrect: false, rationale: 'Incorrect' },
+        { id: 'b', text: 'Option B (Rebalanced)', isCorrect: false, rationale: 'Incorrect' },
+        { id: 'c', text: 'Option C (Rebalanced)', isCorrect: true, rationale: 'Correct' },
+        { id: 'd', text: 'Option D (Rebalanced)', isCorrect: false, rationale: 'Incorrect' },
+      ],
+      provenanceScope: 'global-canonical',
+      editorialStatus: 'published',
+      globalRevision: 14,
+      stemHash: QuestionCanonicalHasher.computeStemHashSync(SAMPLE_QUESTION.stem),
+      authorId: 'usr-faculty',
+      authorDisplayName: 'Faculty',
+      reviewedById: 'usr-admin',
+      reviewedByDisplayName: 'Admin',
+      reviewerNotes: null,
+      publishedAt: '2026-10-31T00:00:00Z',
+      createdAt: '2026-10-31T00:00:00Z',
+      updatedAt: '2026-10-31T00:00:00Z',
+    };
+
+    // Stale incoming question with obsolete bankVersion 1 and old skewed choices
+    const incomingStaleV1Question: GovernedQuestion = {
+      ...SAMPLE_QUESTION,
+      id: 'q-cvs-ana-001',
+      concept: 'Primitive Heart Tube Sacculations',
+      bankVersion: 1,
+      choices: [
+        { id: 'a', text: 'Option A (Old Skewed)', isCorrect: true, rationale: 'Old correct' },
+        { id: 'b', text: 'Option B (Old Skewed)', isCorrect: false, rationale: 'Incorrect' },
+        { id: 'c', text: 'Option C (Old Skewed)', isCorrect: false, rationale: 'Incorrect' },
+        { id: 'd', text: 'Option D (Old Skewed)', isCorrect: false, rationale: 'Incorrect' },
+      ],
+      provenanceScope: 'global-canonical',
+      editorialStatus: 'published',
+      globalRevision: 14,
+      stemHash: QuestionCanonicalHasher.computeStemHashSync(SAMPLE_QUESTION.stem),
+      authorId: 'usr-faculty',
+      authorDisplayName: 'Faculty',
+      reviewedById: 'usr-admin',
+      reviewedByDisplayName: 'Admin',
+      reviewerNotes: null,
+      publishedAt: '2026-10-31T00:00:00Z',
+      createdAt: '2026-10-31T00:00:00Z',
+      updatedAt: '2026-10-31T00:00:00Z',
+    };
+
+    const preview = mergeStrategy.computeDiffPreview({
+      blockId: 'cvs',
+      localRevision: 14,
+      currentLocalQuestions: [localV2Question],
+      delta: {
+        status: 'delta-applied',
+        blockId: 'cvs',
+        revision: 14 as BankRevisionNumber,
+        syncedAt: new Date().toISOString(),
+        etag: 'W/rev-14',
+        upsertedQuestions: [incomingStaleV1Question],
+        archivedQuestionIds: [],
+      },
+    });
+
+    // Zero phantom edits should be produced
+    expect(preview.editedQuestions).toHaveLength(0);
+    expect(preview.addedQuestions).toHaveLength(0);
+    expect(preview.deletedQuestions).toHaveLength(0);
+    expect(preview.hasChanges).toBe(false);
+
+    // Merge must preserve local v2 and NOT downgrade to v1
+    const mergeOutcome = mergeStrategy.mergeGlobalDeltaIntoLocal({
+      blockId: 'cvs',
+      currentLocalQuestions: [localV2Question],
+      incomingGlobalQuestions: [incomingStaleV1Question],
+      archivedGlobalIds: [],
+      previousRevision: 14,
+      newRevision: 14 as BankRevisionNumber,
+      syncedAt: new Date().toISOString(),
+    });
+
+    const mergedItem = mergeOutcome.mergedQuestions.find((q) => q.id === 'q-cvs-ana-001');
+    expect(mergedItem?.bankVersion).toBe(2);
+    expect(mergedItem?.choices[2].isCorrect).toBe(true);
+    expect(mergeOutcome.report.updatedCanonicalCount).toBe(0);
+  });
+
   it('correctly matches multiline stems with quotes, punctuation, and parentheses via enhanced SearchQuerySpecification', () => {
     const sternalQuestion: GovernedQuestion = {
       ...SAMPLE_QUESTION,
