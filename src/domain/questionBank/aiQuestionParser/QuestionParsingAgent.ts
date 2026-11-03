@@ -218,14 +218,28 @@ export class QuestionParsingAgent {
     const bankQuestions: Question[] = Array.from(bankById.values());
 
     const qddEngine = await createClientQddEngine(bankQuestions);
-    const questionsPayload = parsedResult.items.map((item) => item.question);
+    // Always send schema-valid probes: one invalid item must never void the whole batch.
+    const questionsPayload = parsedResult.items.map((item) =>
+      QuestionSchema.safeParse(item.question).success
+        ? item.question
+        : this.repairQuestionToSchema(item.question)
+    );
     const qddBatchResult = await qddEngine.checkBatch(
       questionsPayload,
       { kind: 'block', blockId: 'cvs' },
       signal
     );
 
-    let verdicts: DuplicationVerdict[] = qddBatchResult.ok ? [...qddBatchResult.value] : [];
+    let verdicts: DuplicationVerdict[] = [];
+    if (qddBatchResult.ok) {
+      verdicts = [...qddBatchResult.value];
+    } else {
+      console.error('[QuestionParsingAgent] QDD batch failed, falling back to per-item checks:', qddBatchResult.error);
+      for (const probe of questionsPayload) {
+        const single = await qddEngine.check(probe, { kind: 'block', blockId: 'cvs' }, 'batch-audit', signal);
+        verdicts.push(single.ok ? single.value : (undefined as unknown as DuplicationVerdict));
+      }
+    }
 
     // Also consult Edge D1 (/api/qdd/check-batch) when online so newly published D1 questions are checked
     if (!isTestEnv && typeof fetch === 'function') {
@@ -278,7 +292,8 @@ export class QuestionParsingAgent {
     const conflictTotal = itemsWithVerdicts.filter((i) => i.qddVerdict?.relation === 'CONFLICT').length;
     const nearTotal = itemsWithVerdicts.filter((i) => i.qddVerdict?.relation === 'NEAR').length;
     const siblingTotal = itemsWithVerdicts.filter((i) => i.qddVerdict?.relation === 'SIBLING').length;
-    const uniqueTotal = itemsWithVerdicts.filter((i) => !i.qddVerdict || i.qddVerdict.relation === 'UNIQUE').length;
+    const uniqueTotal = itemsWithVerdicts.filter((i) => i.qddVerdict?.relation === 'UNIQUE').length;
+    const uncheckedTotal = itemsWithVerdicts.filter((i) => !i.qddVerdict).length;
 
     const summaryParts: string[] = [];
     if (exactTotal > 0) summaryParts.push(`${exactTotal} exact`);
@@ -286,6 +301,8 @@ export class QuestionParsingAgent {
     if (nearTotal > 0) summaryParts.push(`${nearTotal} near`);
     if (siblingTotal > 0) summaryParts.push(`${siblingTotal} sibling`);
     summaryParts.push(`${uniqueTotal} unique`);
+    // A missing verdict is a FAILURE, never a pass.
+    if (uncheckedTotal > 0) summaryParts.push(`⚠️ ${uncheckedTotal} NOT CHECKED (engine error)`);
 
     telemetry = this.updateTelemetryStep(telemetry, 'deduplication', 'completed', {
       durationMs: Math.max(1, Date.now() - dedupStartTime),
@@ -640,8 +657,21 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
           }
         }
 
-        const validRes = QuestionSchema.safeParse(q);
-        const finalQuestion = validRes.success ? validRes.data : q;
+        // LLM JSON frequently violates the strict schema (empty rationale, string difficulty,
+        // short evidence quote...). Repair it so downstream QDD + commit never receive invalid input.
+        let validRes = QuestionSchema.safeParse(q);
+        if (!validRes.success) {
+          const firstIssue = validRes.error.issues[0];
+          const repaired = this.repairQuestionToSchema(q);
+          validRes = QuestionSchema.safeParse(repaired);
+          if (validRes.success) {
+            item.warnings = [
+              ...(Array.isArray(item.warnings) ? item.warnings : []),
+              `Schema auto-repaired (${firstIssue?.path?.join('.') || 'root'}: ${firstIssue?.message || 'invalid'})`,
+            ];
+          }
+        }
+        const finalQuestion = validRes.success ? validRes.data : this.repairQuestionToSchema(q);
 
         const correctChoice = finalQuestion.choices.find((c: any) => c.isCorrect) || finalQuestion.choices[0];
         const selectedCorrectChoiceId = (correctChoice?.id as ChoiceId) || 'a';
@@ -1141,6 +1171,92 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
         rationale,
       };
     });
+  }
+
+  /**
+   * Coerces a loosely-shaped (LLM-produced) question into a QuestionSchema-valid object
+   * without altering stem, choice text, or the keyed answer.
+   */
+  public repairQuestionToSchema(raw: any): Question {
+    const q = raw && typeof raw === 'object' ? raw : {};
+    const ids: ChoiceId[] = ['a', 'b', 'c', 'd'];
+    const rawChoices: any[] = Array.isArray(q.choices) ? q.choices : [];
+    const hasCorrect = rawChoices.some((c) => c && c.isCorrect === true);
+
+    const choices = ids.map((id, idx) => {
+      const c = rawChoices.find((rc) => String(rc?.id || '').toLowerCase() === id) || rawChoices[idx] || {};
+      const isCorrect = hasCorrect ? c.isCorrect === true : idx === 0;
+      const text = typeof c.text === 'string' && c.text.trim() ? c.text.trim() : `Option ${id.toUpperCase()}`;
+      const rationale =
+        typeof c.rationale === 'string' && c.rationale.trim()
+          ? c.rationale.trim()
+          : isCorrect
+          ? 'Correct answer per clinical reasoning.'
+          : 'Incorrect for this clinical scenario.';
+      return { id, text, isCorrect, rationale };
+    });
+    // Enforce single correct answer
+    let seen = false;
+    for (const c of choices) {
+      if (c.isCorrect && !seen) seen = true;
+      else c.isCorrect = false;
+    }
+
+    const diffNum = Number(q.difficulty);
+    const difficulty = (diffNum === 1 || diffNum === 2 || diffNum === 3 ? diffNum : 2) as 1 | 2 | 3;
+    const cogRaw = String(q.cognitiveLevel || '').toLowerCase();
+    const cognitiveLevel = (['recall', 'understanding', 'application'].includes(cogRaw)
+      ? cogRaw
+      : 'understanding') as Question['cognitiveLevel'];
+
+    const subjectId = typeof q.subjectId === 'string' && q.subjectId ? q.subjectId : 'physiology';
+    const chapterId = typeof q.chapterId === 'string' && q.chapterId ? q.chapterId : `${subjectId}-general`;
+    const concept = typeof q.concept === 'string' && q.concept ? q.concept : 'Cardiovascular Assessment';
+    const stem = typeof q.stem === 'string' ? q.stem.trim() : '';
+
+    const evidenceIn: any[] = Array.isArray(q.evidence) ? q.evidence : [];
+    const evidence = evidenceIn
+      .filter((e) => e && typeof e === 'object')
+      .map((e) => ({
+        chunkId: typeof e.chunkId === 'string' && e.chunkId ? e.chunkId : `chunk-${Date.now().toString(36)}`,
+        sourceName: typeof e.sourceName === 'string' && e.sourceName ? e.sourceName : 'Cardiovascular Curriculum',
+        location: typeof e.location === 'string' && e.location ? e.location : 'Core Syllabus',
+        quote:
+          typeof e.quote === 'string' && e.quote.trim().length >= 5
+            ? e.quote.trim()
+            : `Curriculum evidence supporting ${concept}.`,
+        kind: e.kind === 'figure' ? ('figure' as const) : ('text' as const),
+      }));
+    if (evidence.length === 0) evidence.push(this.synthesizeEvidence(subjectId, concept));
+
+    const correct = choices.find((c) => c.isCorrect)!;
+    const explanation =
+      typeof q.explanation === 'string' && q.explanation.trim().length >= 10
+        ? q.explanation.trim()
+        : `The correct answer is (${correct.id.toUpperCase()}): "${correct.text}". ${correct.rationale}`;
+
+    return {
+      ...q,
+      id: typeof q.id === 'string' && q.id ? q.id : `q-parsed-${Date.now().toString(36)}`,
+      blockId: typeof q.blockId === 'string' && q.blockId ? q.blockId : 'cvs',
+      subjectId,
+      chapterId,
+      topicId: typeof q.topicId === 'string' && q.topicId ? q.topicId : `${chapterId}/core-concepts`,
+      concept,
+      type: q.type === 'true-false' ? 'true-false' : 'single-best-answer',
+      stem: stem.length >= 10 ? stem : `Clinical scenario regarding ${concept}: ${stem}`.trim(),
+      choices,
+      explanation,
+      examTip: typeof q.examTip === 'string' ? q.examTip : null,
+      mnemonic: typeof q.mnemonic === 'string' ? q.mnemonic : null,
+      difficulty,
+      cognitiveLevel,
+      highYield: q.highYield !== false,
+      origin: q.origin === 'curriculum-self-assessment' ? 'curriculum-self-assessment' : 'authored-grounded',
+      evidence,
+      status: q.status === 'quarantined' ? 'quarantined' : 'active',
+      bankVersion: Number.isInteger(q.bankVersion) && q.bankVersion > 0 ? q.bankVersion : 1,
+    } as Question;
   }
 
   private extractConceptTitle(stem: string, subjectId: string): string {

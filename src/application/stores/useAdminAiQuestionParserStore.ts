@@ -9,7 +9,7 @@
 
 import { create } from 'zustand';
 import type { CloudProviderId } from '../../domain/ai/settings.ts';
-import type { ChoiceId, Question } from '../../domain/model/types.ts';
+import { QuestionSchema, type ChoiceId, type Question } from '../../domain/model/types.ts';
 import { QuestionParsingAgent } from '../../domain/questionBank/aiQuestionParser/QuestionParsingAgent.ts';
 import { CrossModelVerificationPromptBuilder } from '../../domain/questionBank/aiQuestionParser/CrossModelVerificationPromptBuilder.ts';
 import type { ParsedQuestionItem, QuestionStemMode, AgentExecutionTelemetry } from '../../domain/questionBank/aiQuestionParser/types.ts';
@@ -88,6 +88,11 @@ function getMergedBankQuestions(): Question[] {
     if (q?.id) byId.set(q.id, q);
   }
   return Array.from(byId.values());
+}
+
+/** Schema-valid copy for QDD: one malformed LLM item must never void the whole batch. */
+function toQddProbe(q: Question): Question {
+  return QuestionSchema.safeParse(q).success ? q : parsingAgent.repairQuestionToSchema(q);
 }
 
 const VERDICT_RANK: Record<string, number> = {
@@ -258,7 +263,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
 
     let edgeVerdicts: any[] = [];
     try {
-      const questionsPayload = parsedQuestions.map((q) => q.question);
+      const questionsPayload = parsedQuestions.map((q) => toQddProbe(q.question));
       const res = await fetch('/api/qdd/check-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -283,8 +288,11 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       const bankQuestions = getMergedBankQuestions();
       const engine = await createClientQddEngine(bankQuestions);
       const current = get().parsedQuestions;
-      const questionsPayload = current.map((q) => q.question);
+      const questionsPayload = current.map((q) => toQddProbe(q.question));
       const res = await engine.checkBatch(questionsPayload, { kind: 'block', blockId: 'cvs' });
+      if (!res.ok) {
+        console.error('[useAdminAiQuestionParserStore] QDD batch rejected input:', res.error);
+      }
       const clientVerdicts = res.ok ? res.value : [];
 
       const updated = current.map((item, idx) => ({
@@ -308,10 +316,11 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
   saveAllUnique: async () => {
     const { parsedQuestions, commitToGlobalQuestionBank } = get();
 
-    // Unique if no verdict or verdict is UNIQUE or SIBLING (not EXACT, NEAR, or CONFLICT)
+    // Unique ONLY if the engine actually returned UNIQUE or SIBLING.
+    // A missing verdict means the check failed — never treat it as a pass.
     const uniqueItems = parsedQuestions.filter((item) => {
       const rel = item.qddVerdict?.relation;
-      return !rel || rel === 'UNIQUE' || rel === 'SIBLING';
+      return rel === 'UNIQUE' || rel === 'SIBLING';
     });
 
     const duplicateItems = parsedQuestions.filter((item) => {
