@@ -57,7 +57,8 @@ export type AgentToolStepId =
   | 'taxonomy'
   | 'reasoning'
   | 'consensus'
-  | 'validation';
+  | 'validation'
+  | 'deduplication';
 
 export interface AgentToolStep {
   readonly id: AgentToolStepId;
@@ -93,6 +94,7 @@ export interface RawQuestionParseRequest {
   readonly targetChapterId?: ChapterId | 'auto';
   readonly stemMode?: QuestionStemMode;
   readonly enableConsensusCheck?: boolean;
+  readonly existingQuestions?: readonly Question[];
   readonly onTelemetryUpdate?: (telemetry: AgentExecutionTelemetry) => void;
 }
 

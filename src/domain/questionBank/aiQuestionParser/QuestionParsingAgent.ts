@@ -27,6 +27,15 @@ import { curriculumClassificationAgent } from '../../taxonomy/CurriculumClassifi
 import { multiModelConsensusEngine } from './MultiModelConsensusEngine.ts';
 import { createCloudProvider } from '../../../infrastructure/ai/engineRegistry.ts';
 import type { LlmMessage } from '../../../infrastructure/ai/providers/openAiCompatibleProvider.ts';
+import { QuestionCanonicalizerV2 } from '../duplication/QuestionCanonicalizerV2.ts';
+import { MinHasher } from '../duplication/MinHasher.ts';
+import { ClinicalDiscriminatorExtractor } from '../duplication/ClinicalDiscriminatorExtractor.ts';
+import type {
+  DuplicateCandidate,
+  DuplicateRelation,
+  DuplicationVerdict,
+} from '../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
+import defaultCvsBank from '../../../../content/cvs/dist/bank.v1.json';
 
 export class QuestionParsingAgent {
   constructor(private readonly providerOverride?: any) {}
@@ -191,6 +200,193 @@ export class QuestionParsingAgent {
       durationMs: Date.now() - valStartTime,
       detail: `All ${parsedResult.items.length} item(s) conform to board-standard NBME schema`,
     });
+    request.onTelemetryUpdate?.(telemetry);
+
+    // STEP 6: Duplication Detection & Collision Analysis
+    const dedupStartTime = Date.now();
+    telemetry = this.updateTelemetryStep(telemetry, 'deduplication', 'running', {
+      detail: 'Scanning candidates against canonical bank and batch using MinHash LSH and clinical discriminators...',
+    });
+    request.onTelemetryUpdate?.(telemetry);
+
+    const canonicalizer = new QuestionCanonicalizerV2();
+    const minhasher = new MinHasher();
+
+    // 1. Canonicalize parsed items
+    const canonicals = await Promise.all(
+      parsedResult.items.map((item) => canonicalizer.canonicalize(item.question))
+    );
+    const signatures = canonicals.map((c) => minhasher.signature(c.shingles));
+
+    // 2. Canonicalize comparison bank questions
+    const bankQuestions: Question[] =
+      request.existingQuestions && request.existingQuestions.length > 0
+        ? [...request.existingQuestions]
+        : Array.isArray(defaultCvsBank)
+        ? (defaultCvsBank as Question[])
+        : [];
+
+    const bankCanonicals = await Promise.all(
+      bankQuestions.map((q) => canonicalizer.canonicalize(q))
+    );
+    const bankSignatures = bankCanonicals.map((c) => minhasher.signature(c.shingles));
+
+    // 3. Evaluate each item against bank + previous items in batch
+    const itemsWithVerdicts: ParsedQuestionItem[] = parsedResult.items.map((item, idx) => {
+      const candidates: DuplicateCandidate[] = [];
+      const seenMatchedIds = new Set<string>();
+
+      const evaluateCandidate = (
+        cA: typeof canonicals[0],
+        cB: typeof canonicals[0],
+        sigA: Uint32Array,
+        sigB: Uint32Array,
+        matchedQ: Question,
+        stageTag: 'S1_EXACT' | 'S2_LEXICAL_LSH'
+      ) => {
+        if (seenMatchedIds.has(matchedQ.id) || matchedQ.id === item.question.id) return;
+
+        let rel: DuplicateRelation | null = null;
+        let jaccard: number | null = null;
+
+        if (cA.itemHash === cB.itemHash) {
+          rel = 'EXACT';
+          jaccard = 1.0;
+        } else if (cA.stemHash === cB.stemHash) {
+          rel = cA.answerKeyHash === cB.answerKeyHash ? 'EXACT' : 'CONFLICT';
+          jaccard = 1.0;
+        } else {
+          jaccard = MinHasher.estimateJaccard(sigA, sigB);
+          if (jaccard >= 0.8) {
+            const delta = ClinicalDiscriminatorExtractor.computeDelta(
+              cB.discriminators,
+              cA.discriminators
+            );
+            rel = delta.length > 0 ? 'SIBLING' : 'NEAR';
+          } else if (jaccard >= 0.65) {
+            const delta = ClinicalDiscriminatorExtractor.computeDelta(
+              cB.discriminators,
+              cA.discriminators
+            );
+            rel = delta.length > 0 ? 'SIBLING' : 'NEAR';
+          } else if (jaccard >= 0.35) {
+            const delta = ClinicalDiscriminatorExtractor.computeDelta(
+              cB.discriminators,
+              cA.discriminators
+            );
+            if (delta.length > 0) rel = 'SIBLING';
+          }
+        }
+
+        if (rel) {
+          seenMatchedIds.add(matchedQ.id);
+          candidates.push({
+            matchedQuestionId: matchedQ.id,
+            matchedStemPreview: matchedQ.stem.slice(0, 100),
+            relation: rel,
+            decidedBy: stageTag,
+            signals: {
+              lexicalJaccard: jaccard,
+              semanticCosine: null,
+              rerankScore: null,
+              sameAnswerKey: cA.answerKeyHash === cB.answerKeyHash,
+              discriminatorDelta: [],
+              fusedScore: jaccard ?? 1.0,
+            },
+            llm: null,
+            explanationKey: `qdd.explanation.${rel.toLowerCase()}`,
+            explanationParams: { matchedId: matchedQ.id },
+          });
+        }
+      };
+
+      // A. Compare against canonical bank questions
+      for (let bIdx = 0; bIdx < bankQuestions.length; bIdx++) {
+        evaluateCandidate(
+          bankCanonicals[bIdx],
+          canonicals[idx],
+          bankSignatures[bIdx],
+          signatures[idx],
+          bankQuestions[bIdx],
+          'S1_EXACT'
+        );
+      }
+
+      // B. Compare against earlier in-batch questions
+      for (let prevIdx = 0; prevIdx < idx; prevIdx++) {
+        evaluateCandidate(
+          canonicals[prevIdx],
+          canonicals[idx],
+          signatures[prevIdx],
+          signatures[idx],
+          parsedResult!.items[prevIdx].question,
+          'S2_LEXICAL_LSH'
+        );
+      }
+
+      const relSeverity: Record<DuplicateRelation, number> = {
+        EXACT: 5,
+        CONFLICT: 4,
+        NEAR: 3,
+        SIBLING: 2,
+        UNIQUE: 1,
+      };
+
+      let highestRelation: DuplicateRelation = 'UNIQUE';
+      for (const cand of candidates) {
+        if (relSeverity[cand.relation] > relSeverity[highestRelation]) {
+          highestRelation = cand.relation;
+        }
+      }
+
+      const verdict: DuplicationVerdict = {
+        questionId: item.question.id,
+        tier: 'batch-audit',
+        decision:
+          highestRelation === 'EXACT'
+            ? 'BLOCK'
+            : highestRelation === 'UNIQUE'
+            ? 'ALLOW'
+            : 'REVIEW',
+        relation: highestRelation,
+        candidates,
+        stagesExecuted: ['S0_CANONICALIZE', 'S1_EXACT', 'S2_LEXICAL_LSH'],
+        degraded: false,
+        degradedReasons: [],
+        latencyMs: Math.max(1, Date.now() - dedupStartTime),
+        engineVersion: 'qdd-engine-v2',
+        thresholdsVersion: 'v1',
+      };
+
+      return {
+        ...item,
+        qddVerdict: verdict,
+        isCheckingDuplication: false,
+      };
+    });
+
+    parsedResult = {
+      ...parsedResult,
+      items: itemsWithVerdicts,
+    };
+
+    const exactTotal = itemsWithVerdicts.filter((i) => i.qddVerdict?.relation === 'EXACT').length;
+    const conflictTotal = itemsWithVerdicts.filter((i) => i.qddVerdict?.relation === 'CONFLICT').length;
+    const nearTotal = itemsWithVerdicts.filter((i) => i.qddVerdict?.relation === 'NEAR').length;
+    const siblingTotal = itemsWithVerdicts.filter((i) => i.qddVerdict?.relation === 'SIBLING').length;
+    const uniqueTotal = itemsWithVerdicts.filter((i) => !i.qddVerdict || i.qddVerdict.relation === 'UNIQUE').length;
+
+    const summaryParts: string[] = [];
+    if (exactTotal > 0) summaryParts.push(`${exactTotal} exact`);
+    if (conflictTotal > 0) summaryParts.push(`${conflictTotal} conflict`);
+    if (nearTotal > 0) summaryParts.push(`${nearTotal} near`);
+    if (siblingTotal > 0) summaryParts.push(`${siblingTotal} sibling`);
+    summaryParts.push(`${uniqueTotal} unique`);
+
+    telemetry = this.updateTelemetryStep(telemetry, 'deduplication', 'completed', {
+      durationMs: Date.now() - dedupStartTime,
+      detail: `Audited ${parsedResult.items.length} item(s) against ${bankQuestions.length} bank questions: ${summaryParts.join(', ')}`,
+    });
 
     telemetry = {
       ...telemetry,
@@ -244,6 +440,13 @@ export class QuestionParsingAgent {
         toolName: 'SchemaInvariantVerificationTool',
         label: 'Single-Best-Answer Invariants & Zod Validation',
         description: 'Guarantees NBME / USMLE strict 4-choice formatting and pedagogical consistency.',
+        status: 'queued',
+      },
+      {
+        id: 'deduplication',
+        toolName: 'QuestionDuplicationCollisionEngine',
+        label: 'Question Duplication & Collision Analysis',
+        description: 'Discovers LSH bucket collisions, estimates Jaccard similarity, and flags duplicate or conflicting items against canonical bank.',
         status: 'queued',
       },
     ];
@@ -722,11 +925,49 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     const rawChoices: Array<{ id: string; text: string }> = [];
     let detectedExplanation = '';
 
-    const choiceRegex = /^(?:[([{\s]*([A-D1-4])[)\]}\s.:-]+)(.*)$/i;
     const explanationRegex = /^(?:Explanation|Rationale|Note|Why)[:\s]+(.*)$/i;
 
     let inChoices = false;
     let inExplanation = false;
+
+    const matchChoiceLine = (line: string, stemLinesCount: number, currentlyInChoices: boolean) => {
+      // 1. Delimited: A., A), (A), [A], A:, 1., 1), (1), [1], 1:
+      const delimMatch = line.match(/^[([{\s]*([A-D1-4])[)\]}:.]\s*(.*)$/i);
+      if (delimMatch) {
+        return { letterOrNum: delimMatch[1].toLowerCase(), text: delimMatch[2].trim() };
+      }
+
+      // 2. Dash delimited: A - text, A -- text
+      const dashMatch = line.match(/^([A-D1-4])\s*[-–—]+\s+(.*)$/i);
+      if (dashMatch) {
+        return { letterOrNum: dashMatch[1].toLowerCase(), text: dashMatch[2].trim() };
+      }
+
+      // 3. Bare letter without delimiter (e.g. "B Option", "C Option", or "A Option")
+      // Must NOT match English article "A" in clinical stems ("A 45-year-old...", "A patient...", "A healthy...")
+      const bareMatch = line.match(/^([A-D1-4])\s+(.*)$/i);
+      if (bareMatch) {
+        const letter = bareMatch[1].toLowerCase();
+        const rest = bareMatch[2].trim();
+
+        // If letter is 'a' or '1': only treat as choice if we are already in choices or following a question stem,
+        // and it does not start with clinical narrative words or age numbers
+        if (letter === 'a' || letter === '1') {
+          const isClinicalOpener = /^(?:\d+[-\s]?year|patient|healthy|female|male|newborn|child|infant|pregnant|case|man|woman|prior|high|normal)\b/i.test(rest);
+          if (stemLinesCount > 0 && !isClinicalOpener && currentlyInChoices) {
+            return { letterOrNum: letter, text: rest };
+          }
+          return null;
+        }
+
+        // For B, C, D (or 2, 3, 4), they are never English articles
+        if (stemLinesCount > 0 || currentlyInChoices) {
+          return { letterOrNum: letter, text: rest };
+        }
+      }
+
+      return null;
+    };
 
     for (const line of lines) {
       const expMatch = line.match(explanationRegex);
@@ -741,10 +982,10 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
         continue;
       }
 
-      const match = line.match(choiceRegex);
+      const match = matchChoiceLine(line, stemLines.length, inChoices);
       if (match) {
         inChoices = true;
-        const letterOrNum = match[1].toLowerCase();
+        const letterOrNum = match.letterOrNum;
         let letter = letterOrNum;
         if (letterOrNum === '1') letter = 'a';
         else if (letterOrNum === '2') letter = 'b';
@@ -753,7 +994,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
 
         rawChoices.push({
           id: letter,
-          text: match[2].trim(),
+          text: match.text,
         });
       } else if (!inChoices) {
         stemLines.push(line);

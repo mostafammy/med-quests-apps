@@ -165,6 +165,14 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
     set({ isParsing: true, error: null, commitFeedback: null, abortController: controller });
 
     try {
+      const storeQuestions = useQuestionStore.getState().questions;
+      const bankQuestions: Question[] =
+        storeQuestions.length > 0
+          ? storeQuestions
+          : Array.isArray(defaultCvsBank)
+          ? (defaultCvsBank as Question[])
+          : [];
+
       const result = await parsingAgent.parseRawQuestions(
         {
           rawText: rawInputText,
@@ -172,6 +180,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
           modelId: selectedModelId,
           stemMode,
           enableConsensusCheck,
+          existingQuestions: bankQuestions,
           targetSubjectId: targetSubjectId === 'all' || targetSubjectId === 'auto' ? undefined : targetSubjectId,
           targetChapterId: targetChapterId === 'all' || targetChapterId === 'auto' ? undefined : targetChapterId,
           onTelemetryUpdate: (agentTelemetry) => set({ agentTelemetry }),
@@ -215,14 +224,18 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
     const { parsedQuestions } = get();
     if (parsedQuestions.length === 0) return;
 
-    // Set optimistic checking state
-    set({
-      isCheckingDuplication: true,
-      parsedQuestions: parsedQuestions.map((q) => ({
-        ...q,
+    const hasAnyVerdict = parsedQuestions.some((q) => Boolean(q.qddVerdict));
+
+    // Only set shimmering checking state if questions don't already have verdicts
+    if (!hasAnyVerdict) {
+      set({
         isCheckingDuplication: true,
-      })),
-    });
+        parsedQuestions: parsedQuestions.map((q) => ({
+          ...q,
+          isCheckingDuplication: true,
+        })),
+      });
+    }
 
     try {
       const questionsPayload = parsedQuestions.map((q) => q.question);

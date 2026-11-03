@@ -137,27 +137,29 @@ const SUBJECT_META: Record<string, { icon: string; badgeColor: string }> = {
   pathology: { icon: '🧬', badgeColor: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/25' },
 };
 
-const SAMPLE_RAW_TEXT = `1. A 55-year-old man presents with progressive dyspnea on exertion and syncope. Cardiac auscultation reveals a harsh, crescendo-decrescendo systolic murmur heard loudest at the right second intercostal space, radiating to the carotids. Which valve pathology is most likely?
-A. Mitral regurgitation
-B. Aortic stenosis
-C. Tricuspid regurgitation
-D. Pulmonary regurgitation
-Answer: B
-Explanation: Aortic stenosis classically presents with a crescendo-decrescendo systolic murmur at the right upper sternal border with carotid radiation and the triad of SAD (Syncope, Angina, Dyspnea).
+const SAMPLE_RAW_TEXT = `1. Which of the following represents the correct craniocaudal sequence of the five primitive cardiac sacculations before looping occurs?
+A. Truncus arteriosus → Bulbus cordis → Ventricle → Atrium → Sinus venosus
+B. Truncus arteriosus → Ventricle → Bulbus cordis → Sinus venosus → Atrium
+C. Sinus venosus → Atrium → Ventricle → Bulbus cordis → Truncus arteriosus
+D. Bulbus cordis → Truncus arteriosus → Ventricle → Atrium → Sinus venosus
+Answer: A
+Explanation: The early embryonic heart tube develops five dilated sacculations in craniocaudal order: Truncus arteriosus (most cephalic), Bulbus cordis, Ventricle, Atrium, and Sinus venosus (most caudal bifurcation).
 
-2. During cardiac embryogenesis, which structure is primarily responsible for the development of the smooth part of the right ventricle (conus arteriosus)?
-A. Truncus arteriosus
-B. Bulbus cordis
-C. Primitive ventricle
-D. Sinus venosus
-Note: (Admin omitted the answer key here to test AI generation)
+2. In the developing vascular system, what adult arterial structure is derived from the left fourth aortic arch?
+A. A portion of the definitive Arch of the Aorta
+B. Common carotid artery
+C. Ductus arteriosus
+D. Right subclavian artery
+Answer: B
+Note: (Admin intentionally keyed B instead of A to test Duplicate Answer Conflict detection against canonical bank item q-cvs-ana-004)
 
 3. A 64-year-old female with persistent atrial fibrillation is initiated on an antiarrhythmic medication that prolongs the cardiac action potential duration by blocking rapid delayed rectifier potassium currents (IKr). Which adverse effect is most concerning?
 A. Lupus-like syndrome
 B. Torsades de pointes (QTc prolongation)
 C. Pulmonary fibrosis
 D. Cinchonism
-Note: (Tests dynamic curriculum detection of Cardiovascular Pharmacology)`;
+Answer: B
+Explanation: Class III antiarrhythmics (e.g. sotalol, dofetilide, ibutilide) block rapid delayed rectifier potassium channels (IKr), prolonging the cardiac action potential duration and QTc interval, which predisposes to polymorphic ventricular tachycardia (Torsades de pointes).`;
 
 export const AdminAiQuestionParserLab: React.FC = () => {
   const { authState, elevateToPlatformOwner } = useAuthStore();

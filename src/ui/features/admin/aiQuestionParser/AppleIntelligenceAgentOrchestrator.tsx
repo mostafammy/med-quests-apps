@@ -22,6 +22,7 @@ import {
   Loader2,
   FileText,
   ShieldCheck,
+  CopyCheck,
   ChevronDown,
   ChevronUp,
   Terminal,
@@ -47,6 +48,7 @@ const TOOL_ICONS: Record<AgentToolStepId, React.ElementType> = {
   reasoning: Cpu,
   consensus: Scale,
   validation: ShieldCheck,
+  deduplication: CopyCheck,
 };
 
 export const AppleIntelligenceAgentOrchestrator: React.FC<AppleIntelligenceAgentOrchestratorProps> = ({
@@ -128,7 +130,7 @@ export const AppleIntelligenceAgentOrchestrator: React.FC<AppleIntelligenceAgent
               </div>
 
               <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                <span>Ordered execution: 5 Autonomous Tools</span>
+                <span>Ordered execution: {telemetry.steps.length} Autonomous Tools</span>
                 <span>•</span>
                 <span className="font-mono text-zinc-700 dark:text-zinc-300 font-medium">
                   {telemetry.activeToolName || 'Idle'}
@@ -221,7 +223,7 @@ export const AppleIntelligenceAgentOrchestrator: React.FC<AppleIntelligenceAgent
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 relative z-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 relative z-10">
             {telemetry.steps.map((step, idx) => {
               const isSelected = selectedStepId === step.id;
               const isRunning = step.status === 'running' || (isSimulatingReplay && replayStepIndex === idx);
@@ -367,6 +369,8 @@ export const AppleIntelligenceAgentOrchestrator: React.FC<AppleIntelligenceAgent
                         ? `${activeModelName} (${stemMode})`
                         : selectedStep.id === 'consensus'
                         ? (enableConsensusCheck ? '4-Model Quorum Ensemble' : 'Single Engine Pass')
+                        : selectedStep.id === 'deduplication'
+                        ? 'MinHash LSH & Clinical Collision Engine (v2)'
                         : 'Deterministic Engine'}
                     </span>
                   </div>

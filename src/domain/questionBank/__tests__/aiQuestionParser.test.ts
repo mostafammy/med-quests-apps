@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { QuestionParsingAgent } from '../aiQuestionParser/QuestionParsingAgent.ts';
 import { CrossModelVerificationPromptBuilder } from '../aiQuestionParser/CrossModelVerificationPromptBuilder.ts';
-import { QuestionSchema } from '../../model/types.ts';
+import { QuestionSchema, type Question } from '../../model/types.ts';
 
 const SAMPLE_TEXT_WITH_KEY = `
 Question 1:
@@ -90,6 +90,107 @@ describe('QuestionParsingAgent (AI Ingestion & Normalization)', () => {
     expect(result.totalParsed).toBe(2);
     expect(result.items[0].wasAnswerKeyProvidedInInput).toBe(true);
     expect(result.items[1].wasAnswerKeyProvidedInInput).toBe(false);
+  });
+
+  it('executes Stage 06 Duplication Collision Analysis in pipeline and attaches qddVerdict to items', async () => {
+    let capturedTelemetry: any = null;
+
+    const existingBankQuestion: Question = {
+      id: 'q-bank-exact-1',
+      blockId: 'cvs',
+      subjectId: 'anatomy',
+      chapterId: 'cvs-ana-heart-dev',
+      topicId: 'cvs-ana-heart-tube',
+      concept: 'Aortic Dissection Emergency',
+      type: 'single-best-answer',
+      stem: 'A 45-year-old male presents with sudden-onset tearing chest pain radiating to his back. Blood pressure is 185/105 mmHg in the right arm and 140/90 mmHg in the left arm. A transesophageal echocardiogram demonstrates an intimal flap in the ascending aorta. What is the most appropriate definitive management?',
+      choices: [
+        { id: 'a', text: 'Urgent surgical repair of the ascending aorta', isCorrect: true, rationale: 'Open repair' },
+        { id: 'b', text: 'Intravenous thrombolysis with alteplase', isCorrect: false, rationale: 'Contraindicated' },
+        { id: 'c', text: 'Medical management with beta-blockers alone', isCorrect: false, rationale: 'Insufficient' },
+        { id: 'd', text: 'Emergent percutaneous coronary intervention', isCorrect: false, rationale: 'Incorrect' },
+      ],
+      explanation: 'Stanford Type A dissection is a surgical emergency.',
+      mnemonic: null,
+      examTip: 'Urgent surgical repair',
+      difficulty: 2,
+      cognitiveLevel: 'application',
+      highYield: true,
+      origin: 'authored-grounded',
+      evidence: [],
+      status: 'active',
+      bankVersion: 1,
+    };
+
+    const result = await agent.parseRawQuestions({
+      rawText: SAMPLE_TEXT_WITH_KEY,
+      providerId: 'gemini',
+      modelId: 'gemini-2.5-flash',
+      existingQuestions: [existingBankQuestion],
+      onTelemetryUpdate: (telemetry) => {
+        capturedTelemetry = telemetry;
+      },
+    });
+
+    expect(result.totalParsed).toBe(1);
+    const item = result.items[0];
+
+    // Verdict must be directly attached
+    expect(item.qddVerdict).toBeDefined();
+    expect(item.qddVerdict?.relation).toBe('EXACT');
+    expect(item.qddVerdict?.decision).toBe('BLOCK');
+    expect(item.qddVerdict?.candidates.length).toBeGreaterThan(0);
+    expect(item.qddVerdict?.candidates[0].matchedQuestionId).toBe('q-bank-exact-1');
+
+    // Telemetry must have Stage 06: deduplication
+    expect(capturedTelemetry).toBeDefined();
+    const dedupStep = capturedTelemetry.steps.find((s: any) => s.id === 'deduplication');
+    expect(dedupStep).toBeDefined();
+    expect(dedupStep.status).toBe('completed');
+    expect(dedupStep.toolName).toBe('QuestionDuplicationCollisionEngine');
+    expect(dedupStep.detail).toContain('1 exact');
+  });
+
+  it('detects CONFLICT relation when stem matches an existing bank question but keyed answer differs', async () => {
+    const existingBankQuestion: Question = {
+      id: 'q-bank-conflict-1',
+      blockId: 'cvs',
+      subjectId: 'anatomy',
+      chapterId: 'cvs-ana-heart-dev',
+      topicId: 'cvs-ana-heart-tube',
+      concept: 'Aortic Dissection Emergency',
+      type: 'single-best-answer',
+      stem: 'A 45-year-old male presents with sudden-onset tearing chest pain radiating to his back. Blood pressure is 185/105 mmHg in the right arm and 140/90 mmHg in the left arm. A transesophageal echocardiogram demonstrates an intimal flap in the ascending aorta. What is the most appropriate definitive management?',
+      choices: [
+        { id: 'a', text: 'Urgent surgical repair of the ascending aorta', isCorrect: false, rationale: 'Option A' },
+        { id: 'b', text: 'Intravenous thrombolysis with alteplase', isCorrect: true, rationale: 'Keyed as B in bank' },
+        { id: 'c', text: 'Medical management with beta-blockers alone', isCorrect: false, rationale: 'Option C' },
+        { id: 'd', text: 'Emergent percutaneous coronary intervention', isCorrect: false, rationale: 'Option D' },
+      ],
+      explanation: 'Bank explanation.',
+      mnemonic: null,
+      examTip: 'Tip',
+      difficulty: 2,
+      cognitiveLevel: 'application',
+      highYield: true,
+      origin: 'authored-grounded',
+      evidence: [],
+      status: 'active',
+      bankVersion: 1,
+    };
+
+    const result = await agent.parseRawQuestions({
+      rawText: SAMPLE_TEXT_WITH_KEY, // Has Answer: A
+      providerId: 'gemini',
+      modelId: 'gemini-2.5-flash',
+      existingQuestions: [existingBankQuestion], // Bank has Answer: B
+    });
+
+    const item = result.items[0];
+    expect(item.qddVerdict).toBeDefined();
+    expect(item.qddVerdict?.relation).toBe('CONFLICT');
+    expect(item.qddVerdict?.decision).toBe('REVIEW');
+    expect(item.qddVerdict?.candidates[0].matchedQuestionId).toBe('q-bank-conflict-1');
   });
 });
 

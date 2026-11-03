@@ -125,12 +125,13 @@ Answer: C
     // Verify initial telemetry state
     const firstEvent = telemetryEvents[0];
     expect(firstEvent.isRunning).toBe(true);
-    expect(firstEvent.steps.length).toBe(5);
+    expect(firstEvent.steps.length).toBe(6);
     expect(firstEvent.steps[0].id).toBe('segmentation');
     expect(firstEvent.steps[1].id).toBe('taxonomy');
     expect(firstEvent.steps[2].id).toBe('reasoning');
     expect(firstEvent.steps[3].id).toBe('consensus');
     expect(firstEvent.steps[4].id).toBe('validation');
+    expect(firstEvent.steps[5].id).toBe('deduplication');
 
     // Verify final telemetry state
     const lastEvent = telemetryEvents[telemetryEvents.length - 1];
