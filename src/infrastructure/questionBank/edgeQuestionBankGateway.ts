@@ -97,9 +97,32 @@ export class EdgeQuestionBankGateway
         if (deletedIds.size > 0) {
           parsed = parsed.filter((q) => !deletedIds.has(q.id));
         }
-        // If bundled seed bank grew (e.g. 106 questions ingested), merge any missing bundled seed items
-        // AND bump the global block revision so clients never see "Local v6.0 -> Global v6.0" with +106 additions!
+        // If bundled seed bank grew or was rebalanced (e.g. 106 questions updated to bankVersion 2),
+        // reconcile existing seed questions and merge any missing bundled seed items.
+        // Also bump the global block revision so clients never see "Local v6.0 -> Global v6.0" with additions!
         if (blockId === 'cvs' && Array.isArray(defaultCvsBank)) {
+          const bundledMap = new Map((defaultCvsBank as Question[]).map((q) => [q.id, q]));
+          let upgradedCount = 0;
+          parsed = parsed.map((q) => {
+            const bundled = bundledMap.get(q.id);
+            if (
+              bundled &&
+              q.provenanceScope !== 'local-custom' &&
+              ((bundled.bankVersion || 1) > (q.bankVersion || 1) ||
+                ((bundled.bankVersion || 1) === (q.bankVersion || 1) &&
+                  JSON.stringify(bundled.choices) !== JSON.stringify(q.choices)))
+            ) {
+              upgradedCount++;
+              return {
+                ...q,
+                choices: bundled.choices,
+                bankVersion: bundled.bankVersion || 2,
+                stemHash: QuestionCanonicalHasher.computeStemHashSync(bundled.stem),
+              };
+            }
+            return q;
+          });
+
           const existingIds = new Set(parsed.map((q) => q.id));
           const missingSeeds = (defaultCvsBank as Question[]).filter(
             (q) => !existingIds.has(q.id) && !deletedIds.has(q.id)
@@ -116,6 +139,8 @@ export class EdgeQuestionBankGateway
               `${STORAGE_KEYS.SEED_CATALOG_SIZE}_${blockId}`,
               String(defaultCvsBank.length)
             );
+            this.saveLocalCanonicalBank(blockId, parsed);
+          } else if (upgradedCount > 0) {
             this.saveLocalCanonicalBank(blockId, parsed);
           } else if (recordedSeedSize !== defaultCvsBank.length) {
             // Record current seed catalog size
