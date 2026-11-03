@@ -23,6 +23,10 @@ import type {
   DuplicateCluster,
   ResolutionAction,
 } from '../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
+import { ClientQddAuditRunner } from '../../../domain/questionBank/duplication/ClientQddAuditRunner.ts';
+import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
+import defaultCvsBank from '../../../../content/cvs/dist/bank.v1.json';
+import type { Question } from '../../../domain/model/types.ts';
 
 export interface QddAuditBoardProps {
   readonly blockId?: string;
@@ -44,48 +48,93 @@ export const QddAuditBoard: React.FC<QddAuditBoardProps> = ({
   const startAudit = async () => {
     setIsRunning(true);
     setFeedback(null);
+
     try {
+      // 1. Attempt edge Cloudflare Worker endpoint
       const res = await fetch('/api/admin/qdd/audits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blockId, startedBy: 'admin' }),
       });
 
-      if (!res.ok) {
-        throw new Error('Failed to initiate audit job');
-      }
+      if (res.ok) {
+        const job: AuditJob = await res.json();
+        let currentJob = job;
+        setActiveJob(job);
 
-      const job: AuditJob = await res.json();
-      setActiveJob(job);
+        // Advance chunks iteratively
+        while (currentJob && currentJob.status === 'running') {
+          const advRes: Response = await fetch(`/api/admin/qdd/audits/${currentJob.id}/advance`, {
+            method: 'POST',
+          });
+          if (!advRes.ok) break;
+          currentJob = await advRes.json();
+          setActiveJob(currentJob);
+        }
 
-      // Advance chunks iteratively
-      let currentJob = job;
-      while (currentJob.status === 'running') {
-        const advRes = await fetch(`/api/admin/qdd/audits/${currentJob.id}/advance`, {
-          method: 'POST',
+        // Fetch clusters on completion
+        if (currentJob) {
+          const clustersRes: Response = await fetch(`/api/admin/qdd/audits/${currentJob.id}/clusters`);
+          if (clustersRes.ok) {
+            const data: any = await clustersRes.json();
+            setClusters(data.clusters || []);
+          }
+        }
+
+        setIsRunning(false);
+        setFeedback({
+          type: 'success',
+          message: `Audit completed successfully. Found ${currentJob?.clustersFound ?? 0} duplicate clusters.`,
         });
-        if (!advRes.ok) break;
-        currentJob = await advRes.json();
-        setActiveJob(currentJob);
+        return;
       }
+    } catch (edgeErr) {
+      console.info('[QddAuditBoard] Edge audit endpoint unavailable, activating local client runner:', edgeErr);
+    }
 
-      // Fetch clusters on completion
-      const clustersRes = await fetch(`/api/admin/qdd/audits/${currentJob.id}/clusters`);
-      if (clustersRes.ok) {
-        const data = await clustersRes.json();
-        setClusters(data.clusters || []);
-      }
+    // 2. Seamless local-first in-browser fallback
+    try {
+      const storeQuestions = useQuestionStore.getState().questions;
+      const candidateQuestions: readonly Question[] =
+        storeQuestions.length > 0
+          ? storeQuestions
+          : Array.isArray(defaultCvsBank)
+          ? (defaultCvsBank as Question[])
+          : [];
 
+      const runner = new ClientQddAuditRunner();
+      const result = await runner.runAudit(
+        candidateQuestions,
+        blockId,
+        (progress) => {
+          setActiveJob({
+            id: `audit-local-${blockId}` as any,
+            scope: { kind: 'block', blockId },
+            status: progress.phase === 'completed' ? 'completed' : 'running',
+            cursor: String(progress.processed),
+            processed: progress.processed,
+            total: progress.total,
+            clustersFound: progress.clustersFound,
+            startedBy: 'admin (local)',
+            startedAt: new Date().toISOString(),
+            finishedAt: progress.phase === 'completed' ? new Date().toISOString() : null,
+          });
+        },
+        { chunkSliceSize: 25, sliceDelayMs: 12 }
+      );
+
+      setActiveJob(result.job);
+      setClusters(result.clusters);
       setIsRunning(false);
       setFeedback({
         type: 'success',
-        message: `Audit completed successfully. Found ${currentJob.clustersFound} duplicate clusters.`,
+        message: `Audit completed successfully. Scanned ${result.job.total} questions, identified ${result.clusters.length} duplicate cluster${result.clusters.length === 1 ? '' : 's'}.`,
       });
-    } catch (err: any) {
+    } catch (localErr: any) {
       setIsRunning(false);
       setFeedback({
         type: 'error',
-        message: err?.message || 'Audit execution interrupted',
+        message: localErr?.message || 'Audit execution interrupted',
       });
     }
   };
@@ -100,40 +149,56 @@ export const QddAuditBoard: React.FC<QddAuditBoardProps> = ({
       const survivorId = targetCluster?.suggestedSurvivorId || duplicateId;
       const pairKey = [survivorId, duplicateId].sort().join('|');
 
-      const res = await fetch('/api/admin/qdd/resolutions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pairKey,
-          subjectId: survivorId,
-          matchedId: duplicateId,
-          engineRelation: targetCluster?.relation || 'NEAR',
-          humanRelation: action === 'KEEP_BOTH_DISTINCT' ? 'UNIQUE' : targetCluster?.relation,
-          action,
-          reviewerId: 'admin',
-          note: `Resolved via Global Audit Board`,
-        }),
-      });
-
-      if (res.ok) {
-        // Remove resolved duplicate from cluster in UI
-        setClusters((prev) =>
-          prev
-            .map((c) => {
-              if (c.id === targetCluster?.id) {
-                const remaining = c.memberIds.filter((m) => m !== duplicateId);
-                return { ...c, memberIds: remaining };
-              }
-              return c;
-            })
-            .filter((c) => c.memberIds.length >= 2)
-        );
-
-        setFeedback({
-          type: 'success',
-          message: `Successfully applied resolution (${action}) to ${duplicateId}.`,
+      let remoteOk = false;
+      try {
+        const res = await fetch('/api/admin/qdd/resolutions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pairKey,
+            subjectId: survivorId,
+            matchedId: duplicateId,
+            engineRelation: targetCluster?.relation || 'NEAR',
+            humanRelation: action === 'KEEP_BOTH_DISTINCT' ? 'UNIQUE' : targetCluster?.relation,
+            action,
+            reviewerId: 'admin',
+            note: `Resolved via Global Audit Board`,
+          }),
         });
+        remoteOk = res.ok;
+      } catch {
+        remoteOk = false;
       }
+
+      // If action is soft-archiving, update local question store if item exists
+      if (action === 'ARCHIVE_DUPLICATE') {
+        const currentQuestions = useQuestionStore.getState().questions;
+        if (currentQuestions.some((q) => q.id === duplicateId)) {
+          useQuestionStore.setState({
+            questions: currentQuestions.map((q) =>
+              q.id === duplicateId ? { ...q, status: 'quarantined' as const } : q
+            ),
+          });
+        }
+      }
+
+      // Remove resolved duplicate from cluster in UI
+      setClusters((prev) =>
+        prev
+          .map((c) => {
+            if (c.id === targetCluster?.id) {
+              const remaining = c.memberIds.filter((m) => m !== duplicateId);
+              return { ...c, memberIds: remaining };
+            }
+            return c;
+          })
+          .filter((c) => c.memberIds.length >= 2)
+      );
+
+      setFeedback({
+        type: 'success',
+        message: `Successfully applied resolution (${action}) to ${duplicateId}${remoteOk ? '' : ' (Local Bank)'}.`,
+      });
     } catch (err: any) {
       setFeedback({
         type: 'error',
@@ -260,18 +325,19 @@ export const QddAuditBoard: React.FC<QddAuditBoardProps> = ({
       )}
 
       {/* Comparison Modal when Inspecting a Pair */}
-      {inspectPair && (
-        <DuplicateCompareSheet
-          isOpen={true}
-          onClose={() => setInspectPair(null)}
-          subjectQuestion={{
+      {inspectPair && (() => {
+        const allQuestions = useQuestionStore.getState().questions;
+        const fallbackQuestions = Array.isArray(defaultCvsBank) ? (defaultCvsBank as Question[]) : [];
+        const subjectQ =
+          allQuestions.find((q) => q.id === inspectPair.subjectId) ||
+          fallbackQuestions.find((q) => q.id === inspectPair.subjectId) || {
             id: inspectPair.subjectId,
             blockId,
             subjectId: 'anatomy',
             chapterId: 'cvs-ana-heart-dev',
             topicId: 'cvs-ana-heart-dev/core',
             concept: 'Canonical Subject',
-            type: 'single-best-answer',
+            type: 'single-best-answer' as const,
             stem: `Canonical item ${inspectPair.subjectId} clinical vignette.`,
             choices: [
               { id: 'a', text: 'Option A', isCorrect: true, rationale: 'A' },
@@ -283,23 +349,60 @@ export const QddAuditBoard: React.FC<QddAuditBoardProps> = ({
             examTip: null,
             mnemonic: null,
             difficulty: 2,
-            cognitiveLevel: 'understanding',
+            cognitiveLevel: 'understanding' as const,
             highYield: true,
-            origin: 'authored-grounded',
+            origin: 'authored-grounded' as const,
             evidence: [
               {
                 chunkId: 'chk-audit',
                 sourceName: 'Robbins Pathologic Basis of Disease',
                 location: 'Page 500',
                 quote: 'Evidence citation quote for canonical item.',
-                kind: 'text',
+                kind: 'text' as const,
               },
             ],
-            status: 'active',
+            status: 'active' as const,
             bankVersion: 1,
-          }}
-        />
-      )}
+          };
+
+        const matchedQ =
+          allQuestions.find((q) => q.id === inspectPair.matchedId) ||
+          fallbackQuestions.find((q) => q.id === inspectPair.matchedId) || {
+            id: inspectPair.matchedId,
+            blockId,
+            subjectId: 'anatomy',
+            chapterId: 'cvs-ana-heart-dev',
+            topicId: 'cvs-ana-heart-dev/core',
+            concept: 'Matched Duplicate Candidate',
+            type: 'single-best-answer' as const,
+            stem: `Duplicate candidate item ${inspectPair.matchedId} clinical vignette.`,
+            choices: [
+              { id: 'a', text: 'Option A', isCorrect: true, rationale: 'A' },
+              { id: 'b', text: 'Option B', isCorrect: false, rationale: 'B' },
+              { id: 'c', text: 'Option C', isCorrect: false, rationale: 'C' },
+              { id: 'd', text: 'Option D', isCorrect: false, rationale: 'D' },
+            ],
+            explanation: 'Candidate explanation rationale.',
+            examTip: null,
+            mnemonic: null,
+            difficulty: 2,
+            cognitiveLevel: 'understanding' as const,
+            highYield: true,
+            origin: 'authored-grounded' as const,
+            evidence: [],
+            status: 'active' as const,
+            bankVersion: 1,
+          };
+
+        return (
+          <DuplicateCompareSheet
+            isOpen={true}
+            onClose={() => setInspectPair(null)}
+            subjectQuestion={subjectQ}
+            matchedQuestion={matchedQ}
+          />
+        );
+      })()}
     </div>
   );
 };
