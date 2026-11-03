@@ -2501,15 +2501,54 @@ async function ensureGlobalBankSeeded(
   const seeded = buildDefaultSeededBank();
   if (seeded.length === 0) return;
 
-  // Idempotent seed reconciliation: only insert bundled questions that are genuinely missing.
+  // Idempotent seed reconciliation: insert missing seeds and reconcile rebalanced bankVersion
   // This lets a growing bundled bank (e.g. 212 → 318) reach production without overwriting
   // faculty edits or resurrecting archived rows (archived rows still exist by id).
   const existingRows = await db
-    .prepare('SELECT id FROM global_questions WHERE block_id = ?')
+    .prepare('SELECT id, bank_version, author_id FROM global_questions WHERE block_id = ?')
     .bind(blockId)
-    .all<{ id: string }>();
-  const existingIds = new Set(existingRows.results.map((row) => row.id));
-  const missing = seeded.filter((question) => !existingIds.has(question.id));
+    .all<{ id: string; bank_version: number; author_id: string }>();
+  const existingMap = new Map((existingRows.results || []).map((row: any) => [row.id, row]));
+  const missing = seeded.filter((question) => !existingMap.has(question.id));
+
+  // Reconcile existing bundled questions if bundled seeds have higher bankVersion (e.g. SPEC-006 choice rebalancing to v2)
+  const toUpgrade = seeded.filter((q) => {
+    const existing = existingMap.get(q.id);
+    return (
+      existing &&
+      (existing.bank_version || 1) < (q.bankVersion || 1) &&
+      (existing.author_id === 'usr-curriculum-faculty' || !existing.author_id)
+    );
+  });
+
+  if (toUpgrade.length > 0) {
+    const updateSql = `UPDATE global_questions
+                       SET choices_json = ?, bank_version = ?, stem_hash = ?, updated_at = datetime('now')
+                       WHERE id = ? AND bank_version < ?`;
+    const updateStmts = toUpgrade.map((q) =>
+      db
+        .prepare(updateSql)
+        .bind(
+          JSON.stringify(q.choices),
+          q.bankVersion || 2,
+          q.stemHash,
+          q.id,
+          q.bankVersion || 2
+        )
+    );
+    const batch = (db as any).batch;
+    if (typeof batch === 'function') {
+      const CHUNK_SIZE = 50;
+      for (let i = 0; i < updateStmts.length; i += CHUNK_SIZE) {
+        await batch.call(db, updateStmts.slice(i, i + CHUNK_SIZE));
+      }
+    } else {
+      for (const statement of updateStmts) {
+        await statement.run();
+      }
+    }
+  }
+
   if (missing.length === 0) return;
 
   // New seeds must receive a revision above every existing client cursor.
