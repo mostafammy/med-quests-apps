@@ -10,6 +10,7 @@ import {
   Upload,
   Sparkles,
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   ShieldCheck,
   FileText,
@@ -44,6 +45,7 @@ export const QuestionStudio: React.FC = () => {
     errors: string[];
     ticketCount?: number;
     mode?: 'local' | 'global_review';
+    duplicateWarnings?: string[];
   } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSubmissionsTracker, setShowSubmissionsTracker] = useState(false);
@@ -466,6 +468,19 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
                     <p className="text-[11px] text-emerald-700 dark:text-emerald-400 pl-6">
                       Assigned {ingestStatus.ticketCount} curriculum review ticket(s). Once verified by faculty, your questions will be published to all scholars.
                     </p>
+                  )}
+                  {ingestStatus.duplicateWarnings && ingestStatus.duplicateWarnings.length > 0 && (
+                    <div className="mt-2.5 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-[11px] space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span>Prebuilt Duplication Engine Notice:</span>
+                      </div>
+                      <ul className="list-disc list-inside space-y-0.5 text-[10.5px]">
+                        {ingestStatus.duplicateWarnings.map((warn, i) => (
+                          <li key={i}>{warn}</li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
               ) : (

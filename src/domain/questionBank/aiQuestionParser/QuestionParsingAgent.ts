@@ -27,14 +27,8 @@ import { curriculumClassificationAgent } from '../../taxonomy/CurriculumClassifi
 import { multiModelConsensusEngine } from './MultiModelConsensusEngine.ts';
 import { createCloudProvider } from '../../../infrastructure/ai/engineRegistry.ts';
 import type { LlmMessage } from '../../../infrastructure/ai/providers/openAiCompatibleProvider.ts';
-import { QuestionCanonicalizerV2 } from '../duplication/QuestionCanonicalizerV2.ts';
-import { MinHasher } from '../duplication/MinHasher.ts';
-import { ClinicalDiscriminatorExtractor } from '../duplication/ClinicalDiscriminatorExtractor.ts';
-import type {
-  DuplicateCandidate,
-  DuplicateRelation,
-  DuplicationVerdict,
-} from '../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
+import { createClientQddEngine } from '../duplication/clientCompositionRoot.ts';
+import type { DuplicationVerdict } from '../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
 import defaultCvsBank from '../../../../content/cvs/dist/bank.v1.json';
 
 export class QuestionParsingAgent {
@@ -203,22 +197,13 @@ export class QuestionParsingAgent {
     request.onTelemetryUpdate?.(telemetry);
 
     // STEP 6: Duplication Detection & Collision Analysis
+    // Launch our prebuilt DuplicationDetectionEngine
     const dedupStartTime = Date.now();
     telemetry = this.updateTelemetryStep(telemetry, 'deduplication', 'running', {
-      detail: 'Scanning candidates against canonical bank and batch using MinHash LSH and clinical discriminators...',
+      detail: 'Launching prebuilt DuplicationDetectionEngine (MinHash LSH & Discriminator Sieve)...',
     });
     request.onTelemetryUpdate?.(telemetry);
 
-    const canonicalizer = new QuestionCanonicalizerV2();
-    const minhasher = new MinHasher();
-
-    // 1. Canonicalize parsed items
-    const canonicals = await Promise.all(
-      parsedResult.items.map((item) => canonicalizer.canonicalize(item.question))
-    );
-    const signatures = canonicals.map((c) => minhasher.signature(c.shingles));
-
-    // 2. Canonicalize comparison bank questions
     const bankQuestions: Question[] =
       request.existingQuestions && request.existingQuestions.length > 0
         ? [...request.existingQuestions]
@@ -226,144 +211,21 @@ export class QuestionParsingAgent {
         ? (defaultCvsBank as Question[])
         : [];
 
-    const bankCanonicals = await Promise.all(
-      bankQuestions.map((q) => canonicalizer.canonicalize(q))
+    const qddEngine = await createClientQddEngine(bankQuestions);
+    const questionsPayload = parsedResult.items.map((item) => item.question);
+    const qddBatchResult = await qddEngine.checkBatch(
+      questionsPayload,
+      { kind: 'block', blockId: 'cvs' },
+      signal
     );
-    const bankSignatures = bankCanonicals.map((c) => minhasher.signature(c.shingles));
 
-    // 3. Evaluate each item against bank + previous items in batch
-    const itemsWithVerdicts: ParsedQuestionItem[] = parsedResult.items.map((item, idx) => {
-      const candidates: DuplicateCandidate[] = [];
-      const seenMatchedIds = new Set<string>();
+    const verdicts: readonly DuplicationVerdict[] = qddBatchResult.ok ? qddBatchResult.value : [];
 
-      const evaluateCandidate = (
-        cA: typeof canonicals[0],
-        cB: typeof canonicals[0],
-        sigA: Uint32Array,
-        sigB: Uint32Array,
-        matchedQ: Question,
-        stageTag: 'S1_EXACT' | 'S2_LEXICAL_LSH'
-      ) => {
-        if (seenMatchedIds.has(matchedQ.id) || matchedQ.id === item.question.id) return;
-
-        let rel: DuplicateRelation | null = null;
-        let jaccard: number | null = null;
-
-        if (cA.itemHash === cB.itemHash) {
-          rel = 'EXACT';
-          jaccard = 1.0;
-        } else if (cA.stemHash === cB.stemHash) {
-          rel = cA.answerKeyHash === cB.answerKeyHash ? 'EXACT' : 'CONFLICT';
-          jaccard = 1.0;
-        } else {
-          jaccard = MinHasher.estimateJaccard(sigA, sigB);
-          if (jaccard >= 0.8) {
-            const delta = ClinicalDiscriminatorExtractor.computeDelta(
-              cB.discriminators,
-              cA.discriminators
-            );
-            rel = delta.length > 0 ? 'SIBLING' : 'NEAR';
-          } else if (jaccard >= 0.65) {
-            const delta = ClinicalDiscriminatorExtractor.computeDelta(
-              cB.discriminators,
-              cA.discriminators
-            );
-            rel = delta.length > 0 ? 'SIBLING' : 'NEAR';
-          } else if (jaccard >= 0.35) {
-            const delta = ClinicalDiscriminatorExtractor.computeDelta(
-              cB.discriminators,
-              cA.discriminators
-            );
-            if (delta.length > 0) rel = 'SIBLING';
-          }
-        }
-
-        if (rel) {
-          seenMatchedIds.add(matchedQ.id);
-          candidates.push({
-            matchedQuestionId: matchedQ.id,
-            matchedStemPreview: matchedQ.stem.slice(0, 100),
-            relation: rel,
-            decidedBy: stageTag,
-            signals: {
-              lexicalJaccard: jaccard,
-              semanticCosine: null,
-              rerankScore: null,
-              sameAnswerKey: cA.answerKeyHash === cB.answerKeyHash,
-              discriminatorDelta: [],
-              fusedScore: jaccard ?? 1.0,
-            },
-            llm: null,
-            explanationKey: `qdd.explanation.${rel.toLowerCase()}`,
-            explanationParams: { matchedId: matchedQ.id },
-          });
-        }
-      };
-
-      // A. Compare against canonical bank questions
-      for (let bIdx = 0; bIdx < bankQuestions.length; bIdx++) {
-        evaluateCandidate(
-          bankCanonicals[bIdx],
-          canonicals[idx],
-          bankSignatures[bIdx],
-          signatures[idx],
-          bankQuestions[bIdx],
-          'S1_EXACT'
-        );
-      }
-
-      // B. Compare against earlier in-batch questions
-      for (let prevIdx = 0; prevIdx < idx; prevIdx++) {
-        evaluateCandidate(
-          canonicals[prevIdx],
-          canonicals[idx],
-          signatures[prevIdx],
-          signatures[idx],
-          parsedResult!.items[prevIdx].question,
-          'S2_LEXICAL_LSH'
-        );
-      }
-
-      const relSeverity: Record<DuplicateRelation, number> = {
-        EXACT: 5,
-        CONFLICT: 4,
-        NEAR: 3,
-        SIBLING: 2,
-        UNIQUE: 1,
-      };
-
-      let highestRelation: DuplicateRelation = 'UNIQUE';
-      for (const cand of candidates) {
-        if (relSeverity[cand.relation] > relSeverity[highestRelation]) {
-          highestRelation = cand.relation;
-        }
-      }
-
-      const verdict: DuplicationVerdict = {
-        questionId: item.question.id,
-        tier: 'batch-audit',
-        decision:
-          highestRelation === 'EXACT'
-            ? 'BLOCK'
-            : highestRelation === 'UNIQUE'
-            ? 'ALLOW'
-            : 'REVIEW',
-        relation: highestRelation,
-        candidates,
-        stagesExecuted: ['S0_CANONICALIZE', 'S1_EXACT', 'S2_LEXICAL_LSH'],
-        degraded: false,
-        degradedReasons: [],
-        latencyMs: Math.max(1, Date.now() - dedupStartTime),
-        engineVersion: 'qdd-engine-v2',
-        thresholdsVersion: 'v1',
-      };
-
-      return {
-        ...item,
-        qddVerdict: verdict,
-        isCheckingDuplication: false,
-      };
-    });
+    const itemsWithVerdicts: ParsedQuestionItem[] = parsedResult.items.map((item, idx) => ({
+      ...item,
+      qddVerdict: verdicts[idx],
+      isCheckingDuplication: false,
+    }));
 
     parsedResult = {
       ...parsedResult,
@@ -384,8 +246,8 @@ export class QuestionParsingAgent {
     summaryParts.push(`${uniqueTotal} unique`);
 
     telemetry = this.updateTelemetryStep(telemetry, 'deduplication', 'completed', {
-      durationMs: Date.now() - dedupStartTime,
-      detail: `Audited ${parsedResult.items.length} item(s) against ${bankQuestions.length} bank questions: ${summaryParts.join(', ')}`,
+      durationMs: Math.max(1, Date.now() - dedupStartTime),
+      detail: `Prebuilt QDD Engine audited ${parsedResult.items.length} item(s) against ${bankQuestions.length} bank questions: ${summaryParts.join(', ')}`,
     });
 
     telemetry = {
@@ -926,6 +788,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     let detectedExplanation = '';
 
     const explanationRegex = /^(?:Explanation|Rationale|Note|Why)[:\s]+(.*)$/i;
+    const answerKeyLineRegex = /^(?:Answer|Ans|Correct(?:\s*Answer)?|Key|Option)\s*[:=-]?\s*\(?[A-D]\)?$/i;
 
     let inChoices = false;
     let inExplanation = false;
@@ -970,6 +833,10 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     };
 
     for (const line of lines) {
+      if (answerKeyLineRegex.test(line.trim())) {
+        continue;
+      }
+
       const expMatch = line.match(explanationRegex);
       if (expMatch) {
         inExplanation = true;

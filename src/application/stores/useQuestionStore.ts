@@ -9,6 +9,7 @@ import { QuestionCanonicalHasher } from '../../domain/questionBank/canonicalHash
 import { useAuthStore } from './useAuthStore.ts';
 import { edgeAuthGateway } from '../../infrastructure/auth/edgeAuthGateway.ts';
 import { analytics } from '../../infrastructure/analytics/medQuestsAnalyticsFacade.ts';
+import { createClientQddEngine } from '../../domain/questionBank/duplication/clientCompositionRoot.ts';
 import type {
   BankSyncCursor,
   LocalBankMergeReport,
@@ -61,6 +62,7 @@ interface QuestionStoreState {
     count: number;
     errors: string[];
     ingested?: Question[];
+    duplicateWarnings?: string[];
   }>;
   submitQuestionsForGlobalReview: (
     rawJson: string | unknown[],
@@ -545,7 +547,32 @@ export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
       }
     });
 
+    const duplicateWarnings: string[] = [];
+
     if (validated.length > 0) {
+      // Launch prebuilt DuplicationDetectionEngine to audit incoming questions
+      try {
+        const qddEngine = await createClientQddEngine(get().questions);
+        const qddResult = await qddEngine.checkBatch(validated, { kind: 'block', blockId: 'cvs' });
+        if (qddResult.ok) {
+          for (const verdict of qddResult.value) {
+            if (verdict.relation === 'EXACT') {
+              const cand = verdict.candidates[0];
+              duplicateWarnings.push(
+                `Question "${verdict.questionId}" is an exact duplicate of existing bank item (${cand?.matchedQuestionId || 'bank question'}).`
+              );
+            } else if (verdict.relation === 'CONFLICT') {
+              const cand = verdict.candidates[0];
+              duplicateWarnings.push(
+                `Question "${verdict.questionId}" has an answer-key conflict with question (${cand?.matchedQuestionId || 'bank question'}).`
+              );
+            }
+          }
+        }
+      } catch {
+        // Non-blocking duplicate audit
+      }
+
       await db.questions.bulkPut(validated);
       const current = get().questions;
       const map = new Map<string, Question>();
@@ -554,7 +581,7 @@ export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
       set({ questions: filterActiveQuestions(Array.from(map.values())) });
     }
 
-    return { count: validated.length, errors, ingested: validated };
+    return { count: validated.length, errors, ingested: validated, duplicateWarnings };
   },
 
   // Dual Action 2: Save Locally AND Submit for Global Curriculum Review
@@ -578,6 +605,32 @@ export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
 
     if (candidates.length === 0) {
       return { count: 0, errors: localResult.errors, ticketCount: 0 };
+    }
+
+    // Launch prebuilt DuplicationDetectionEngine to verify candidates before submitting
+    try {
+      const qddEngine = await createClientQddEngine(get().questions);
+      const qddRes = await qddEngine.checkBatch(candidates, { kind: 'block', blockId: 'cvs' });
+      if (qddRes.ok) {
+        const blockedItems = qddRes.value.filter(
+          (v) => v.decision === 'BLOCK' && v.candidates.some((c) => c.matchedQuestionId !== v.questionId)
+        );
+        if (blockedItems.length > 0) {
+          const reasons = blockedItems.map(
+            (b) => `Question "${b.questionId}" is a duplicate of ${b.candidates[0]?.matchedQuestionId}`
+          );
+          return {
+            count: localResult.count,
+            errors: [
+              ...localResult.errors,
+              `Submission stopped by DuplicationDetectionEngine: ${reasons.join(', ')}`,
+            ],
+            ticketCount: 0,
+          };
+        }
+      }
+    } catch {
+      // Fallback
     }
 
     const submissionRes = await edgeQuestionBankGateway.submitQuestionsForGlobalReview({

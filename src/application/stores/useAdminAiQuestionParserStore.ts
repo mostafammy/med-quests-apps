@@ -15,14 +15,7 @@ import { CrossModelVerificationPromptBuilder } from '../../domain/questionBank/a
 import type { ParsedQuestionItem, QuestionStemMode, AgentExecutionTelemetry } from '../../domain/questionBank/aiQuestionParser/types.ts';
 import { multiModelConsensusEngine } from '../../domain/questionBank/aiQuestionParser/MultiModelConsensusEngine.ts';
 import { curriculumTaxonomyRegistry } from '../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
-import { QuestionCanonicalizerV2 } from '../../domain/questionBank/duplication/QuestionCanonicalizerV2.ts';
-import { MinHasher } from '../../domain/questionBank/duplication/MinHasher.ts';
-import { ClinicalDiscriminatorExtractor } from '../../domain/questionBank/duplication/ClinicalDiscriminatorExtractor.ts';
-import type {
-  DuplicateRelation,
-  DuplicateCandidate,
-  DuplicationVerdict,
-} from '../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
+import { createClientQddEngine } from '../../domain/questionBank/duplication/clientCompositionRoot.ts';
 import { useAuthStore } from './useAuthStore.ts';
 import { useBankGovernanceStore } from './useBankGovernanceStore.ts';
 import { useQuestionStore } from './useQuestionStore.ts';
@@ -264,19 +257,8 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       // Network or offline fallback
     }
 
-    // Graceful offline & in-browser fallback: check BOTH against existing bank AND in-batch
+    // Graceful offline & in-browser fallback: launch prebuilt DuplicationDetectionEngine
     try {
-      const canonicalizer = new QuestionCanonicalizerV2();
-      const minhasher = new MinHasher();
-      const current = get().parsedQuestions;
-
-      // 1. Canonicalize current batch items
-      const canonicals = await Promise.all(
-        current.map((item) => canonicalizer.canonicalize(item.question))
-      );
-      const signatures = canonicals.map((c) => minhasher.signature(c.shingles));
-
-      // 2. Load and canonicalize bank questions
       const storeQuestions = useQuestionStore.getState().questions;
       const bankQuestions: Question[] =
         storeQuestions.length > 0
@@ -285,147 +267,21 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
           ? (defaultCvsBank as Question[])
           : [];
 
-      const bankCanonicals = await Promise.all(
-        bankQuestions.map((q) => canonicalizer.canonicalize(q))
-      );
-      const bankSignatures = bankCanonicals.map((c) => minhasher.signature(c.shingles));
+      const engine = await createClientQddEngine(bankQuestions);
+      const current = get().parsedQuestions;
+      const questionsPayload = current.map((q) => q.question);
+      const res = await engine.checkBatch(questionsPayload, { kind: 'block', blockId: 'cvs' });
 
-      const updated = current.map((item, idx) => {
-        const candidates: DuplicateCandidate[] = [];
-        const seenMatchedIds = new Set<string>();
-
-        const evaluateCandidate = (
-          cA: typeof canonicals[0],
-          cB: typeof canonicals[0],
-          sigA: Uint32Array,
-          sigB: Uint32Array,
-          matchedQ: Question,
-          stageTag: 'S1_EXACT' | 'S2_LEXICAL_LSH'
-        ) => {
-          if (seenMatchedIds.has(matchedQ.id) || matchedQ.id === item.question.id) return;
-
-          let rel: DuplicateRelation | null = null;
-          let jaccard: number | null = null;
-
-          if (cA.itemHash === cB.itemHash) {
-            rel = 'EXACT';
-            jaccard = 1.0;
-          } else if (cA.stemHash === cB.stemHash) {
-            rel = cA.answerKeyHash === cB.answerKeyHash ? 'EXACT' : 'CONFLICT';
-            jaccard = 1.0;
-          } else {
-            jaccard = MinHasher.estimateJaccard(sigA, sigB);
-            if (jaccard >= 0.8) {
-              const delta = ClinicalDiscriminatorExtractor.computeDelta(
-                cB.discriminators,
-                cA.discriminators
-              );
-              rel = delta.length > 0 ? 'SIBLING' : 'NEAR';
-            } else if (jaccard >= 0.65) {
-              const delta = ClinicalDiscriminatorExtractor.computeDelta(
-                cB.discriminators,
-                cA.discriminators
-              );
-              rel = delta.length > 0 ? 'SIBLING' : 'NEAR';
-            } else if (jaccard >= 0.35) {
-              const delta = ClinicalDiscriminatorExtractor.computeDelta(
-                cB.discriminators,
-                cA.discriminators
-              );
-              if (delta.length > 0) rel = 'SIBLING';
-            }
-          }
-
-          if (rel) {
-            seenMatchedIds.add(matchedQ.id);
-            candidates.push({
-              matchedQuestionId: matchedQ.id,
-              matchedStemPreview: matchedQ.stem.slice(0, 100),
-              relation: rel,
-              decidedBy: stageTag,
-              signals: {
-                lexicalJaccard: jaccard,
-                semanticCosine: null,
-                rerankScore: null,
-                sameAnswerKey: cA.answerKeyHash === cB.answerKeyHash,
-                discriminatorDelta: [],
-                fusedScore: jaccard ?? 1.0,
-              },
-              llm: null,
-              explanationKey: `qdd.explanation.${rel.toLowerCase()}`,
-              explanationParams: { matchedId: matchedQ.id },
-            });
-          }
-        };
-
-        // A. Compare against all canonical bank questions
-        for (let bIdx = 0; bIdx < bankQuestions.length; bIdx++) {
-          evaluateCandidate(
-            bankCanonicals[bIdx],
-            canonicals[idx],
-            bankSignatures[bIdx],
-            signatures[idx],
-            bankQuestions[bIdx],
-            'S1_EXACT'
-          );
-        }
-
-        // B. Compare against earlier in-batch questions
-        for (let prevIdx = 0; prevIdx < idx; prevIdx++) {
-          evaluateCandidate(
-            canonicals[prevIdx],
-            canonicals[idx],
-            signatures[prevIdx],
-            signatures[idx],
-            current[prevIdx].question,
-            'S2_LEXICAL_LSH'
-          );
-        }
-
-        const relSeverity: Record<DuplicateRelation, number> = {
-          EXACT: 5,
-          CONFLICT: 4,
-          NEAR: 3,
-          SIBLING: 2,
-          UNIQUE: 1,
-        };
-
-        let highestRelation: DuplicateRelation = 'UNIQUE';
-        for (const cand of candidates) {
-          if (relSeverity[cand.relation] > relSeverity[highestRelation]) {
-            highestRelation = cand.relation;
-          }
-        }
-
-        const verdict: DuplicationVerdict = {
-          questionId: item.question.id,
-          tier: 'batch-audit',
-          decision:
-            highestRelation === 'EXACT'
-              ? 'BLOCK'
-              : highestRelation === 'UNIQUE'
-              ? 'ALLOW'
-              : 'REVIEW',
-          relation: highestRelation,
-          candidates,
-          stagesExecuted: ['S0_CANONICALIZE', 'S1_EXACT', 'S2_LEXICAL_LSH'],
-          degraded: false,
-          degradedReasons: [],
-          latencyMs: 1,
-          engineVersion: 'qdd-engine-v2',
-          thresholdsVersion: 'v1',
-        };
-
-        return {
+      if (res.ok) {
+        const updated = current.map((item, idx) => ({
           ...item,
-          qddVerdict: verdict,
+          qddVerdict: res.value[idx] || item.qddVerdict,
           isCheckingDuplication: false,
-        };
-      });
-
-      set({ parsedQuestions: updated, isCheckingDuplication: false });
+        }));
+        set({ parsedQuestions: updated, isCheckingDuplication: false });
+      }
     } catch (fallbackErr) {
-      console.error('[useAdminAiQuestionParserStore] Duplication check failed:', fallbackErr);
+      console.error('[useAdminAiQuestionParserStore] Prebuilt QDD check failed:', fallbackErr);
       const reset = get().parsedQuestions.map((q) => ({
         ...q,
         isCheckingDuplication: false,
