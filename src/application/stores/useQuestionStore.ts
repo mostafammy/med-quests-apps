@@ -131,12 +131,12 @@ export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
         await db.questions.bulkPut(enrichedSeed as unknown as Question[]);
         stored = enrichedSeed as unknown as Question[];
       } else if (stored.length > 0 && blockId === 'cvs' && Array.isArray(defaultCvsBank)) {
-        // Non-destructive upgrade: Reconcile unedited seed-bundled questions to bankVersion 2
+        // Non-destructive upgrade: Reconcile unedited canonical questions to bankVersion 2
         const bundledMap = new Map((defaultCvsBank as Question[]).map((q) => [q.id, q]));
         const toUpgrade: Question[] = [];
         for (const q of stored) {
           const governed = q as GovernedQuestion;
-          if (governed.provenanceScope === 'seed-bundled' && (governed.bankVersion || 1) < 2) {
+          if (governed.provenanceScope !== 'local-custom' && (governed.bankVersion || 1) < 2) {
             const bundled = bundledMap.get(q.id);
             if (bundled && (bundled.bankVersion || 1) >= 2) {
               toUpgrade.push({
