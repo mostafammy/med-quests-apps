@@ -25,6 +25,7 @@ import { S4DiscriminatorsStage } from '../../../../domain/questionBank/duplicati
 import { useAdminAiQuestionParserStore } from '../../../../application/stores/useAdminAiQuestionParserStore.ts';
 import { useBankGovernanceStore } from '../../../../application/stores/useBankGovernanceStore.ts';
 import { useAuthStore } from '../../../../application/stores/useAuthStore.ts';
+import { useQuestionStore } from '../../../../application/stores/useQuestionStore.ts';
 import type { Question } from '../../../../domain/model/types.ts';
 import type { DuplicationVerdict } from '../../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
 
@@ -395,6 +396,79 @@ describe('US2: In-Batch & Against-Bank Deduplication Engine', () => {
 
       // Clear store state
       useAdminAiQuestionParserStore.getState().clearParsedQuestions();
+    });
+
+    it('flags duplicate when parsed question matches an existing question in the bank', async () => {
+      const bankQ = createDummyQuestion(
+        'bank-original-1',
+        'Which of the following represents the correct craniocaudal sequence of the five primitive cardiac sacculations before looping occurs?',
+        'a'
+      );
+      useQuestionStore.setState({ questions: [bankQ] });
+
+      const parsedDup = createDummyQuestion('parsed-dup-1', bankQ.stem, 'a');
+
+      useAdminAiQuestionParserStore.setState({
+        parsedQuestions: [
+          {
+            tempId: 't-dup',
+            rawInputExcerpt: '',
+            question: parsedDup,
+            wasAnswerKeyProvidedInInput: true,
+            aiGeneratedAnswerKey: false,
+            selectedCorrectChoiceId: 'a',
+            confidenceScore: 99,
+            warnings: [],
+            isApproved: true,
+          },
+        ],
+      });
+
+      // Run duplication check
+      await useAdminAiQuestionParserStore.getState().runBatchDuplicationCheck();
+
+      const updated = useAdminAiQuestionParserStore.getState().parsedQuestions;
+      expect(updated[0].qddVerdict).toBeDefined();
+      expect(updated[0].qddVerdict?.relation).toBe('EXACT');
+      expect(updated[0].qddVerdict?.decision).toBe('BLOCK');
+      expect(updated[0].qddVerdict?.candidates[0].matchedQuestionId).toBe('bank-original-1');
+    });
+
+    it('flags CONFLICT when parsed question matches bank stem but has different correct answer', async () => {
+      const bankQ = createDummyQuestion(
+        'bank-original-2',
+        'Which congenital heart anomaly represents the most common cause of cyanotic heart disease in newborns?',
+        'a'
+      );
+      useQuestionStore.setState({ questions: [bankQ] });
+
+      // Parsed question has identical stem but marks choice 'b' as correct
+      const parsedConflict = createDummyQuestion('parsed-conflict-1', bankQ.stem, 'b');
+
+      useAdminAiQuestionParserStore.setState({
+        parsedQuestions: [
+          {
+            tempId: 't-conflict',
+            rawInputExcerpt: '',
+            question: parsedConflict,
+            wasAnswerKeyProvidedInInput: true,
+            aiGeneratedAnswerKey: false,
+            selectedCorrectChoiceId: 'b',
+            confidenceScore: 99,
+            warnings: [],
+            isApproved: true,
+          },
+        ],
+      });
+
+      // Run duplication check
+      await useAdminAiQuestionParserStore.getState().runBatchDuplicationCheck();
+
+      const updated = useAdminAiQuestionParserStore.getState().parsedQuestions;
+      expect(updated[0].qddVerdict).toBeDefined();
+      expect(updated[0].qddVerdict?.relation).toBe('CONFLICT');
+      expect(updated[0].qddVerdict?.decision).toBe('REVIEW');
+      expect(updated[0].qddVerdict?.candidates[0].matchedQuestionId).toBe('bank-original-2');
     });
 
     it('filters out duplicates and commits only unique items', async () => {

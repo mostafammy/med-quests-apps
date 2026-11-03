@@ -42,12 +42,14 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../../../application/stores/useAuthStore.ts';
 import { useAdminAiQuestionParserStore } from '../../../../application/stores/useAdminAiQuestionParserStore.ts';
+import { useQuestionStore } from '../../../../application/stores/useQuestionStore.ts';
+import defaultCvsBank from '../../../../../content/cvs/dist/bank.v1.json';
 import { curriculumTaxonomyRegistry } from '../../../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
 import { AppleIntelligenceAgentOrchestrator } from './AppleIntelligenceAgentOrchestrator.tsx';
 import { DuplicateBadge } from '../../qdd/DuplicateBadge.tsx';
 import { DuplicateCompareSheet } from '../../qdd/DuplicateCompareSheet.tsx';
 import type { ParsedQuestionItem } from '../../../../domain/questionBank/aiQuestionParser/types.ts';
-import type { ChoiceId } from '../../../../domain/model/types.ts';
+import type { ChoiceId, Question } from '../../../../domain/model/types.ts';
 import type { CloudProviderId } from '../../../../domain/ai/settings.ts';
 
 interface ModelOption {
@@ -1504,14 +1506,24 @@ export const AdminAiQuestionParserLab: React.FC = () => {
       )}
 
       {/* QDD Duplicate Comparison & Diff Sheet */}
-      {inspectingQuestionItem && (
-        <DuplicateCompareSheet
-          isOpen={true}
-          onClose={() => setInspectingQuestionItem(null)}
-          subjectQuestion={inspectingQuestionItem.question}
-          verdict={inspectingQuestionItem.qddVerdict}
-        />
-      )}
+      {inspectingQuestionItem && (() => {
+        const storeQuestions = useQuestionStore.getState().questions;
+        const candidateId = inspectingQuestionItem.qddVerdict?.candidates[0]?.matchedQuestionId;
+        const matched =
+          storeQuestions.find((q) => q.id === candidateId) ||
+          parsedQuestions.find((p) => p.question.id === candidateId)?.question ||
+          (Array.isArray(defaultCvsBank) ? (defaultCvsBank as Question[]).find((q) => q.id === candidateId) : undefined);
+
+        return (
+          <DuplicateCompareSheet
+            isOpen={true}
+            onClose={() => setInspectingQuestionItem(null)}
+            subjectQuestion={inspectingQuestionItem.question}
+            matchedQuestion={matched}
+            verdict={inspectingQuestionItem.qddVerdict}
+          />
+        );
+      })()}
     </div>
   );
 };

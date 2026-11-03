@@ -264,6 +264,35 @@ function cloudflareQddDevPlugin(): Plugin {
           res.end(JSON.stringify({ ok: false, error: String(err) }));
         }
       });
+
+      server.middlewares.use('/api/qdd', async (req, res, next) => {
+        try {
+          const reqUrl = new URL(req.url || '', 'http://localhost:3000');
+          const pathname = reqUrl.pathname;
+
+          if ((pathname === '/check-batch' || pathname === '/check-batch/') && req.method === 'POST') {
+            let bodyStr = '';
+            req.on('data', (chunk) => { bodyStr += chunk; });
+            req.on('end', () => {
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ verdicts: [] }));
+            });
+            return;
+          }
+
+          if ((pathname === '/check' || pathname === '/check/') && req.method === 'POST') {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ decision: 'ALLOW', relation: 'UNIQUE', candidates: [] }));
+            return;
+          }
+
+          next();
+        } catch {
+          next();
+        }
+      });
     },
   };
 }

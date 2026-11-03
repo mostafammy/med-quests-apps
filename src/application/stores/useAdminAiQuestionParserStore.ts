@@ -26,6 +26,7 @@ import type {
 import { useAuthStore } from './useAuthStore.ts';
 import { useBankGovernanceStore } from './useBankGovernanceStore.ts';
 import { useQuestionStore } from './useQuestionStore.ts';
+import defaultCvsBank from '../../../content/cvs/dist/bank.v1.json';
 
 interface AdminAiQuestionParserStoreState {
   // Input & Configuration
@@ -250,24 +251,45 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       // Network or offline fallback
     }
 
-    // Graceful offline fallback: perform in-batch lexical deduplication
+    // Graceful offline & in-browser fallback: check BOTH against existing bank AND in-batch
     try {
       const canonicalizer = new QuestionCanonicalizerV2();
       const minhasher = new MinHasher();
       const current = get().parsedQuestions;
+
+      // 1. Canonicalize current batch items
       const canonicals = await Promise.all(
         current.map((item) => canonicalizer.canonicalize(item.question))
       );
       const signatures = canonicals.map((c) => minhasher.signature(c.shingles));
 
-      const updated = current.map((item, idx) => {
-        let highestRelation: DuplicateRelation = 'UNIQUE';
-        const candidates: DuplicateCandidate[] = [];
+      // 2. Load and canonicalize bank questions
+      const storeQuestions = useQuestionStore.getState().questions;
+      const bankQuestions: Question[] =
+        storeQuestions.length > 0
+          ? storeQuestions
+          : Array.isArray(defaultCvsBank)
+          ? (defaultCvsBank as Question[])
+          : [];
 
-        for (let prevIdx = 0; prevIdx < idx; prevIdx++) {
-          const cA = canonicals[prevIdx];
-          const cB = canonicals[idx];
-          const qA = current[prevIdx].question;
+      const bankCanonicals = await Promise.all(
+        bankQuestions.map((q) => canonicalizer.canonicalize(q))
+      );
+      const bankSignatures = bankCanonicals.map((c) => minhasher.signature(c.shingles));
+
+      const updated = current.map((item, idx) => {
+        const candidates: DuplicateCandidate[] = [];
+        const seenMatchedIds = new Set<string>();
+
+        const evaluateCandidate = (
+          cA: typeof canonicals[0],
+          cB: typeof canonicals[0],
+          sigA: Uint32Array,
+          sigB: Uint32Array,
+          matchedQ: Question,
+          stageTag: 'S1_EXACT' | 'S2_LEXICAL_LSH'
+        ) => {
+          if (seenMatchedIds.has(matchedQ.id) || matchedQ.id === item.question.id) return;
 
           let rel: DuplicateRelation | null = null;
           let jaccard: number | null = null;
@@ -279,28 +301,35 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
             rel = cA.answerKeyHash === cB.answerKeyHash ? 'EXACT' : 'CONFLICT';
             jaccard = 1.0;
           } else {
-            jaccard = MinHasher.estimateJaccard(signatures[prevIdx], signatures[idx]);
+            jaccard = MinHasher.estimateJaccard(sigA, sigB);
             if (jaccard >= 0.8) {
               const delta = ClinicalDiscriminatorExtractor.computeDelta(
-                cA.discriminators,
-                cB.discriminators
+                cB.discriminators,
+                cA.discriminators
+              );
+              rel = delta.length > 0 ? 'SIBLING' : 'NEAR';
+            } else if (jaccard >= 0.65) {
+              const delta = ClinicalDiscriminatorExtractor.computeDelta(
+                cB.discriminators,
+                cA.discriminators
               );
               rel = delta.length > 0 ? 'SIBLING' : 'NEAR';
             } else if (jaccard >= 0.35) {
               const delta = ClinicalDiscriminatorExtractor.computeDelta(
-                cA.discriminators,
-                cB.discriminators
+                cB.discriminators,
+                cA.discriminators
               );
               if (delta.length > 0) rel = 'SIBLING';
             }
           }
 
           if (rel) {
+            seenMatchedIds.add(matchedQ.id);
             candidates.push({
-              matchedQuestionId: qA.id,
-              matchedStemPreview: qA.stem.slice(0, 100),
+              matchedQuestionId: matchedQ.id,
+              matchedStemPreview: matchedQ.stem.slice(0, 100),
               relation: rel,
-              decidedBy: 'S1_EXACT',
+              decidedBy: stageTag,
               signals: {
                 lexicalJaccard: jaccard,
                 semanticCosine: null,
@@ -311,17 +340,47 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
               },
               llm: null,
               explanationKey: `qdd.explanation.${rel.toLowerCase()}`,
-              explanationParams: { matchedId: qA.id },
+              explanationParams: { matchedId: matchedQ.id },
             });
-            if (rel === 'EXACT') highestRelation = 'EXACT';
-            else if (rel === 'CONFLICT' && highestRelation !== 'EXACT')
-              highestRelation = 'CONFLICT';
-            else if (
-              rel === 'NEAR' &&
-              highestRelation !== 'EXACT' &&
-              highestRelation !== 'CONFLICT'
-            )
-              highestRelation = 'NEAR';
+          }
+        };
+
+        // A. Compare against all canonical bank questions
+        for (let bIdx = 0; bIdx < bankQuestions.length; bIdx++) {
+          evaluateCandidate(
+            bankCanonicals[bIdx],
+            canonicals[idx],
+            bankSignatures[bIdx],
+            signatures[idx],
+            bankQuestions[bIdx],
+            'S1_EXACT'
+          );
+        }
+
+        // B. Compare against earlier in-batch questions
+        for (let prevIdx = 0; prevIdx < idx; prevIdx++) {
+          evaluateCandidate(
+            canonicals[prevIdx],
+            canonicals[idx],
+            signatures[prevIdx],
+            signatures[idx],
+            current[prevIdx].question,
+            'S2_LEXICAL_LSH'
+          );
+        }
+
+        const relSeverity: Record<DuplicateRelation, number> = {
+          EXACT: 5,
+          CONFLICT: 4,
+          NEAR: 3,
+          SIBLING: 2,
+          UNIQUE: 1,
+        };
+
+        let highestRelation: DuplicateRelation = 'UNIQUE';
+        for (const cand of candidates) {
+          if (relSeverity[cand.relation] > relSeverity[highestRelation]) {
+            highestRelation = cand.relation;
           }
         }
 
@@ -336,7 +395,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
               : 'REVIEW',
           relation: highestRelation,
           candidates,
-          stagesExecuted: ['S0_CANONICALIZE', 'S1_EXACT'],
+          stagesExecuted: ['S0_CANONICALIZE', 'S1_EXACT', 'S2_LEXICAL_LSH'],
           degraded: false,
           degradedReasons: [],
           latencyMs: 1,
@@ -352,7 +411,8 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       });
 
       set({ parsedQuestions: updated, isCheckingDuplication: false });
-    } catch {
+    } catch (fallbackErr) {
+      console.error('[useAdminAiQuestionParserStore] Duplication check failed:', fallbackErr);
       const reset = get().parsedQuestions.map((q) => ({
         ...q,
         isCheckingDuplication: false,

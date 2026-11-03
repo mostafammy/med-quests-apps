@@ -26,6 +26,10 @@ export interface BackfillProgress {
   lshBandsCreated: number;
 }
 
+function escapeSql(val: string): string {
+  return `'${val.replace(/'/g, "''")}'`;
+}
+
 export async function runBackfill(options?: {
   readonly questions?: readonly Question[];
   readonly sqlOutputPath?: string;
@@ -71,17 +75,17 @@ INSERT INTO question_fingerprints (
   minhash, discriminators_json, embedding_model, embedded_at,
   content_version, updated_at
 ) VALUES (
-  ${JSON.stringify(canon.questionId)},
-  ${JSON.stringify(canon.blockId)},
-  ${JSON.stringify(canon.chapterId)},
-  ${JSON.stringify(canon.topicId || 'general')},
+  ${escapeSql(canon.questionId)},
+  ${escapeSql(canon.blockId)},
+  ${escapeSql(canon.chapterId)},
+  ${escapeSql(canon.topicId || 'general')},
   'published',
-  ${JSON.stringify(canon.normalizerVersion)},
-  ${JSON.stringify(canon.stemHash)},
-  ${JSON.stringify(canon.itemHash)},
-  ${JSON.stringify(canon.answerKeyHash)},
+  ${escapeSql(canon.normalizerVersion)},
+  ${escapeSql(canon.stemHash)},
+  ${escapeSql(canon.itemHash)},
+  ${escapeSql(canon.answerKeyHash)},
   ${hexBlob},
-  ${JSON.stringify(JSON.stringify(canon.discriminators))},
+  ${escapeSql(JSON.stringify(canon.discriminators))},
   '@cf/baai/bge-small-en-v1.5',
   datetime('now'),
   1,
@@ -104,7 +108,7 @@ ON CONFLICT(question_id) DO UPDATE SET
       for (const bk of bandKeys) {
         const insertBandSql = `
 INSERT OR IGNORE INTO question_lsh_bands (question_id, block_id, band_key)
-VALUES (${JSON.stringify(canon.questionId)}, ${JSON.stringify(canon.blockId)}, ${JSON.stringify(bk)});
+VALUES (${escapeSql(canon.questionId)}, ${escapeSql(canon.blockId)}, ${escapeSql(bk)});
         `.trim();
         sqlStatements.push(insertBandSql);
         progress.lshBandsCreated++;
