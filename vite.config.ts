@@ -160,9 +160,117 @@ function cloudflareLiveObservabilityDevPlugin(): Plugin {
   };
 }
 
+function cloudflareQddDevPlugin(): Plugin {
+  let devJobCounter = 1;
+  const devJobs = new Map<string, any>();
+
+  return {
+    name: 'cloudflare-qdd-dev-middleware',
+    configureServer(server) {
+      server.middlewares.use('/api/admin/qdd', async (req, res, next) => {
+        try {
+          const reqUrl = new URL(req.url || '', 'http://localhost:3000');
+          const pathname = reqUrl.pathname;
+
+          // 1. POST /audits
+          if ((pathname === '/audits' || pathname === '/audits/') && req.method === 'POST') {
+            const jobId = `audit-dev-${Date.now()}-${devJobCounter++}`;
+            const job = {
+              id: jobId,
+              scope: { kind: 'block', blockId: 'cvs' },
+              status: 'running',
+              cursor: '0',
+              processed: 0,
+              total: 219,
+              clustersFound: 0,
+              startedBy: 'admin',
+              startedAt: new Date().toISOString(),
+              finishedAt: null,
+            };
+            devJobs.set(jobId, job);
+
+            res.statusCode = 202;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(job));
+            return;
+          }
+
+          // 2. POST /audits/:id/advance
+          const advanceMatch = pathname.match(/^\/audits\/([^/]+)\/advance\/?$/);
+          if (advanceMatch && req.method === 'POST') {
+            const jobId = advanceMatch[1];
+            const job = devJobs.get(jobId);
+            if (!job) {
+              res.statusCode = 404;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'JOB_NOT_FOUND' }));
+              return;
+            }
+
+            const updatedJob = {
+              ...job,
+              status: 'completed',
+              cursor: String(job.total),
+              processed: job.total,
+              clustersFound: 0,
+              finishedAt: new Date().toISOString(),
+            };
+            devJobs.set(jobId, updatedJob);
+
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(updatedJob));
+            return;
+          }
+
+          // 3. GET /audits/:id/clusters
+          const clustersMatch = pathname.match(/^\/audits\/([^/]+)\/clusters\/?$/);
+          if (clustersMatch && req.method === 'GET') {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ clusters: [] }));
+            return;
+          }
+
+          // 4. GET /audits/:id
+          const getJobMatch = pathname.match(/^\/audits\/([^/]+)\/?$/);
+          if (getJobMatch && req.method === 'GET') {
+            const jobId = getJobMatch[1];
+            const job = devJobs.get(jobId);
+            if (!job) {
+              res.statusCode = 404;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'JOB_NOT_FOUND' }));
+              return;
+            }
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(job));
+            return;
+          }
+
+          // 5. POST /resolutions
+          if ((pathname === '/resolutions' || pathname === '/resolutions/') && req.method === 'POST') {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ ok: true, success: true }));
+            return;
+          }
+
+          next();
+        } catch (err) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: false, error: String(err) }));
+        }
+      });
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), cloudflareLiveObservabilityDevPlugin()],
+  plugins: [react(), tailwindcss(), cloudflareLiveObservabilityDevPlugin(), cloudflareQddDevPlugin()],
   server: {
     port: 3000,
     open: true,
