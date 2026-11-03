@@ -273,7 +273,26 @@ function cloudflareQddDevPlugin(): Plugin {
           if ((pathname === '/check-batch' || pathname === '/check-batch/') && req.method === 'POST') {
             let bodyStr = '';
             req.on('data', (chunk) => { bodyStr += chunk; });
-            req.on('end', () => {
+            req.on('end', async () => {
+              try {
+                const upstream = await fetch(
+                  'https://med-quests-apps.mostafa-yaser-developer.workers.dev/api/qdd/check-batch',
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: bodyStr,
+                  }
+                );
+                if (upstream.ok) {
+                  const text = await upstream.text();
+                  res.statusCode = 200;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(text);
+                  return;
+                }
+              } catch {
+                // Offline fallback
+              }
               res.statusCode = 200;
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({ verdicts: [] }));
@@ -282,9 +301,32 @@ function cloudflareQddDevPlugin(): Plugin {
           }
 
           if ((pathname === '/check' || pathname === '/check/') && req.method === 'POST') {
-            res.statusCode = 200;
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ decision: 'ALLOW', relation: 'UNIQUE', candidates: [] }));
+            let bodyStr = '';
+            req.on('data', (chunk) => { bodyStr += chunk; });
+            req.on('end', async () => {
+              try {
+                const upstream = await fetch(
+                  'https://med-quests-apps.mostafa-yaser-developer.workers.dev/api/qdd/check',
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: bodyStr,
+                  }
+                );
+                if (upstream.ok) {
+                  const text = await upstream.text();
+                  res.statusCode = 200;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(text);
+                  return;
+                }
+              } catch {
+                // Offline fallback
+              }
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ decision: 'ALLOW', relation: 'UNIQUE', candidates: [] }));
+            });
             return;
           }
 
@@ -303,5 +345,11 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
+    proxy: {
+      '/api/ai': {
+        target: 'https://med-quests-apps.mostafa-yaser-developer.workers.dev',
+        changeOrigin: true,
+      },
+    },
   },
 });

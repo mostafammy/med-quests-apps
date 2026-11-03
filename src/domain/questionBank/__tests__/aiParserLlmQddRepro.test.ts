@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { QuestionParsingAgent } from '../aiQuestionParser/QuestionParsingAgent.ts';
+import { edgeQuestionBankGateway } from '../../../infrastructure/questionBank/edgeQuestionBankGateway.ts';
 import type { Question } from '../../model/types.ts';
 
 const GAS_STEM =
@@ -15,10 +16,10 @@ const bankGas: Question = {
   type: 'single-best-answer',
   stem: GAS_STEM,
   choices: [
-    { id: 'a', text: 'Blood culture.', isCorrect: false, rationale: 'x' },
-    { id: 'b', text: 'Culture of a heart valve in a patient with carditis.', isCorrect: false, rationale: 'x' },
-    { id: 'c', text: 'A high titer of antibody against the hyaluronic acid capsule.', isCorrect: false, rationale: 'x' },
-    { id: 'd', text: 'A high titer of antibody against streptolysin O.', isCorrect: true, rationale: 'x' },
+    { id: 'a', text: 'Blood culture.', isCorrect: false, rationale: 'Incorrect distractor choice.' },
+    { id: 'b', text: 'Culture of a heart valve in a patient with carditis.', isCorrect: false, rationale: 'Incorrect distractor choice.' },
+    { id: 'c', text: 'A high titer of antibody against the hyaluronic acid capsule.', isCorrect: false, rationale: 'Capsule is non-immunogenic.' },
+    { id: 'd', text: 'A high titer of antibody against streptolysin O.', isCorrect: true, rationale: 'ASO titer confirms preceding GAS infection.' },
   ],
   explanation: 'ASO titer confirms preceding GAS infection.',
   mnemonic: null,
@@ -27,7 +28,15 @@ const bankGas: Question = {
   cognitiveLevel: 'understanding',
   highYield: true,
   origin: 'authored-grounded',
-  evidence: [],
+  evidence: [
+    {
+      chunkId: 'chunk-gas-1',
+      sourceName: 'Jawetz Medical Microbiology',
+      location: 'Chapter 14',
+      quote: 'Anti-streptolysin O (ASO) titers demonstrate prior Group A Streptococcus infection in acute rheumatic fever.',
+      kind: 'text',
+    },
+  ],
   status: 'active',
   bankVersion: 1,
 };
@@ -38,7 +47,7 @@ B. Culture of a heart valve in a patient with carditis.
 C. A high titer of antibody against the hyaluronic acid capsule.
 D. A high titer of antibody against streptolysin O.`;
 
-/** Gemini-like output with typical schema defects (empty rationale, short quote, string difficulty). */
+/** Gemini-like output with typical schema defects AND the colliding placeholder id "q-parsed-1701987600000-1". */
 function makeSloppyProvider() {
   return {
     providerId: 'gemini' as const,
@@ -53,6 +62,8 @@ function makeSloppyProvider() {
               aiGeneratedAnswerKey: true,
               selectedCorrectChoiceId: 'd',
               question: {
+                id: 'q-parsed-1701987600000-1',
+                blockId: 'block-206',
                 subjectId: 'microbiology',
                 chapterId: 'cvs-mic-rheumatic-fever',
                 topicId: 'x',
@@ -78,7 +89,7 @@ function makeSloppyProvider() {
 }
 
 describe('LLM path → QDD (regression for silent "1 unique")', () => {
-  it('flags EXACT even when LLM JSON violates QuestionSchema', async () => {
+  it('flags EXACT even when LLM JSON reuses colliding placeholder ID "q-parsed-1701987600000-1" and violates QuestionSchema', async () => {
     const agent = new QuestionParsingAgent(makeSloppyProvider());
     let telemetry: any;
     const result = await agent.parseRawQuestions({
@@ -90,10 +101,78 @@ describe('LLM path → QDD (regression for silent "1 unique")', () => {
     });
 
     const item = result.items[0];
+    expect(item.question.id).not.toBe('q-parsed-1701987600000-1');
     expect(item.question.stem).toBe(GAS_STEM);
     expect(item.qddVerdict?.relation).toBe('EXACT');
+    expect(item.qddVerdict?.decision).toBe('BLOCK');
     expect(item.qddVerdict?.candidates[0].matchedQuestionId).toBe('q-parsed-1701987600000-1');
     const dedup = telemetry.steps.find((s: any) => s.id === 'deduplication');
     expect(dedup.detail).toContain('1 exact');
+  });
+
+  it('flags EXACT when bank question choices lack trailing periods ("Blood culture" vs "Blood culture.")', async () => {
+    const bankWithoutPeriods: Question = {
+      ...bankGas,
+      id: 'q-bank-no-periods',
+      choices: bankGas.choices.map((c) => ({ ...c, text: c.text.replace(/\.$/, '') })),
+    };
+
+    const agent = new QuestionParsingAgent(makeSloppyProvider());
+    const result = await agent.parseRawQuestions({
+      rawText: RAW,
+      providerId: 'gemini',
+      modelId: 'gemini-2.5-flash',
+      existingQuestions: [bankWithoutPeriods],
+    });
+
+    expect(result.items[0].qddVerdict?.relation).toBe('EXACT');
+    expect(result.items[0].qddVerdict?.decision).toBe('BLOCK');
+    expect(result.items[0].qddVerdict?.candidates[0].matchedQuestionId).toBe('q-bank-no-periods');
+  });
+
+  it('flags duplicate even if local bank question was saved earlier with legacy stem-shift ("Clinical scenario regarding...")', async () => {
+    const legacyCorruptedBankQuestion: Question = {
+      ...bankGas,
+      id: 'q-legacy-corrupted-gas',
+      stem: 'Clinical scenario regarding Cardiovascular MICROBIOLOGY Clinical Assessment:',
+      choices: [
+        { id: 'a', text: `1. ${GAS_STEM}`, isCorrect: true, rationale: 'shifted' },
+        { id: 'b', text: 'Blood culture.', isCorrect: false, rationale: 'x' },
+        { id: 'c', text: 'Culture of a heart valve in a patient with carditis.', isCorrect: false, rationale: 'x' },
+        { id: 'd', text: 'A high titer of antibody against streptolysin O.', isCorrect: false, rationale: 'x' },
+      ],
+    };
+
+    const agent = new QuestionParsingAgent(makeSloppyProvider());
+    const result = await agent.parseRawQuestions({
+      rawText: RAW,
+      providerId: 'gemini',
+      modelId: 'gemini-2.5-flash',
+      existingQuestions: [legacyCorruptedBankQuestion],
+    });
+
+    expect(['EXACT', 'NEAR']).toContain(result.items[0].qddVerdict?.relation);
+    expect(result.items[0].qddVerdict?.candidates[0].matchedQuestionId).toBe('q-legacy-corrupted-gas');
+  });
+
+  it('automatically discovers questions stored in edgeQuestionBankGateway local canonical bank even when existingQuestions is omitted', async () => {
+    await edgeQuestionBankGateway.createCanonicalQuestions({
+      questions: [bankGas],
+      actorId: 'admin-1',
+      actorDisplayName: 'Admin',
+      actorRole: 'admin',
+    });
+
+    const agent = new QuestionParsingAgent(makeSloppyProvider());
+    const result = await agent.parseRawQuestions({
+      rawText: RAW,
+      providerId: 'gemini',
+      modelId: 'gemini-2.5-flash',
+      existingQuestions: [],
+    });
+
+    expect(result.items[0].qddVerdict?.relation).toBe('EXACT');
+    expect(result.items[0].qddVerdict?.decision).toBe('BLOCK');
+    expect(result.items[0].qddVerdict?.candidates[0].matchedQuestionId).toBe('q-parsed-1701987600000-1');
   });
 });

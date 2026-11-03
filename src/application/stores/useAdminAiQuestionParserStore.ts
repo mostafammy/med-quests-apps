@@ -15,11 +15,11 @@ import { CrossModelVerificationPromptBuilder } from '../../domain/questionBank/a
 import type { ParsedQuestionItem, QuestionStemMode, AgentExecutionTelemetry } from '../../domain/questionBank/aiQuestionParser/types.ts';
 import { multiModelConsensusEngine } from '../../domain/questionBank/aiQuestionParser/MultiModelConsensusEngine.ts';
 import { curriculumTaxonomyRegistry } from '../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
-import { createClientQddEngine } from '../../domain/questionBank/duplication/clientCompositionRoot.ts';
+import { createClientQddEngine, loadAllClientBankQuestions } from '../../domain/questionBank/duplication/clientCompositionRoot.ts';
+import { db } from '../../infrastructure/storage/db.ts';
 import { useAuthStore } from './useAuthStore.ts';
 import { useBankGovernanceStore } from './useBankGovernanceStore.ts';
 import { useQuestionStore } from './useQuestionStore.ts';
-import defaultCvsBank from '../../../content/cvs/dist/bank.v1.json';
 
 interface AdminAiQuestionParserStoreState {
   // Input & Configuration
@@ -72,27 +72,23 @@ interface AdminAiQuestionParserStoreState {
 
 const parsingAgent = new QuestionParsingAgent();
 
-function getMergedBankQuestions(): Question[] {
-  const byId = new Map<string, Question>();
-  if (Array.isArray(defaultCvsBank)) {
-    for (const q of defaultCvsBank as Question[]) {
-      if (q?.id) byId.set(q.id, q);
-    }
-  }
+async function getMergedBankQuestions(): Promise<Question[]> {
   const storeQuestions = useQuestionStore.getState().questions || [];
-  for (const q of storeQuestions) {
-    if (q?.id) byId.set(q.id, q);
-  }
-  const govQuestions = (useBankGovernanceStore.getState() as any)?.canonicalQuestions || [];
-  for (const q of govQuestions) {
-    if (q?.id) byId.set(q.id, q);
-  }
-  return Array.from(byId.values());
+  const govState = useBankGovernanceStore.getState();
+  const govCatalog = govState.catalogQuestions || [];
+  const govQueue = (govState.reviewQueue || []).map((r) => r.question).filter(Boolean);
+  return loadAllClientBankQuestions([...storeQuestions, ...govCatalog, ...govQueue]);
 }
 
 /** Schema-valid copy for QDD: one malformed LLM item must never void the whole batch. */
-function toQddProbe(q: Question): Question {
-  return QuestionSchema.safeParse(q).success ? q : parsingAgent.repairQuestionToSchema(q);
+function toQddProbe(q: Question, bankIdSet?: Set<string>, idx = 0): Question {
+  const valid = QuestionSchema.safeParse(q).success ? q : parsingAgent.repairQuestionToSchema(q);
+  const safeId = bankIdSet?.has(valid.id) ? `${valid.id}-probe-${idx + 1}` : valid.id;
+  return {
+    ...valid,
+    id: safeId,
+    blockId: 'cvs',
+  };
 }
 
 const VERDICT_RANK: Record<string, number> = {
@@ -195,7 +191,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
     set({ isParsing: true, error: null, commitFeedback: null, abortController: controller });
 
     try {
-      const bankQuestions = getMergedBankQuestions();
+      const bankQuestions = await getMergedBankQuestions();
 
       const result = await parsingAgent.parseRawQuestions(
         {
@@ -261,9 +257,12 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       });
     }
 
+    const bankQuestions = await getMergedBankQuestions();
+    const bankIdSet = new Set(bankQuestions.map((q) => q.id));
+
     let edgeVerdicts: any[] = [];
     try {
-      const questionsPayload = parsedQuestions.map((q) => toQddProbe(q.question));
+      const questionsPayload = parsedQuestions.map((q, idx) => toQddProbe(q.question, bankIdSet, idx));
       const res = await fetch('/api/qdd/check-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -285,10 +284,9 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
 
     // Launch prebuilt DuplicationDetectionEngine against merged local + governed bank
     try {
-      const bankQuestions = getMergedBankQuestions();
       const engine = await createClientQddEngine(bankQuestions);
       const current = get().parsedQuestions;
-      const questionsPayload = current.map((q) => toQddProbe(q.question));
+      const questionsPayload = current.map((q, idx) => toQddProbe(q.question, bankIdSet, idx));
       const res = await engine.checkBatch(questionsPayload, { kind: 'block', blockId: 'cvs' });
       if (!res.ok) {
         console.error('[useAdminAiQuestionParserStore] QDD batch rejected input:', res.error);
@@ -614,7 +612,12 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       });
 
       if (success) {
-        // Also refresh question store
+        // Persist committed canonical questions directly into IndexedDB and refresh question store
+        try {
+          await db.questions.bulkPut(canonicalQuestions);
+        } catch {
+          // Ignore IndexedDB write error in non-browser environment
+        }
         await useQuestionStore.getState().loadQuestions('cvs');
 
         // Clear committed items from list

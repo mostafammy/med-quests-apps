@@ -26,8 +26,8 @@ export class S4DiscriminatorsStage implements IDetectionStage {
     const { subject, thresholds } = context;
 
     for (const [candId, cand] of context.candidates.entries()) {
-      // If already decided by S1 (e.g. EXACT), skip
-      if (cand.relation === 'EXACT') continue;
+      // If already decided by S1 (e.g. EXACT or stem+key match), skip
+      if (cand.decidedBy === 'S1_EXACT' || cand.relation === 'EXACT') continue;
 
       // 1. Compute clinical discriminator delta
       const delta = ClinicalDiscriminatorExtractor.computeDelta(

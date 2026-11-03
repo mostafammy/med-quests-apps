@@ -46,6 +46,9 @@ export class QuestionCanonicalizerV2 implements IQuestionCanonicalizer {
       .replace(/°\s*c\b/g, 'c')
       .replace(/(\d+)\s+%/g, '$1%');
 
+    // Strip leading question numbers like "1.", "1-", "Q1:", "(1)"
+    text = text.replace(/^(?:(?:question|item|q)\s*\d+\s*[:.)-]\s*|\(\d+\)\s*|\d+\s*[.):-]\s+)/i, '');
+
     // Strip multiple-choice leading labels like "a)", "b.", "(c)", "d:"
     // Crucial: Must NOT strip the English article "A" in "A 45-year-old male..."
     text = text.replace(/^(?:\(?[a-d]\)[.:\s-]*|[a-d][.:-]\s+)/i, '');
@@ -59,18 +62,26 @@ export class QuestionCanonicalizerV2 implements IQuestionCanonicalizer {
     return text;
   }
 
+  /**
+   * Normalizes choice text, additionally stripping trailing periods/punctuation noise
+   * so "Blood culture." and "Blood culture" yield identical canonical choice & answerKey hashes.
+   */
+  public normalizeChoiceText(rawChoiceText: string): string {
+    return this.normalizeText(rawChoiceText).replace(/[.]+$/, '').trim();
+  }
+
   public async canonicalize(question: Question): Promise<CanonicalQuestion> {
     const canonicalStem = this.normalizeText(question.stem);
 
-    // Normalize each choice and strip letter markers
-    const normalizedChoices = (question.choices || []).map((c) => this.normalizeText(c.text));
+    // Normalize each choice and strip letter markers + trailing periods
+    const normalizedChoices = (question.choices || []).map((c) => this.normalizeChoiceText(c.text));
 
     // Choice order invariance: sort alphabetically
     const canonicalChoices = [...normalizedChoices].sort();
 
     // Identify correct answer text
     const correctChoice = (question.choices || []).find((c) => c.isCorrect);
-    const canonicalCorrectAnswer = correctChoice ? this.normalizeText(correctChoice.text) : '';
+    const canonicalCorrectAnswer = correctChoice ? this.normalizeChoiceText(correctChoice.text) : '';
 
     // Embedding input string incorporates both stem and the target answer key
     const embeddingText = `${canonicalStem} || ${canonicalCorrectAnswer}`;

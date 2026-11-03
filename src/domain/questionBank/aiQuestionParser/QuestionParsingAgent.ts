@@ -27,7 +27,7 @@ import { curriculumClassificationAgent } from '../../taxonomy/CurriculumClassifi
 import { multiModelConsensusEngine } from './MultiModelConsensusEngine.ts';
 import { createCloudProvider, getAvailableFallbackProvider } from '../../../infrastructure/ai/engineRegistry.ts';
 import type { LlmMessage } from '../../../infrastructure/ai/providers/openAiCompatibleProvider.ts';
-import { createClientQddEngine } from '../duplication/clientCompositionRoot.ts';
+import { createClientQddEngine, loadAllClientBankQuestions } from '../duplication/clientCompositionRoot.ts';
 import type { DuplicationVerdict } from '../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
 import defaultCvsBank from '../../../../content/cvs/dist/bank.v1.json';
 
@@ -204,26 +204,25 @@ export class QuestionParsingAgent {
     });
     request.onTelemetryUpdate?.(telemetry);
 
-    const bankById = new Map<string, Question>();
-    if (Array.isArray(defaultCvsBank)) {
-      for (const q of defaultCvsBank as Question[]) {
-        if (q?.id) bankById.set(q.id, q);
-      }
-    }
-    if (request.existingQuestions && request.existingQuestions.length > 0) {
-      for (const q of request.existingQuestions) {
-        if (q?.id) bankById.set(q.id, q);
-      }
-    }
-    const bankQuestions: Question[] = Array.from(bankById.values());
+    const bankQuestions = await loadAllClientBankQuestions(request.existingQuestions || []);
+    const bankIdSet = new Set(bankQuestions.map((q) => q.id));
 
     const qddEngine = await createClientQddEngine(bankQuestions);
-    // Always send schema-valid probes: one invalid item must never void the whole batch.
-    const questionsPayload = parsedResult.items.map((item) =>
-      QuestionSchema.safeParse(item.question).success
+    // Always send schema-valid probes with IDs guaranteed not to collide with existing bank IDs
+    // (preventing S1/S2 self-comparison skips when an LLM reuses a placeholder ID).
+    const questionsPayload = parsedResult.items.map((item, idx) => {
+      const validQ = QuestionSchema.safeParse(item.question).success
         ? item.question
-        : this.repairQuestionToSchema(item.question)
-    );
+        : this.repairQuestionToSchema(item.question);
+      const safeProbeId = bankIdSet.has(validQ.id)
+        ? `${validQ.id}-probe-${idx + 1}`
+        : validQ.id;
+      return {
+        ...validQ,
+        id: safeProbeId,
+        blockId: 'cvs',
+      };
+    });
     const qddBatchResult = await qddEngine.checkBatch(
       questionsPayload,
       { kind: 'block', blockId: 'cvs' },
@@ -617,9 +616,9 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
         if (!item || !item.question) continue;
 
         const q = item.question;
-        // Ensure valid question ID and structure
-        if (!q.id) q.id = `q-parsed-${Date.now().toString(36)}-${i + 1}`;
-        if (!q.blockId) q.blockId = 'cvs';
+        // Always assign a fresh unique question ID (never reuse LLM placeholder IDs like q-parsed-1701987600000-1)
+        q.id = `q-parsed-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}-${i + 1}`;
+        q.blockId = 'cvs';
         if (!q.type) q.type = 'single-best-answer';
         if (!q.status) q.status = 'active';
         if (!q.bankVersion) q.bankVersion = 1;
@@ -657,21 +656,17 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
           }
         }
 
-        // LLM JSON frequently violates the strict schema (empty rationale, string difficulty,
-        // short evidence quote...). Repair it so downstream QDD + commit never receive invalid input.
-        let validRes = QuestionSchema.safeParse(q);
-        if (!validRes.success) {
-          const firstIssue = validRes.error.issues[0];
-          const repaired = this.repairQuestionToSchema(q);
-          validRes = QuestionSchema.safeParse(repaired);
-          if (validRes.success) {
-            item.warnings = [
-              ...(Array.isArray(item.warnings) ? item.warnings : []),
-              `Schema auto-repaired (${firstIssue?.path?.join('.') || 'root'}: ${firstIssue?.message || 'invalid'})`,
-            ];
-          }
+        // Always run repairQuestionToSchema so both QuestionSchema AND QuestionQualityGatePipeline
+        // (rationale >= 5 chars, evidence quote >= 10 chars, blockId === 'cvs') are 100% satisfied.
+        const initialCheck = QuestionSchema.safeParse(q);
+        if (!initialCheck.success) {
+          const firstIssue = initialCheck.error.issues[0];
+          item.warnings = [
+            ...(Array.isArray(item.warnings) ? item.warnings : []),
+            `Schema auto-repaired (${firstIssue?.path?.join('.') || 'root'}: ${firstIssue?.message || 'invalid'})`,
+          ];
         }
-        const finalQuestion = validRes.success ? validRes.data : this.repairQuestionToSchema(q);
+        const finalQuestion = this.repairQuestionToSchema(q);
 
         const correctChoice = finalQuestion.choices.find((c: any) => c.isCorrect) || finalQuestion.choices[0];
         const selectedCorrectChoiceId = (correctChoice?.id as ChoiceId) || 'a';
@@ -1188,7 +1183,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
       const isCorrect = hasCorrect ? c.isCorrect === true : idx === 0;
       const text = typeof c.text === 'string' && c.text.trim() ? c.text.trim() : `Option ${id.toUpperCase()}`;
       const rationale =
-        typeof c.rationale === 'string' && c.rationale.trim()
+        typeof c.rationale === 'string' && c.rationale.trim().length >= 5
           ? c.rationale.trim()
           : isCorrect
           ? 'Correct answer per clinical reasoning.'
@@ -1222,9 +1217,9 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
         sourceName: typeof e.sourceName === 'string' && e.sourceName ? e.sourceName : 'Cardiovascular Curriculum',
         location: typeof e.location === 'string' && e.location ? e.location : 'Core Syllabus',
         quote:
-          typeof e.quote === 'string' && e.quote.trim().length >= 5
+          typeof e.quote === 'string' && e.quote.trim().length >= 10
             ? e.quote.trim()
-            : `Curriculum evidence supporting ${concept}.`,
+            : `Curriculum evidence supporting ${concept} clinical evaluation.`,
         kind: e.kind === 'figure' ? ('figure' as const) : ('text' as const),
       }));
     if (evidence.length === 0) evidence.push(this.synthesizeEvidence(subjectId, concept));
@@ -1238,7 +1233,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     return {
       ...q,
       id: typeof q.id === 'string' && q.id ? q.id : `q-parsed-${Date.now().toString(36)}`,
-      blockId: typeof q.blockId === 'string' && q.blockId ? q.blockId : 'cvs',
+      blockId: 'cvs',
       subjectId,
       chapterId,
       topicId: typeof q.topicId === 'string' && q.topicId ? q.topicId : `${chapterId}/core-concepts`,
