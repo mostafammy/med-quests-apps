@@ -175,4 +175,63 @@ describe('LLM path → QDD (regression for silent "1 unique")', () => {
     expect(result.items[0].qddVerdict?.decision).toBe('BLOCK');
     expect(result.items[0].qddVerdict?.candidates[0].matchedQuestionId).toBe('q-parsed-1701987600000-1');
   });
+
+  it('delays commit by unselecting duplicate items and blocks direct commit if duplicate is selected', async () => {
+    const { useAdminAiQuestionParserStore } = await import('../../../application/stores/useAdminAiQuestionParserStore.ts');
+    const { useAuthStore } = await import('../../../application/stores/useAuthStore.ts');
+    const { useBankGovernanceStore } = await import('../../../application/stores/useBankGovernanceStore.ts');
+
+    useAuthStore.setState({
+      authState: {
+        status: 'authenticated-active',
+        user: { id: 'admin-1', displayName: 'Admin Editor', role: 'admin' },
+      } as any,
+    });
+
+    // Seed bank with bankGas
+    await edgeQuestionBankGateway.createCanonicalQuestions({
+      questions: [bankGas],
+      actorId: 'admin-1',
+      actorDisplayName: 'Admin Editor',
+      actorRole: 'admin',
+    });
+
+    const store = useAdminAiQuestionParserStore.getState();
+    store.clearParsedQuestions();
+    useAdminAiQuestionParserStore.setState({
+      rawInputText: RAW,
+      selectedProvider: 'gemini',
+      selectedModelId: 'gemini-2.5-flash',
+    });
+
+    // Parse the duplicate question
+    await useAdminAiQuestionParserStore.getState().parseRawQuestions();
+
+    const stateAfterParse = useAdminAiQuestionParserStore.getState();
+    expect(stateAfterParse.parsedQuestions.length).toBe(1);
+    expect(stateAfterParse.parsedQuestions[0].qddVerdict?.relation).toBe('EXACT');
+
+    // 1. DUPLICATE IS NOT SELECTED BY DEFAULT (delayed from direct commit)
+    expect(stateAfterParse.selectedTempIds.size).toBe(0);
+
+    // 2. If manually selected and commit attempted, DIRECT COMMIT IS BLOCKED
+    useAdminAiQuestionParserStore.getState().toggleQuestionSelection(stateAfterParse.parsedQuestions[0].tempId);
+    expect(useAdminAiQuestionParserStore.getState().selectedTempIds.size).toBe(1);
+
+    const commitSuccess = await useAdminAiQuestionParserStore.getState().commitToGlobalQuestionBank(true);
+    expect(commitSuccess).toBe(false);
+    expect(useAdminAiQuestionParserStore.getState().commitFeedback?.type).toBe('error');
+    expect(useAdminAiQuestionParserStore.getState().commitFeedback?.message).toContain('Direct commit blocked');
+
+    // 3. SEND TO APPROVAL QUEUE routes the duplicate to the Governance Review Queue
+    const routeSuccess = await useAdminAiQuestionParserStore.getState().sendToApprovalQueue();
+    expect(routeSuccess).toBe(true);
+    expect(useAdminAiQuestionParserStore.getState().parsedQuestions.length).toBe(0);
+    expect(useAdminAiQuestionParserStore.getState().commitFeedback?.type).toBe('success');
+    expect(useAdminAiQuestionParserStore.getState().commitFeedback?.message).toContain('routed 1 duplicate question');
+
+    // Verify it appeared in Bank Governance review queue
+    const govQueue = useBankGovernanceStore.getState().reviewQueue;
+    expect(govQueue.length).toBeGreaterThan(0);
+  });
 });

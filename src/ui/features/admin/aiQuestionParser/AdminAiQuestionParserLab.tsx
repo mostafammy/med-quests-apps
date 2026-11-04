@@ -13,6 +13,9 @@ import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   ShieldCheck,
+  ShieldAlert,
+  AlertOctagon,
+  Send,
   CheckCircle2,
   AlertTriangle,
   Copy,
@@ -43,6 +46,8 @@ import {
 import { useAuthStore } from '../../../../application/stores/useAuthStore.ts';
 import { useAdminAiQuestionParserStore } from '../../../../application/stores/useAdminAiQuestionParserStore.ts';
 import { useQuestionStore } from '../../../../application/stores/useQuestionStore.ts';
+import { useBankGovernanceStore } from '../../../../application/stores/useBankGovernanceStore.ts';
+import { edgeQuestionBankGateway } from '../../../../infrastructure/questionBank/edgeQuestionBankGateway.ts';
 import defaultCvsBank from '../../../../../content/cvs/dist/bank.v1.json';
 import { curriculumTaxonomyRegistry } from '../../../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
 import { AppleIntelligenceAgentOrchestrator } from './AppleIntelligenceAgentOrchestrator.tsx';
@@ -189,6 +194,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     commitFeedback,
     isCheckingDuplication,
     saveAllUnique,
+    sendToApprovalQueue,
     parseRawQuestions,
     toggleQuestionSelection,
     selectAll,
@@ -686,13 +692,26 @@ export const AdminAiQuestionParserLab: React.FC = () => {
           <div className="p-6 rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl shadow-lg space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800/80 pb-4">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-base font-bold font-heading text-zinc-900 dark:text-zinc-50">
                     Pre-Approval Inspection Queue ({parsedQuestions.length} Items)
                   </h2>
                   <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                     {selectedTempIds.size} Selected
                   </span>
+                  {(() => {
+                    const duplicateCount = parsedQuestions.filter((q) => {
+                      const rel = q.qddVerdict?.relation;
+                      return rel === 'EXACT' || rel === 'NEAR' || rel === 'CONFLICT';
+                    }).length;
+                    if (duplicateCount === 0) return null;
+                    return (
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 inline-flex items-center gap-1.5 shadow-2xs">
+                        <ShieldAlert className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span>{duplicateCount} Duplicate Held for Approval</span>
+                      </span>
+                    );
+                  })()}
                 </div>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                   Inspect the structured questions below before committing to the Global Question Bank.
@@ -702,54 +721,100 @@ export const AdminAiQuestionParserLab: React.FC = () => {
 
               {/* Batch Action Toolbar */}
               <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => selectAll(selectedTempIds.size !== parsedQuestions.length)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer"
-                >
-                  {selectedTempIds.size === parsedQuestions.length ? 'Deselect All' : 'Select All'}
-                </button>
+                {(() => {
+                  const duplicateCount = parsedQuestions.filter((q) => {
+                    const rel = q.qddVerdict?.relation;
+                    return rel === 'EXACT' || rel === 'NEAR' || rel === 'CONFLICT';
+                  }).length;
+                  const selectedDuplicateCount = parsedQuestions.filter((q) => {
+                    const rel = q.qddVerdict?.relation;
+                    return (
+                      selectedTempIds.has(q.tempId) &&
+                      (rel === 'EXACT' || rel === 'NEAR' || rel === 'CONFLICT')
+                    );
+                  }).length;
 
-                <button
-                  type="button"
-                  onClick={handleCopyBatchPrompt}
-                  title="Copy a single comprehensive prompt for all selected questions to cross-examine with other LLMs"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer"
-                >
-                  {copiedBatchPrompt ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-500" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5 text-purple-500" />
-                  )}
-                  <span>{copiedBatchPrompt ? 'Batch Prompt Copied!' : 'Copy Batch Prompt'}</span>
-                </button>
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => selectAll(selectedTempIds.size !== parsedQuestions.length)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer"
+                      >
+                        {selectedTempIds.size === parsedQuestions.length ? 'Deselect All' : 'Select All Unique'}
+                      </button>
 
-                <button
-                  type="button"
-                  onClick={() => saveAllUnique()}
-                  disabled={isCommitting || isCheckingDuplication || parsedQuestions.length === 0}
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Automatically skip all questions flagged as duplicates or conflicts and commit only unique items to the bank"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>
-                    {isCommitting ? 'Saving…' : 'Save all unique'}
-                  </span>
-                </button>
+                      <button
+                        type="button"
+                        onClick={handleCopyBatchPrompt}
+                        title="Copy a single comprehensive prompt for all selected questions to cross-examine with other LLMs"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer"
+                      >
+                        {copiedBatchPrompt ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-500" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5 text-purple-500" />
+                        )}
+                        <span>{copiedBatchPrompt ? 'Batch Prompt Copied!' : 'Copy Batch Prompt'}</span>
+                      </button>
 
-                <button
-                  type="button"
-                  onClick={() => commitToGlobalQuestionBank(true)}
-                  disabled={isCommitting || selectedTempIds.size === 0}
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>
-                    {isCommitting
-                      ? 'Committing...'
-                      : `Approve & Commit (${selectedTempIds.size}) to Bank`}
-                  </span>
-                </button>
+                      {duplicateCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => sendToApprovalQueue()}
+                          disabled={isCommitting}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                          title="Route all duplicate or conflicting questions to the Governance Review Queue for formal faculty approval"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Send Duplicates ({duplicateCount}) to Approvals</span>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => saveAllUnique()}
+                        disabled={isCommitting || isCheckingDuplication || parsedQuestions.length === 0}
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Automatically skip all questions flagged as duplicates or conflicts and commit only unique items to the bank"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>
+                          {isCommitting ? 'Saving…' : 'Save all unique'}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => commitToGlobalQuestionBank(true)}
+                        disabled={isCommitting || selectedTempIds.size === 0 || selectedDuplicateCount > 0}
+                        className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                          selectedDuplicateCount > 0
+                            ? 'bg-rose-600 hover:bg-rose-500'
+                            : 'bg-emerald-600 hover:bg-emerald-500 shadow-sm'
+                        }`}
+                        title={
+                          selectedDuplicateCount > 0
+                            ? `${selectedDuplicateCount} duplicate question(s) selected. Direct commit is locked; route to approval queue instead.`
+                            : undefined
+                        }
+                      >
+                        {selectedDuplicateCount > 0 ? (
+                          <AlertOctagon className="w-3.5 h-3.5" />
+                        ) : (
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        )}
+                        <span>
+                          {isCommitting
+                            ? 'Committing...'
+                            : selectedDuplicateCount > 0
+                            ? `Commit Locked (${selectedDuplicateCount} Duplicate)`
+                            : `Approve & Commit (${selectedTempIds.size}) to Bank`}
+                        </span>
+                      </button>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -827,11 +892,23 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                   badgeColor: 'bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-500/25',
                 };
 
+              const isExactDuplicate = item.qddVerdict?.relation === 'EXACT';
+              const isConflictDuplicate = item.qddVerdict?.relation === 'CONFLICT';
+              const isNearDuplicate = item.qddVerdict?.relation === 'NEAR';
+              const isDuplicateOrConflict = isExactDuplicate || isConflictDuplicate || isNearDuplicate;
+              const firstCand = item.qddVerdict?.candidates[0];
+
               return (
                 <div
                   key={item.tempId}
                   className={`p-6 rounded-3xl border transition-all space-y-4 ${
-                    isSelected
+                    isConflictDuplicate
+                      ? 'border-2 border-rose-500/80 dark:border-rose-500/80 bg-rose-50/20 dark:bg-rose-950/20 shadow-md ring-2 ring-rose-500/20'
+                      : isExactDuplicate
+                      ? 'border-2 border-amber-500/80 dark:border-amber-500/80 bg-amber-50/20 dark:bg-amber-950/20 shadow-md ring-2 ring-amber-500/20'
+                      : isNearDuplicate
+                      ? 'border-2 border-amber-400/60 dark:border-amber-600/60 bg-amber-50/10 dark:bg-amber-950/10 shadow-sm'
+                      : isSelected
                       ? 'border-purple-300 dark:border-purple-800 bg-white/90 dark:bg-zinc-900/90 shadow-md'
                       : 'border-zinc-200/80 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/60 opacity-80'
                   }`}
@@ -930,6 +1007,90 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                       </button>
                     </div>
                   </div>
+
+                  {/* PROMINENT COLLISION / DUPLICATE ALERT BANNER */}
+                  {isDuplicateOrConflict && (
+                    <div
+                      className={`p-4 rounded-2xl border transition-all ${
+                        isConflictDuplicate
+                          ? 'bg-rose-500/10 dark:bg-rose-950/30 border-rose-500/40 text-rose-900 dark:text-rose-200 shadow-sm'
+                          : isExactDuplicate
+                          ? 'bg-amber-500/10 dark:bg-amber-950/30 border-amber-500/40 text-amber-900 dark:text-amber-200 shadow-sm'
+                          : 'bg-purple-500/10 dark:bg-purple-950/30 border-purple-500/30 text-purple-900 dark:text-purple-200 shadow-sm'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${
+                              isConflictDuplicate
+                                ? 'bg-rose-600 text-white'
+                                : isExactDuplicate
+                                ? 'bg-amber-600 text-white'
+                                : 'bg-purple-600 text-white'
+                            }`}
+                          >
+                            {isConflictDuplicate ? (
+                              <AlertOctagon className="w-5 h-5" />
+                            ) : isExactDuplicate ? (
+                              <ShieldAlert className="w-5 h-5" />
+                            ) : (
+                              <AlertTriangle className="w-5 h-5" />
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-black uppercase tracking-wider">
+                                {isConflictDuplicate
+                                  ? 'Answer Contradiction with Existing Question'
+                                  : isExactDuplicate
+                                  ? 'Question Already Exists in Global Bank'
+                                  : 'Likely Duplicate / High Content Overlap'}
+                              </span>
+                              <span
+                                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase border ${
+                                  isConflictDuplicate
+                                    ? 'bg-rose-500/20 text-rose-800 dark:text-rose-200 border-rose-500/40'
+                                    : 'bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-500/40'
+                                }`}
+                              >
+                                Direct Commit Locked • Approval Required
+                              </span>
+                            </div>
+                            <p className="text-xs mt-1 opacity-90 leading-relaxed">
+                              {isConflictDuplicate
+                                ? `Identical question stem exists in the Global Bank, but the correct keyed answer contradicts bank item ${firstCand?.matchedQuestionId || ''}. Cannot be directly committed.`
+                                : isExactDuplicate
+                                ? `Matches canonical bank question ${firstCand?.matchedQuestionId || ''} (${Math.round((firstCand?.signals?.lexicalJaccard ?? 1) * 100)}% lexical match). Held from bank commit to prevent duplication.`
+                                : `High similarity (${Math.round((firstCand?.signals?.lexicalJaccard ?? 0.8) * 100)}%) detected with bank question ${firstCand?.matchedQuestionId || ''}.`}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                          <button
+                            type="button"
+                            onClick={() => setInspectingQuestionItem(item)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/80 dark:bg-zinc-800/80 hover:bg-white dark:hover:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 shadow-2xs transition-all cursor-pointer"
+                          >
+                            <Scale className="w-3.5 h-3.5 text-purple-500" />
+                            <span>Compare Diff</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => sendToApprovalQueue(item.tempId)}
+                            disabled={isCommitting}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Send for Approval</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* DEDICATED AUTONOMOUS CURRICULUM AUTO-CLASSIFIER RESULT LENS */}
                   <div className="p-4 rounded-2xl border border-purple-500/25 bg-gradient-to-r from-purple-500/5 via-indigo-500/5 to-cyan-500/5 dark:from-purple-950/20 dark:via-zinc-900/40 dark:to-cyan-950/20 backdrop-blur-md space-y-3">
@@ -1511,9 +1672,13 @@ export const AdminAiQuestionParserLab: React.FC = () => {
       {inspectingQuestionItem && (() => {
         const storeQuestions = useQuestionStore.getState().questions;
         const candidateId = inspectingQuestionItem.qddVerdict?.candidates[0]?.matchedQuestionId;
+        const govCatalog = useBankGovernanceStore.getState().catalogQuestions || [];
+        const localCanonical = edgeQuestionBankGateway.getLocalCanonicalBank('cvs') || [];
         const matched =
           storeQuestions.find((q) => q.id === candidateId) ||
           parsedQuestions.find((p) => p.question.id === candidateId)?.question ||
+          govCatalog.find((q) => q.id === candidateId) ||
+          localCanonical.find((q) => q.id === candidateId) ||
           (Array.isArray(defaultCvsBank) ? (defaultCvsBank as Question[]).find((q) => q.id === candidateId) : undefined);
 
         return (

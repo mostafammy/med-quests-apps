@@ -433,6 +433,8 @@ export interface IStudioProposalSubmissionPort {
     readonly authorId: UserId;
     readonly authorDisplayName: string;
     readonly authorRole: UserRole;
+    readonly allowDuplicateStems?: boolean;
+    readonly reviewerNotes?: string;
   }): Promise<
     Result<
       {

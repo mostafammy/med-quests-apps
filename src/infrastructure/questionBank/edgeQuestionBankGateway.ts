@@ -521,6 +521,8 @@ export class EdgeQuestionBankGateway
     readonly authorId: string;
     readonly authorDisplayName: string;
     readonly authorRole: any;
+    readonly allowDuplicateStems?: boolean;
+    readonly reviewerNotes?: string;
   }): Promise<
     Result<
       {
@@ -530,7 +532,7 @@ export class EdgeQuestionBankGateway
       QuestionBankDomainError
     >
   > {
-    const { questions, authorId, authorDisplayName, authorRole } = params;
+    const { questions, authorId, authorDisplayName, authorRole, allowDuplicateStems, reviewerNotes } = params;
 
     // Quality Gate Ingestion
     const validation = this.qualityPipeline.validateBatch(questions);
@@ -556,7 +558,7 @@ export class EdgeQuestionBankGateway
     for (const q of validation.validQuestions) {
       const stemHash = validation.stemHashes.get(q.id) || QuestionCanonicalHasher.computeStemHashSync(q.stem);
 
-      if (existingStemHashes.has(stemHash)) {
+      if (existingStemHashes.has(stemHash) && !allowDuplicateStems) {
         duplicateQuestionIds.push(q.id);
         continue;
       }
@@ -573,7 +575,7 @@ export class EdgeQuestionBankGateway
         authorDisplayName,
         reviewedById: null,
         reviewedByDisplayName: null,
-        reviewerNotes: null,
+        reviewerNotes: reviewerNotes || null,
         publishedAt: null,
         createdAt: nowIso,
         updatedAt: nowIso,
@@ -590,7 +592,7 @@ export class EdgeQuestionBankGateway
         reviewedByUserId: null,
         reviewedByDisplayName: null,
         reviewedAt: null,
-        reviewerNotes: null,
+        reviewerNotes: reviewerNotes || null,
       };
 
       submittedTickets.push(ticket);

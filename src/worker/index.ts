@@ -1423,8 +1423,9 @@ export default {
               'edge-authoritative'
             );
             const qddVerdict = qddCheck.ok ? qddCheck.value : null;
+            const allowDuplicateStems = Boolean(payload.allowDuplicateStems);
 
-            if (qddVerdict && qddVerdict.decision === 'BLOCK') {
+            if (qddVerdict && qddVerdict.decision === 'BLOCK' && !allowDuplicateStems) {
               duplicateQuestionIds.push(q.id);
               if (validatedQuestions.length === 1) {
                 return new Response(
@@ -1439,26 +1440,29 @@ export default {
               continue;
             }
 
-            const duplicate = await env.MED_QUESTS_DB.prepare(
-              `SELECT 1 AS found FROM global_questions
-               WHERE chapter_id = ? AND stem_hash = ? AND editorial_status = 'published'
-               UNION ALL
-               SELECT 1 AS found FROM question_review_submissions
-               WHERE chapter_id = ? AND stem_hash = ?
-                 AND editorial_status IN ('pending_review', 'changes_requested')
-               LIMIT 1`
-            )
-              .bind(q.chapterId, stemHash, q.chapterId, stemHash)
-              .first<{ found: number }>();
+            if (!allowDuplicateStems) {
+              const duplicate = await env.MED_QUESTS_DB.prepare(
+                `SELECT 1 AS found FROM global_questions
+                 WHERE chapter_id = ? AND stem_hash = ? AND editorial_status = 'published'
+                 UNION ALL
+                 SELECT 1 AS found FROM question_review_submissions
+                 WHERE chapter_id = ? AND stem_hash = ?
+                   AND editorial_status IN ('pending_review', 'changes_requested')
+                 LIMIT 1`
+              )
+                .bind(q.chapterId, stemHash, q.chapterId, stemHash)
+                .first<{ found: number }>();
 
-            if (duplicate) {
-              duplicateQuestionIds.push(q.id);
-              continue;
+              if (duplicate) {
+                duplicateQuestionIds.push(q.id);
+                continue;
+              }
             }
 
             const storedPayload = {
               ...q,
               _qddVerdict: qddVerdict,
+              _reviewerNotes: payload.reviewerNotes || null,
             };
 
             await env.MED_QUESTS_DB.prepare(

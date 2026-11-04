@@ -16,6 +16,7 @@ import type { ParsedQuestionItem, QuestionStemMode, AgentExecutionTelemetry } fr
 import { multiModelConsensusEngine } from '../../domain/questionBank/aiQuestionParser/MultiModelConsensusEngine.ts';
 import { curriculumTaxonomyRegistry } from '../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
 import { createClientQddEngine, loadAllClientBankQuestions } from '../../domain/questionBank/duplication/clientCompositionRoot.ts';
+import { edgeQuestionBankGateway } from '../../infrastructure/questionBank/edgeQuestionBankGateway.ts';
 import { db } from '../../infrastructure/storage/db.ts';
 import { useAuthStore } from './useAuthStore.ts';
 import { useBankGovernanceStore } from './useBankGovernanceStore.ts';
@@ -53,6 +54,7 @@ interface AdminAiQuestionParserStoreState {
   abortCurrentExecution: () => void;
   runBatchDuplicationCheck: () => Promise<void>;
   saveAllUnique: () => Promise<boolean>;
+  sendToApprovalQueue: (targetTempId?: string) => Promise<boolean>;
   runSingleQuestionConsensus: (index: number) => Promise<void>;
   toggleQuestionSelection: (tempId: string) => void;
   selectAll: (select: boolean) => void;
@@ -217,12 +219,20 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
         return;
       }
 
-      const allIds = new Set(result.items.map((i) => i.tempId));
+      // Pre-select ONLY safe non-duplicate questions by default (Stage 06 verdicts are already attached)
+      const safeIds = new Set(
+        result.items
+          .filter((i) => {
+            const rel = i.qddVerdict?.relation;
+            return rel !== 'EXACT' && rel !== 'NEAR' && rel !== 'CONFLICT';
+          })
+          .map((i) => i.tempId)
+      );
       set({
         isParsing: false,
         abortController: null,
         parsedQuestions: [...result.items],
-        selectedTempIds: allIds,
+        selectedTempIds: safeIds,
       });
 
       // Automatically trigger duplication detection across the batch and bank
@@ -299,7 +309,16 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
           pickStrongerVerdict(clientVerdicts[idx], edgeVerdicts[idx]) || item.qddVerdict,
         isCheckingDuplication: false,
       }));
-      set({ parsedQuestions: updated, isCheckingDuplication: false });
+
+      // Ensure any newly detected duplicates are unselected to delay/protect bank commits
+      const filteredSelected = new Set(
+        Array.from(get().selectedTempIds).filter((tempId) => {
+          const item = updated.find((p) => p.tempId === tempId);
+          const rel = item?.qddVerdict?.relation;
+          return rel !== 'EXACT' && rel !== 'NEAR' && rel !== 'CONFLICT';
+        })
+      );
+      set({ parsedQuestions: updated, selectedTempIds: filteredSelected, isCheckingDuplication: false });
     } catch (fallbackErr) {
       console.error('[useAdminAiQuestionParserStore] Prebuilt QDD check failed:', fallbackErr);
       const reset = get().parsedQuestions.map((q, idx) => ({
@@ -307,7 +326,14 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
         qddVerdict: edgeVerdicts[idx] || q.qddVerdict,
         isCheckingDuplication: false,
       }));
-      set({ parsedQuestions: reset, isCheckingDuplication: false });
+      const filteredSelected = new Set(
+        Array.from(get().selectedTempIds).filter((tempId) => {
+          const item = reset.find((p) => p.tempId === tempId);
+          const rel = item?.qddVerdict?.relation;
+          return rel !== 'EXACT' && rel !== 'NEAR' && rel !== 'CONFLICT';
+        })
+      );
+      set({ parsedQuestions: reset, selectedTempIds: filteredSelected, isCheckingDuplication: false });
     }
   },
 
@@ -357,6 +383,123 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
     return success;
   },
 
+  sendToApprovalQueue: async (targetTempId?: string) => {
+    const { parsedQuestions, selectedTempIds } = get();
+    const authState = useAuthStore.getState().authState;
+    const actor =
+      authState.status === 'authenticated-active'
+        ? authState.user
+        : { id: 'usr_admin', displayName: 'Curriculum Administrator', role: 'admin' as const };
+
+    let itemsToRoute: ParsedQuestionItem[] = [];
+    if (targetTempId) {
+      const item = parsedQuestions.find((p) => p.tempId === targetTempId);
+      if (item) itemsToRoute = [item];
+    } else {
+      const selectedDuplicates = parsedQuestions.filter(
+        (p) =>
+          selectedTempIds.has(p.tempId) &&
+          (p.qddVerdict?.relation === 'EXACT' ||
+            p.qddVerdict?.relation === 'NEAR' ||
+            p.qddVerdict?.relation === 'CONFLICT')
+      );
+      if (selectedDuplicates.length > 0) {
+        itemsToRoute = selectedDuplicates;
+      } else {
+        itemsToRoute = parsedQuestions.filter(
+          (p) =>
+            p.qddVerdict?.relation === 'EXACT' ||
+            p.qddVerdict?.relation === 'NEAR' ||
+            p.qddVerdict?.relation === 'CONFLICT'
+        );
+      }
+    }
+
+    if (itemsToRoute.length === 0) {
+      set({
+        commitFeedback: {
+          type: 'error',
+          message: 'No duplicate questions found to route for approval.',
+        },
+      });
+      return false;
+    }
+
+    set({ isCommitting: true, commitFeedback: null });
+
+    try {
+      const questionsToSubmit = itemsToRoute.map((item) => {
+        const q = toQddProbe(item.question);
+        const cand = item.qddVerdict?.candidates[0];
+        const collisionNote = cand
+          ? `[QDD Auto-Triage: ${item.qddVerdict?.relation}] Matched against bank question ${cand.matchedQuestionId}`
+          : `[QDD Auto-Triage: ${item.qddVerdict?.relation || 'DUPLICATE'}] Flagged by Prebuilt Duplication Engine`;
+        return {
+          ...q,
+          evidence: [
+            ...(q.evidence || []),
+            {
+              chunkId: `qdd-flag-${Date.now().toString(36)}`,
+              sourceName: 'Duplication Detection Engine',
+              location: 'Pre-Approval Triage',
+              quote: collisionNote,
+              kind: 'text' as const,
+            },
+          ],
+        };
+      });
+
+      const res = await edgeQuestionBankGateway.submitQuestionsForGlobalReview({
+        questions: questionsToSubmit,
+        authorId: actor.id,
+        authorDisplayName: actor.displayName,
+        authorRole: actor.role,
+        allowDuplicateStems: true,
+        reviewerNotes: `Flagged duplicate/collision routed from AI Question Ingestion Lab for faculty editorial review.`,
+      });
+
+      if (res.ok) {
+        await useBankGovernanceStore.getState().loadGovernanceData('cvs');
+
+        const routedIds = new Set(itemsToRoute.map((i) => i.tempId));
+        const remaining = parsedQuestions.filter((item) => !routedIds.has(item.tempId));
+        const remainingSelected = new Set(
+          Array.from(get().selectedTempIds).filter((id) => !routedIds.has(id))
+        );
+
+        set({
+          isCommitting: false,
+          parsedQuestions: remaining,
+          selectedTempIds: remainingSelected,
+          rawInputText: remaining.length === 0 ? '' : get().rawInputText,
+          commitFeedback: {
+            type: 'success',
+            message: `Successfully routed ${itemsToRoute.length} duplicate question(s) to the Faculty Approval Queue (Review Tickets created).`,
+          },
+        });
+        return true;
+      } else {
+        set({
+          isCommitting: false,
+          commitFeedback: {
+            type: 'error',
+            message: `Could not route to approval queue: ${res.error.code}`,
+          },
+        });
+        return false;
+      }
+    } catch (err: any) {
+      set({
+        isCommitting: false,
+        commitFeedback: {
+          type: 'error',
+          message: `Routing failed: ${err?.message || 'Unknown processing error'}`,
+        },
+      });
+      return false;
+    }
+  },
+
   toggleQuestionSelection: (tempId) => {
     const current = new Set(get().selectedTempIds);
     if (current.has(tempId)) {
@@ -369,8 +512,14 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
 
   selectAll: (select) => {
     if (select) {
-      const allIds = new Set(get().parsedQuestions.map((i) => i.tempId));
-      set({ selectedTempIds: allIds });
+      // By default, select only safe non-duplicate questions
+      const uniqueIds = get()
+        .parsedQuestions.filter((q) => {
+          const rel = q.qddVerdict?.relation;
+          return rel !== 'EXACT' && rel !== 'NEAR' && rel !== 'CONFLICT';
+        })
+        .map((i) => i.tempId);
+      set({ selectedTempIds: new Set(uniqueIds) });
     } else {
       set({ selectedTempIds: new Set() });
     }
@@ -594,6 +743,22 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
         commitFeedback: {
           type: 'error',
           message: 'No questions selected for commit.',
+        },
+      });
+      return false;
+    }
+
+    const duplicateItems = itemsToCommit.filter((item) => {
+      const rel = item.qddVerdict?.relation;
+      return rel === 'EXACT' || rel === 'NEAR' || rel === 'CONFLICT';
+    });
+
+    if (duplicateItems.length > 0) {
+      set({
+        isCommitting: false,
+        commitFeedback: {
+          type: 'error',
+          message: `Direct commit blocked: ${duplicateItems.length} question(s) already exist in the bank or have collisions. Please send them to the Faculty Approval Queue or deselect them before committing.`,
         },
       });
       return false;
