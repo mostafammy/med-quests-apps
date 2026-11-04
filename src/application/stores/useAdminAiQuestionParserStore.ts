@@ -717,7 +717,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
   },
 
   clearParsedQuestions: () => {
-    set({ parsedQuestions: [], selectedTempIds: new Set(), commitFeedback: null });
+    set({ parsedQuestions: [], selectedTempIds: new Set(), commitFeedback: null, agentTelemetry: null });
   },
 
   commitToGlobalQuestionBank: async (selectedOnly = true) => {
