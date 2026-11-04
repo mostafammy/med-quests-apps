@@ -31,6 +31,7 @@ import {
   LayoutGrid,
   Columns,
   ChevronDown,
+  Trash2,
 } from 'lucide-react';
 import { useAuthStore } from '../../../../application/stores/useAuthStore.ts';
 import { useAdminAiQuestionParserStore } from '../../../../application/stores/useAdminAiQuestionParserStore.ts';
@@ -185,6 +186,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     commitFeedback,
     isCheckingDuplication,
     saveAllUnique,
+    sendToApprovalQueue,
     parseRawQuestions,
     toggleQuestionSelection,
     selectAll,
@@ -195,6 +197,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     updateQuestionTaxonomy,
     approveTaxonomyProposal,
     removeParsedQuestion,
+    clearParsedQuestions,
     commitToGlobalQuestionBank,
     getSingleQuestionPrompt,
     getBatchVerificationPrompt,
@@ -214,10 +217,128 @@ export const AdminAiQuestionParserLab: React.FC = () => {
   const [viewMode, setViewMode] = useState<'split' | 'list'>('split');
   const [, startTransition] = useTransition();
 
-  // Automatic Smooth Scrolling Refs
+  // Automatic Smooth Scrolling & Exit Orchestration Refs
   const pipelineOrchestratorRef = useRef<HTMLDivElement>(null);
   const stagingStudioRef = useRef<HTMLDivElement>(null);
+  const directTextInputRef = useRef<HTMLDivElement>(null);
   const prevIsParsingRef = useRef(isParsing);
+
+  // Apple Coordinated Exit, Dusting & Scroll-Up Lifecycle State
+  const [exitState, setExitState] = useState<'idle' | 'celebrating' | 'scrolling' | 'dusting'>('idle');
+  const [cachedItemsBeforeExit, setCachedItemsBeforeExit] = useState<ParsedQuestionItem[]>([]);
+
+  // Coordinated Apple Exit Workflow: celebratory glow -> smooth scroll-up -> physical dusting -> pristine reset
+  const handlePerformExit = (celebrationToast?: string, onComplete?: () => void) => {
+    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (parsedQuestions.length > 0) {
+      setCachedItemsBeforeExit(parsedQuestions);
+    }
+
+    if (prefersReducedMotion) {
+      onComplete?.();
+      setExitState('idle');
+      setCachedItemsBeforeExit([]);
+      if (celebrationToast) {
+        setProposalToast(celebrationToast);
+        setTimeout(() => setProposalToast(null), 4000);
+      }
+      return;
+    }
+
+    // Phase 1: Celebratory Emerald Pulse
+    setExitState('celebrating');
+
+    // Phase 2: Smooth Cinematic Scroll Up to Direct Text Ingestion Chamber
+    const scrollTimer = setTimeout(() => {
+      setExitState('scrolling');
+      if (directTextInputRef.current) {
+        directTextInputRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      }
+    }, 320);
+
+    // Phase 3: The "Dusting" / Physical Glass Dissolve & Height Collapse
+    const dustingTimer = setTimeout(() => {
+      setExitState('dusting');
+    }, 620);
+
+    // Phase 4: Final Pristine State Teardown
+    const teardownTimer = setTimeout(() => {
+      onComplete?.();
+      setExitState('idle');
+      setCachedItemsBeforeExit([]);
+      if (celebrationToast) {
+        setProposalToast(celebrationToast);
+        setTimeout(() => setProposalToast(null), 4500);
+      }
+    }, 1250);
+
+    return () => {
+      clearTimeout(scrollTimer);
+      clearTimeout(dustingTimer);
+      clearTimeout(teardownTimer);
+    };
+  };
+
+  const handleCommitWithSmoothExit = async () => {
+    const totalSelected = selectedTempIds.size;
+    const isFullBatch = totalSelected === parsedQuestions.length;
+
+    const success = await commitToGlobalQuestionBank(true);
+    if (success) {
+      if (isFullBatch || parsedQuestions.length <= totalSelected) {
+        handlePerformExit(
+          `✨ All ${totalSelected} question(s) successfully approved & committed to the Global Bank!`,
+          () => {
+            clearParsedQuestions();
+            setRawInputText('');
+          }
+        );
+      } else {
+        setProposalToast(`✨ Committed ${totalSelected} question(s) to bank. ${parsedQuestions.length - totalSelected} remaining in queue.`);
+        setTimeout(() => setProposalToast(null), 3500);
+      }
+    }
+  };
+
+  const handleSaveAllUniqueWithSmoothExit = async () => {
+    const success = await saveAllUnique();
+    if (success) {
+      const remaining = useAdminAiQuestionParserStore.getState().parsedQuestions;
+      if (remaining.length === 0) {
+        handlePerformExit(
+          `✨ All unique questions successfully approved & committed to the Global Bank!`,
+          () => {
+            clearParsedQuestions();
+            setRawInputText('');
+          }
+        );
+      }
+    }
+  };
+
+  const handleDiscardBatchWithSmoothExit = () => {
+    handlePerformExit('✨ Inspection queue cleared.', () => {
+      clearParsedQuestions();
+      setRawInputText('');
+    });
+  };
+
+  const handleDeleteQuestionWithExit = (index: number) => {
+    if (parsedQuestions.length <= 1) {
+      handlePerformExit('✨ Item removed. Queue cleared.', () => {
+        removeParsedQuestion(index);
+        setRawInputText('');
+      });
+    } else {
+      removeParsedQuestion(index);
+    }
+  };
+
+  const effectiveQuestions = exitState !== 'idle' && parsedQuestions.length === 0 ? cachedItemsBeforeExit : parsedQuestions;
 
   // When user clicks Parse, smoothly glide down to the live neural orchestrator
   const handleParseQuestions = () => {
@@ -270,11 +391,11 @@ export const AdminAiQuestionParserLab: React.FC = () => {
   // Global Keyboard Navigation (J/K or Up/Down between questions, Cmd+Enter to commit)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd/Ctrl + Enter to commit
+      // Cmd/Ctrl + Enter to commit with smooth exit
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        if (!isCommitting && selectedTempIds.size > 0) {
+        if (!isCommitting && selectedTempIds.size > 0 && exitState === 'idle') {
           e.preventDefault();
-          commitToGlobalQuestionBank(true);
+          handleCommitWithSmoothExit();
         }
         return;
       }
@@ -661,7 +782,10 @@ export const AdminAiQuestionParserLab: React.FC = () => {
       </div>
 
       {/* DIRECT RAW TEXT INPUT CHAMBER */}
-      <div className="p-6 rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl shadow-lg space-y-4">
+      <div
+        ref={directTextInputRef}
+        className="p-6 rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl shadow-lg space-y-4 scroll-mt-6"
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-purple-500" />
@@ -731,7 +855,12 @@ export const AdminAiQuestionParserLab: React.FC = () => {
 
         {/* APPLE INTELLIGENCE INTERACTIVE NEURAL ORCHESTRATOR */}
         {agentTelemetry && (
-          <div ref={pipelineOrchestratorRef} className="scroll-mt-6">
+          <div
+            ref={pipelineOrchestratorRef}
+            className={`scroll-mt-6 transition-all duration-500 ${
+              exitState === 'dusting' ? 'apple-dust-exit' : ''
+            }`}
+          >
             <AppleIntelligenceAgentOrchestrator
               telemetry={agentTelemetry}
               isParsing={isParsing}
@@ -752,15 +881,24 @@ export const AdminAiQuestionParserLab: React.FC = () => {
       </div>
 
       {/* INSPECTION & PRE-APPROVAL STAGING STUDIO */}
-      {parsedQuestions.length > 0 && (
-        <div ref={stagingStudioRef} className="space-y-6 animate-in slide-in-from-bottom duration-300 scroll-mt-6">
+      {(effectiveQuestions.length > 0 || exitState !== 'idle') && (
+        <div
+          ref={stagingStudioRef}
+          className={`space-y-6 scroll-mt-6 transition-all duration-500 ${
+            exitState === 'dusting'
+              ? 'apple-dust-exit'
+              : exitState === 'celebrating'
+              ? 'animate-apple-celebrate'
+              : 'animate-in slide-in-from-bottom duration-300'
+          }`}
+        >
           {/* Header & Global Batch Actions */}
           <div className="p-6 rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl shadow-lg space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800/80 pb-4">
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-base font-bold font-heading text-zinc-900 dark:text-zinc-50">
-                    Pre-Approval Inspection Queue ({parsedQuestions.length} Items)
+                    Pre-Approval Inspection Queue ({effectiveQuestions.length} Items)
                   </h2>
                   <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                     {selectedTempIds.size} Selected
@@ -772,8 +910,8 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                 </p>
               </div>
 
-              {/* View Switcher: Split Stage (Spatial) vs Stacked List */}
-              <div className="flex items-center gap-2">
+              {/* View Switcher: Split Stage (Spatial) vs Stacked List & Clear Batch */}
+              <div className="flex items-center gap-2 flex-wrap">
                 <div className="inline-flex p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/70 dark:border-zinc-700 text-xs">
                   <button
                     type="button"
@@ -800,6 +938,18 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                     <span>Stacked List</span>
                   </button>
                 </div>
+
+                {/* Discard / Clear Batch Action */}
+                <button
+                  type="button"
+                  onClick={handleDiscardBatchWithSmoothExit}
+                  disabled={exitState !== 'idle'}
+                  title="Discard all parsed questions and smoothly reset workspace"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-zinc-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-zinc-200/70 dark:border-zinc-700 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Clear Queue</span>
+                </button>
               </div>
             </div>
 
@@ -819,16 +969,16 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-600 dark:text-zinc-400 flex-wrap">
-                    <span>Target Block: <strong className="text-zinc-900 dark:text-zinc-100 font-semibold">{parsedQuestions[0]?.taxonomyClassification?.blockName || 'Cardiovascular System (CVS) - Block 206'}</strong></span>
+                    <span>Target Block: <strong className="text-zinc-900 dark:text-zinc-100 font-semibold">{effectiveQuestions[0]?.taxonomyClassification?.blockName || 'Cardiovascular System (CVS) - Block 206'}</strong></span>
                     <span>•</span>
-                    <span>{parsedQuestions.length} Question(s) Grounded to Active Syllabus</span>
+                    <span>{effectiveQuestions.length} Question(s) Grounded to Active Syllabus</span>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                {Array.from(new Set(parsedQuestions.map((q) => q.question.subjectId))).map((subjId) => {
-                  const count = parsedQuestions.filter((q) => q.question.subjectId === subjId).length;
+                {Array.from(new Set(effectiveQuestions.map((q) => q.question.subjectId))).map((subjId) => {
+                  const count = effectiveQuestions.filter((q) => q.question.subjectId === subjId).length;
                   const meta = SUBJECT_META[subjId] || { icon: '📚', badgeColor: 'bg-zinc-500/10 text-zinc-700' };
                   return (
                     <span
@@ -866,7 +1016,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
             <div className="flex flex-col lg:flex-row gap-5 items-start">
               {/* Left Navigator Rail */}
               <StagingMasterRail
-                questions={parsedQuestions}
+                questions={effectiveQuestions}
                 selectedIndex={selectedQuestionIndex}
                 onSelectIndex={(idx) => {
                   startTransition(() => {
@@ -881,24 +1031,24 @@ export const AdminAiQuestionParserLab: React.FC = () => {
               />
 
               {/* Right Detail Workspace Canvas */}
-              {parsedQuestions[selectedQuestionIndex] ? (
+              {effectiveQuestions[selectedQuestionIndex] ? (
                 <StagingDetailCanvas
-                  item={parsedQuestions[selectedQuestionIndex]}
+                  item={effectiveQuestions[selectedQuestionIndex]}
                   index={selectedQuestionIndex}
-                  totalCount={parsedQuestions.length}
-                  isEditing={editingTempId === parsedQuestions[selectedQuestionIndex].tempId}
+                  totalCount={effectiveQuestions.length}
+                  isEditing={editingTempId === effectiveQuestions[selectedQuestionIndex].tempId}
                   onToggleEdit={() => {
-                    const currentId = parsedQuestions[selectedQuestionIndex].tempId;
+                    const currentId = effectiveQuestions[selectedQuestionIndex].tempId;
                     setEditingTempId(editingTempId === currentId ? null : currentId);
                   }}
-                  onDelete={() => removeParsedQuestion(selectedQuestionIndex)}
+                  onDelete={() => handleDeleteQuestionWithExit(selectedQuestionIndex)}
                   onCopyPrompt={() =>
                     handleCopySinglePrompt(
                       selectedQuestionIndex,
-                      parsedQuestions[selectedQuestionIndex].tempId
+                      effectiveQuestions[selectedQuestionIndex].tempId
                     )
                   }
-                  isPromptCopied={copiedPromptId === parsedQuestions[selectedQuestionIndex].tempId}
+                  isPromptCopied={copiedPromptId === effectiveQuestions[selectedQuestionIndex].tempId}
                   onToggleStemFormat={() => toggleStemFormat(selectedQuestionIndex)}
                   onUpdateStem={(stem) => updateQuestionStem(selectedQuestionIndex, stem)}
                   onUpdateChoice={(cId, text, rat) =>
@@ -911,7 +1061,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                   }
                   onApproveProposal={(type, name) =>
                     handleApproveProposal(
-                      parsedQuestions[selectedQuestionIndex].tempId,
+                      effectiveQuestions[selectedQuestionIndex].tempId,
                       type,
                       name
                     )
@@ -919,6 +1069,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                   onRunConsensus={() => runSingleQuestionConsensus(selectedQuestionIndex)}
                   isVerifyingConsensus={isVerifyingConsensusIndex === selectedQuestionIndex}
                   onInspectDuplication={(item) => setInspectingQuestionItem(item)}
+                  onSendToApprovalQueue={(tempId) => sendToApprovalQueue(tempId)}
                   isCheckingDuplication={isCheckingDuplication}
                   subjectMetaMap={SUBJECT_META}
                 />
@@ -931,17 +1082,17 @@ export const AdminAiQuestionParserLab: React.FC = () => {
           ) : (
             /* STACKED LIST VIEW (COLLAPSIBLE CARDS) */
             <div className="space-y-4">
-              {parsedQuestions.map((item, idx) => (
+              {effectiveQuestions.map((item, idx) => (
                 <StagingDetailCanvas
                   key={item.tempId}
                   item={item}
                   index={idx}
-                  totalCount={parsedQuestions.length}
+                  totalCount={effectiveQuestions.length}
                   isEditing={editingTempId === item.tempId}
                   onToggleEdit={() => {
                     setEditingTempId(editingTempId === item.tempId ? null : item.tempId);
                   }}
-                  onDelete={() => removeParsedQuestion(idx)}
+                  onDelete={() => handleDeleteQuestionWithExit(idx)}
                   onCopyPrompt={() => handleCopySinglePrompt(idx, item.tempId)}
                   isPromptCopied={copiedPromptId === item.tempId}
                   onToggleStemFormat={() => toggleStemFormat(idx)}
@@ -954,6 +1105,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                   onRunConsensus={() => runSingleQuestionConsensus(idx)}
                   isVerifyingConsensus={isVerifyingConsensusIndex === idx}
                   onInspectDuplication={(itemToInspect) => setInspectingQuestionItem(itemToInspect)}
+                  onSendToApprovalQueue={(tempId) => sendToApprovalQueue(tempId)}
                   isCheckingDuplication={isCheckingDuplication}
                   subjectMetaMap={SUBJECT_META}
                 />
@@ -963,24 +1115,30 @@ export const AdminAiQuestionParserLab: React.FC = () => {
 
           {/* FLOATING PERSISTENT BATCH COMMAND BAR */}
           <FloatingBatchCommandBar
-            totalCount={parsedQuestions.length}
+            totalCount={effectiveQuestions.length}
             selectedCount={selectedTempIds.size}
             isCommitting={isCommitting}
             isCheckingDuplication={isCheckingDuplication}
             copiedBatchPrompt={copiedBatchPrompt}
-            onToggleSelectAll={() => selectAll(selectedTempIds.size !== parsedQuestions.length)}
+            onToggleSelectAll={() => selectAll(selectedTempIds.size !== effectiveQuestions.length)}
             onCopyBatchPrompt={handleCopyBatchPrompt}
-            onSaveAllUnique={() => saveAllUnique()}
-            onCommitToBank={() => commitToGlobalQuestionBank(true)}
+            onSaveAllUnique={handleSaveAllUniqueWithSmoothExit}
+            onCommitToBank={handleCommitWithSmoothExit}
           />
         </div>
       )}
 
-      {/* FEEDBACK TOAST */}
-      {proposalToast && (
-        <div className="fixed bottom-24 right-6 z-50 p-4 rounded-2xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom duration-300">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
-          <span>{proposalToast}</span>
+      {/* APPLE CELEBRATION & FEEDBACK TOAST */}
+      {(proposalToast || (commitFeedback && exitState === 'idle')) && (
+        <div className="fixed bottom-24 right-6 z-50 p-4 rounded-2xl bg-zinc-900/95 dark:bg-zinc-100/95 backdrop-blur-xl text-white dark:text-zinc-900 text-xs shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-bottom-3 duration-300 border border-white/10 dark:border-zinc-800 max-w-md">
+          {commitFeedback?.type === 'error' ? (
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0 animate-pulse" />
+          )}
+          <span className="font-semibold leading-relaxed">
+            {proposalToast || commitFeedback?.message}
+          </span>
         </div>
       )}
 

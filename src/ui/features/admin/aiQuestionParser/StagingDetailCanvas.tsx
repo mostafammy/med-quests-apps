@@ -16,6 +16,8 @@ import {
   Layers,
   Scale,
   ShieldCheck,
+  ShieldAlert,
+  AlertOctagon,
   Check,
   AlertTriangle,
   RotateCcw,
@@ -29,6 +31,8 @@ import {
   FolderPlus,
   Info,
   ExternalLink,
+  Send,
+  X,
 } from 'lucide-react';
 import type { ParsedQuestionItem } from '../../../../domain/questionBank/aiQuestionParser/types.ts';
 import type { ChoiceId } from '../../../../domain/model/types.ts';
@@ -54,6 +58,7 @@ interface StagingDetailCanvasProps {
   readonly onRunConsensus: () => void;
   readonly isVerifyingConsensus: boolean;
   readonly onInspectDuplication?: (item: ParsedQuestionItem) => void;
+  readonly onSendToApprovalQueue?: (tempId: string) => void;
   readonly isCheckingDuplication: boolean;
   readonly subjectMetaMap: Record<string, { icon: string; badgeColor: string }>;
 }
@@ -79,12 +84,53 @@ export const StagingDetailCanvas: React.FC<StagingDetailCanvasProps> = ({
   onRunConsensus,
   isVerifyingConsensus,
   onInspectDuplication,
+  onSendToApprovalQueue,
   isCheckingDuplication,
   subjectMetaMap,
 }) => {
   const [activeTab, setActiveTab] = useState<CanvasTab>('sba');
   const [isTaxonomyEditing, setIsTaxonomyEditing] = useState(false);
-  const [isRationaleExpanded, setIsRationaleExpanded] = useState(true);
+
+  // Remember rationales expanded/collapsed state across questions and re-renders
+  const [isRationaleExpanded, setIsRationaleExpanded] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('medquests_ai_parser_rationales_expanded');
+      if (stored !== null) return stored === 'true';
+    } catch {
+      // ignore
+    }
+    return true;
+  });
+
+  const toggleRationaleExpanded = (expand?: boolean) => {
+    setIsRationaleExpanded((prev) => {
+      const next = expand !== undefined ? expand : !prev;
+      try {
+        localStorage.setItem('medquests_ai_parser_rationales_expanded', String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  // Allow user to dismiss/collapse the duplicate warning banner and remember it
+  const [isDuplicateBannerDismissed, setIsDuplicateBannerDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(`medquests_dismissed_dup_${item.tempId}`) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleDismissDuplicateBanner = () => {
+    setIsDuplicateBannerDismissed(true);
+    try {
+      localStorage.setItem(`medquests_dismissed_dup_${item.tempId}`, 'true');
+    } catch {
+      // ignore
+    }
+  };
 
   const classification = item.taxonomyClassification;
   const currentSubjects = curriculumTaxonomyRegistry.getSubjects();
@@ -246,6 +292,117 @@ export const StagingDetailCanvas: React.FC<StagingDetailCanvasProps> = ({
         {/* ==================== TAB 1: SINGLE-BEST ANSWER ==================== */}
         {activeTab === 'sba' && (
           <div className="space-y-4 animate-in fade-in duration-200">
+            {/* PROMINENT BANK DUPLICATE / CONFLICT ALERT BANNER */}
+            {(() => {
+              const rel = item.qddVerdict?.relation;
+              const isDuplicateOrConflict = rel === 'EXACT' || rel === 'NEAR' || rel === 'CONFLICT';
+              if (!isDuplicateOrConflict || isDuplicateBannerDismissed) return null;
+
+              const isExact = rel === 'EXACT';
+              const isConflict = rel === 'CONFLICT';
+              const firstCand = item.qddVerdict?.candidates[0];
+              const matchPercent = firstCand?.signals?.lexicalJaccard
+                ? Math.round(firstCand.signals.lexicalJaccard * 100)
+                : 100;
+
+              return (
+                <div
+                  className={`p-4 rounded-2xl border transition-all ${
+                    isConflict
+                      ? 'bg-rose-500/10 dark:bg-rose-950/30 border-rose-500/40 text-rose-900 dark:text-rose-200 shadow-sm'
+                      : isExact
+                      ? 'bg-blue-500/10 dark:bg-blue-950/30 border-blue-500/40 text-blue-900 dark:text-blue-200 shadow-sm'
+                      : 'bg-amber-500/10 dark:bg-amber-950/30 border-amber-500/30 text-amber-900 dark:text-amber-200 shadow-sm'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${
+                          isConflict
+                            ? 'bg-rose-600 text-white'
+                            : isExact
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-amber-600 text-white'
+                        }`}
+                      >
+                        {isConflict ? (
+                          <AlertOctagon className="w-5 h-5" />
+                        ) : isExact ? (
+                          <ShieldAlert className="w-5 h-5" />
+                        ) : (
+                          <AlertTriangle className="w-5 h-5" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-black uppercase tracking-wider">
+                            {isConflict
+                              ? 'Answer Contradiction with Existing Question'
+                              : isExact
+                              ? 'Question Already Exists in Global Bank'
+                              : 'Likely Duplicate / High Content Overlap'}
+                          </span>
+                          <span
+                            className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase border ${
+                              isConflict
+                                ? 'bg-rose-500/20 text-rose-800 dark:text-rose-200 border-rose-500/40'
+                                : isExact
+                                ? 'bg-blue-500/20 text-blue-800 dark:text-blue-200 border-blue-500/40'
+                                : 'bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-500/40'
+                            }`}
+                          >
+                            Direct Commit Locked • Approval Required
+                          </span>
+                        </div>
+                        <p className="text-xs mt-1 opacity-90 leading-relaxed">
+                          {isConflict
+                            ? `Identical question stem exists in the Global Bank, but the correct keyed answer contradicts bank item ${firstCand?.matchedQuestionId || ''}. Cannot be directly committed.`
+                            : isExact
+                            ? `Matches canonical bank question ${firstCand?.matchedQuestionId || ''} (${matchPercent}% lexical match). Held from bank commit to prevent duplication.`
+                            : `High similarity (${matchPercent}%) detected with bank question ${firstCand?.matchedQuestionId || ''}.`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                      {onInspectDuplication && (
+                        <button
+                          type="button"
+                          onClick={() => onInspectDuplication(item)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/80 dark:bg-zinc-800/80 hover:bg-white dark:hover:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 shadow-2xs transition-all cursor-pointer"
+                        >
+                          <Scale className="w-3.5 h-3.5 text-purple-500" />
+                          <span>Compare Diff</span>
+                        </button>
+                      )}
+
+                      {onSendToApprovalQueue && (
+                        <button
+                          type="button"
+                          onClick={() => onSendToApprovalQueue(item.tempId)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-xs transition-all cursor-pointer"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Send for Approval</span>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleDismissDuplicateBanner}
+                        title="Dismiss warning (stays collapsed)"
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Stem Header & Mode Switcher */}
             <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
               <div className="flex items-center gap-2">
@@ -392,7 +549,7 @@ export const StagingDetailCanvas: React.FC<StagingDetailCanvasProps> = ({
               <div className="flex items-center justify-between text-xs">
                 <button
                   type="button"
-                  onClick={() => setIsRationaleExpanded(!isRationaleExpanded)}
+                  onClick={() => toggleRationaleExpanded()}
                   className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1.5 cursor-pointer"
                 >
                   {isRationaleExpanded ? (

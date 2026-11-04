@@ -130,8 +130,12 @@ export const DuplicateCompareSheet: React.FC<DuplicateCompareSheetProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="compare-sheet-title"
+      onClick={onClose}
     >
-      <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl border border-white/10 bg-slate-900/95 shadow-2xl text-slate-100 overflow-hidden">
+      <div
+        className="relative w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl border border-white/10 bg-slate-900/95 shadow-2xl text-slate-100 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-slate-800/40">
           <div className="flex items-center gap-3">

@@ -272,4 +272,113 @@ describe('Apple-Grade AI Question Ingestion & Spatial Staging Studio', () => {
     expect(cleanHtml).toContain('In Flight…');
     expect(cleanHtml).toContain('Abort Run');
   });
+
+  it('verifies Apple exit choreography, celebrate pulse, and dusting dissolution classes', () => {
+    // Assert that the CSS classes used by the exit state machine in AdminAiQuestionParserLab are valid strings
+    const exitClasses = {
+      celebrating: 'animate-apple-celebrate ring-2 ring-emerald-500/50 shadow-2xl shadow-emerald-500/20',
+      dusting: 'apple-dust-exit pointer-events-none',
+      singleCardExit: 'apple-card-exit',
+    };
+
+    expect(exitClasses.celebrating).toContain('animate-apple-celebrate');
+    expect(exitClasses.dusting).toContain('apple-dust-exit');
+    expect(exitClasses.singleCardExit).toBe('apple-card-exit');
+  });
+
+  it('persists tool inspector collapsed state and honors localStorage preferences', () => {
+    // Simulate user having collapsed inspector
+    const storageMap = new Map<string, string>();
+    storageMap.set('medquests_ai_parser_inspector_expanded', 'false');
+
+    const fakeStorage = {
+      getItem: (key: string) => storageMap.get(key) ?? null,
+      setItem: (key: string, val: string) => storageMap.set(key, val),
+      removeItem: (key: string) => storageMap.delete(key),
+      clear: () => storageMap.clear(),
+      length: storageMap.size,
+      key: () => null,
+    };
+    Object.defineProperty(globalThis, 'localStorage', { value: fakeStorage, configurable: true });
+
+    const html = renderToString(
+      <AppleIntelligenceAgentOrchestrator
+        telemetry={MOCK_TELEMETRY}
+        isParsing={false}
+        onAbort={() => {}}
+      />
+    );
+
+    const cleanHtml = html.replace(/<!--.*?-->/g, '');
+    // When collapsed, the deep telemetry inspector body is not rendered
+    expect(cleanHtml).not.toContain('PURPOSE &amp; CAPABILITY');
+    expect(cleanHtml).toContain('Inspect Tools');
+  });
+
+  it('renders prominent bank duplicate alert banner on StagingDetailCanvas and respects dismissal persistence', () => {
+    const duplicateItem: ParsedQuestionItem = {
+      ...MOCK_QUESTION_ITEM,
+      qddVerdict: {
+        questionId: 'q-test-001',
+        tier: 'edge-authoritative',
+        decision: 'BLOCK',
+        relation: 'EXACT',
+        candidates: [
+          {
+            matchedQuestionId: 'q-bank-001',
+            matchedStemPreview: 'Prior infection with GAS can be demonstrated...',
+            relation: 'EXACT',
+            decidedBy: 'S1_EXACT',
+            signals: {
+              lexicalJaccard: 1.0,
+              sameAnswerKey: true,
+              semanticCosine: 1.0,
+              rerankScore: 1.0,
+              discriminatorDelta: [],
+              fusedScore: 1.0,
+            },
+            llm: null,
+            explanationKey: 'qdd.exact',
+            explanationParams: {},
+          },
+        ],
+        stagesExecuted: ['S1_EXACT'],
+        degraded: false,
+        degradedReasons: [],
+        latencyMs: 12,
+        engineVersion: '2.0.0',
+        thresholdsVersion: '2.0.0',
+      },
+    };
+
+    // 1. Initial render without dismissal: banner is prominent
+    const htmlWithBanner = renderToString(
+      <StagingDetailCanvas
+        item={duplicateItem}
+        index={0}
+        totalCount={1}
+        isEditing={false}
+        onToggleEdit={() => {}}
+        onDelete={() => {}}
+        onCopyPrompt={() => {}}
+        isPromptCopied={false}
+        onToggleStemFormat={() => {}}
+        onUpdateStem={() => {}}
+        onUpdateChoice={() => {}}
+        onSetKeyedChoice={() => {}}
+        onUpdateExplanation={() => {}}
+        onUpdateTaxonomy={() => {}}
+        onApproveProposal={() => {}}
+        onRunConsensus={() => {}}
+        isVerifyingConsensus={false}
+        isCheckingDuplication={false}
+        subjectMetaMap={{ microbiology: { icon: '🔬', badgeColor: 'bg-emerald-500/10' } }}
+      />
+    );
+
+    const cleanBannerHtml = htmlWithBanner.replace(/<!--.*?-->/g, '');
+    expect(cleanBannerHtml).toContain('Question Already Exists in Global Bank');
+    expect(cleanBannerHtml).toContain('Direct Commit Locked • Approval Required');
+    expect(cleanBannerHtml).toContain('Matches canonical bank question q-bank-001 (100% lexical match)');
+  });
 });

@@ -152,7 +152,53 @@ export const AppleIntelligenceAgentOrchestrator: React.FC<AppleIntelligenceAgent
   const [selectedStepId, setSelectedStepId] = useState<AgentToolStepId | null>(
     telemetry.currentStepId || 'reasoning'
   );
-  const [isInspectorExpanded, setIsInspectorExpanded] = useState<boolean>(initialExpandedInspector);
+
+  // Remember inspector expanded/collapsed state across runs & re-renders so user intent is permanent
+  const [isInspectorExpanded, setIsInspectorExpanded] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('medquests_ai_parser_inspector_expanded');
+      if (stored !== null) return stored === 'true';
+    } catch {
+      // ignore
+    }
+    return initialExpandedInspector;
+  });
+
+  const toggleInspector = (expand?: boolean) => {
+    setIsInspectorExpanded((prev) => {
+      const next = expand !== undefined ? expand : !prev;
+      try {
+        localStorage.setItem('medquests_ai_parser_inspector_expanded', String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  // User-controllable capsule collapse to tuck away the pipeline once parsing completes
+  const [isCapsuleCollapsed, setIsCapsuleCollapsed] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('medquests_ai_parser_capsule_collapsed');
+      if (stored !== null) return stored === 'true';
+    } catch {
+      // ignore
+    }
+    return false;
+  });
+
+  const toggleCapsule = (collapsed?: boolean) => {
+    setIsCapsuleCollapsed((prev) => {
+      const next = collapsed !== undefined ? collapsed : !prev;
+      try {
+        localStorage.setItem('medquests_ai_parser_capsule_collapsed', String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
   const [isSimulatingReplay, setIsSimulatingReplay] = useState<boolean>(false);
   const [replayStepIndex, setReplayStepIndex] = useState<number>(-1);
   const [hoveredStepId, setHoveredStepId] = useState<AgentToolStepId | null>(null);
@@ -167,6 +213,13 @@ export const AppleIntelligenceAgentOrchestrator: React.FC<AppleIntelligenceAgent
       setSelectedStepId(telemetry.currentStepId);
     }
   }, [telemetry.currentStepId]);
+
+  // If pipeline starts running, automatically reveal capsule so user observes real-time neural progress
+  useEffect(() => {
+    if (telemetry.isRunning) {
+      setIsCapsuleCollapsed(false);
+    }
+  }, [telemetry.isRunning]);
 
   // Dynamic Sub-Phase Rotation: during 14s Gemini reasoning, cycle clinical stages every 2.4s
   useEffect(() => {
@@ -247,6 +300,43 @@ export const AppleIntelligenceAgentOrchestrator: React.FC<AppleIntelligenceAgent
   }, [telemetry.isRunning, telemetry.currentStepId, reasoningSubPhaseIdx, telemetry.activeToolName, isAllCompleted]);
 
   const selectedStepMeta = getToolPerformanceMeta(selectedStep.id, selectedStep.durationMs, selectedStep.status);
+
+  // Render ultra-compact frosted glass pill when pipeline is complete and user collapsed it
+  if (isCapsuleCollapsed && isAllCompleted) {
+    return (
+      <div className="rounded-2xl p-[1px] bg-gradient-to-r from-emerald-500/30 via-teal-500/20 to-cyan-500/30 shadow-sm animate-in fade-in duration-200">
+        <div className="rounded-[15px] bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl p-3 px-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-xs">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                  Apple Intelligence Pipeline: 6 Stages Synced
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20">
+                  {(telemetry.elapsedMs / 1000).toFixed(2)}s • 100% Invariants Verified
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 line-clamp-1">
+                {activeNarrative}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => toggleCapsule(false)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-purple-600 dark:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 transition-all cursor-pointer shadow-2xs self-start sm:self-auto active:scale-95"
+          >
+            <span>Expand Pipeline Trace</span>
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -363,6 +453,19 @@ export const AppleIntelligenceAgentOrchestrator: React.FC<AppleIntelligenceAgent
               </button>
             )}
 
+            {/* Collapse Pipeline Button (when finished) */}
+            {isAllCompleted && (
+              <button
+                type="button"
+                onClick={() => toggleCapsule(true)}
+                title="Collapse pipeline to save vertical screen space"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 transition-all cursor-pointer shadow-2xs active:scale-95"
+              >
+                <ChevronUp className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Collapse Pipeline</span>
+              </button>
+            )}
+
             {/* Abort Execution Button */}
             {(telemetry.isRunning || isParsing) && (
               <button
@@ -378,7 +481,7 @@ export const AppleIntelligenceAgentOrchestrator: React.FC<AppleIntelligenceAgent
             {/* Deep Telemetry Inspector Toggle */}
             <button
               type="button"
-              onClick={() => setIsInspectorExpanded(!isInspectorExpanded)}
+              onClick={() => toggleInspector()}
               title={isInspectorExpanded ? 'Hide deep tool inspector' : 'Inspect the 6 autonomous tools & latency benchmarks'}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer shadow-2xs ${
                 isInspectorExpanded
@@ -431,8 +534,11 @@ export const AppleIntelligenceAgentOrchestrator: React.FC<AppleIntelligenceAgent
                   onMouseEnter={() => setHoveredStepId(step.id)}
                   onMouseLeave={() => setHoveredStepId(null)}
                   onClick={() => {
-                    setSelectedStepId(step.id);
-                    setIsInspectorExpanded(true);
+                    if (selectedStepId === step.id) {
+                      toggleInspector();
+                    } else {
+                      setSelectedStepId(step.id);
+                    }
                   }}
                   title={`${step.label} • ${stepMeta.badgeLabel} (${step.durationMs !== undefined ? `${step.durationMs}ms` : step.status})`}
                   className={`group relative h-2.5 sm:h-3 rounded-full transition-all duration-300 cursor-pointer overflow-hidden p-0 border ${
@@ -582,6 +688,21 @@ export const AppleIntelligenceAgentOrchestrator: React.FC<AppleIntelligenceAgent
                   <span>{s.label}</span>
                 </button>
               ))}
+            </div>
+
+            {/* Collapse Inspector Action Footer */}
+            <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800 text-[11px]">
+              <span className="text-zinc-400">
+                Detailed telemetry for stage: <strong className="text-zinc-700 dark:text-zinc-300">{selectedStep.label}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => toggleInspector(false)}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-purple-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 transition-all cursor-pointer"
+              >
+                <ChevronUp className="w-3.5 h-3.5" />
+                <span>Collapse Inspector</span>
+              </button>
             </div>
           </div>
         )}
