@@ -134,6 +134,8 @@ export interface QuestionFingerprint {
   readonly stemHash: CanonicalStemHash;
   readonly itemHash: CanonicalItemHash;
   readonly answerKeyHash: AnswerKeyHash;
+  /** Optional canonical answer key text for semantic answer-key parity checks. */
+  readonly canonicalCorrectAnswer?: string;
   /** 128 x uint32 MinHash signature. */
   readonly minhash: Uint32Array;
   /** 32 band keys derived from the signature (hex). */

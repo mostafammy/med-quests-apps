@@ -26,6 +26,7 @@ import type {
   DuplicateCandidate,
   DuplicationVerdict,
 } from '../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
+import { isAnswerKeySemanticallyEqual } from '../../../domain/questionBank/duplication/answerKeySemantics.ts';
 
 export interface DuplicateCompareSheetProps {
   readonly isOpen: boolean;
@@ -103,11 +104,24 @@ export const DuplicateCompareSheet: React.FC<DuplicateCompareSheetProps> = ({
 
   if (!isOpen) return null;
 
+  const subjectCorrectChoice = subjectQuestion.choices.find((c) => c.isCorrect);
+  const matchedCorrectChoice = matchedQuestion?.choices?.find((c) => c.isCorrect);
+
+  const isClinicallySameAnswer = useMemo(() => {
+    if (!subjectCorrectChoice || !matchedCorrectChoice) return null;
+    return isAnswerKeySemanticallyEqual(subjectCorrectChoice.text, matchedCorrectChoice.text);
+  }, [subjectCorrectChoice, matchedCorrectChoice]);
+
   const relation = activeCandidate?.relation || verdict?.relation || 'NEAR';
   const jaccardPercent = activeCandidate?.signals.lexicalJaccard
     ? Math.round(activeCandidate.signals.lexicalJaccard * 100)
     : null;
-  const isConflict = relation === 'CONFLICT' || activeCandidate?.signals.sameAnswerKey === false;
+  const isConflict =
+    isClinicallySameAnswer === true
+      ? false
+      : isClinicallySameAnswer === false
+      ? true
+      : relation === 'CONFLICT' || activeCandidate?.signals.sameAnswerKey === false;
   const discriminatorDeltas = activeCandidate?.signals.discriminatorDelta || [];
 
   return (

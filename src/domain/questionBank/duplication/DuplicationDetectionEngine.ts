@@ -25,6 +25,7 @@ import type {
 import thresholdsJson from './config/thresholds.v1.json' with { type: 'json' };
 import { MinHasher } from './MinHasher.ts';
 import { ClinicalDiscriminatorExtractor } from './ClinicalDiscriminatorExtractor.ts';
+import { isAnswerKeySemanticallyEqual } from './answerKeySemantics.ts';
 
 const RELATION_SEVERITY: Record<DuplicateRelation, number> = {
   EXACT: 5,
@@ -170,7 +171,10 @@ export class DuplicationDetectionEngine implements IDuplicationDetectionEngine {
           decidedBy = 'S1_EXACT';
           jaccard = 1.0;
         } else if (cA.stemHash === cB.stemHash) {
-          if (cA.answerKeyHash === cB.answerKeyHash) {
+          const isSameKey =
+            cA.answerKeyHash === cB.answerKeyHash ||
+            isAnswerKeySemanticallyEqual(cA.canonicalCorrectAnswer, cB.canonicalCorrectAnswer);
+          if (isSameKey) {
             relation = 'EXACT';
             decidedBy = 'S1_EXACT';
             jaccard = 1.0;
@@ -186,10 +190,14 @@ export class DuplicationDetectionEngine implements IDuplicationDetectionEngine {
               cA.discriminators,
               cB.discriminators
             );
+            const isDiffKey =
+              cA.answerKeyHash !== cB.answerKeyHash &&
+              !isAnswerKeySemanticallyEqual(cA.canonicalCorrectAnswer, cB.canonicalCorrectAnswer);
+
             if (delta.length > 0) {
               relation = 'SIBLING';
               decidedBy = 'S4_DISCRIMINATORS';
-            } else if (cA.answerKeyHash !== cB.answerKeyHash && jaccard >= 0.5) {
+            } else if (isDiffKey && jaccard >= 0.5) {
               relation = 'CONFLICT';
               decidedBy = 'S4_DISCRIMINATORS';
             } else if (jaccard >= this.thresholds.nearAutoMin) {
@@ -309,7 +317,14 @@ export class DuplicationDetectionEngine implements IDuplicationDetectionEngine {
         highestRelation = rel;
       }
 
-      const sameKey = context.subject.answerKeyHash === mutable.fingerprint.answerKeyHash;
+      const sameKey =
+        context.subject.answerKeyHash === mutable.fingerprint.answerKeyHash ||
+        (mutable.fingerprint.canonicalCorrectAnswer && context.subject.canonicalCorrectAnswer
+          ? isAnswerKeySemanticallyEqual(
+              context.subject.canonicalCorrectAnswer,
+              mutable.fingerprint.canonicalCorrectAnswer
+            )
+          : false);
 
       candidatesList.push({
         matchedQuestionId: candId,

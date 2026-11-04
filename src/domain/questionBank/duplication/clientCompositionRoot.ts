@@ -135,6 +135,7 @@ export async function createClientQddEngine(
         stemHash: c.stemHash,
         itemHash: c.itemHash,
         answerKeyHash: c.answerKeyHash,
+        canonicalCorrectAnswer: c.canonicalCorrectAnswer,
         minhash: sig,
         lshBands: bandKeys,
         discriminators: c.discriminators,

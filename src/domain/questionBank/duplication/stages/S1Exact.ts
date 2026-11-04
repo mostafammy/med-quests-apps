@@ -10,6 +10,7 @@ import type {
   IFingerprintRepository,
   QddStageId,
 } from '../../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
+import { isAnswerKeySemanticallyEqual } from '../answerKeySemantics.ts';
 
 export class S1ExactStage implements IDetectionStage {
   public readonly id: QddStageId = 'S1_EXACT';
@@ -50,8 +51,15 @@ export class S1ExactStage implements IDetectionStage {
 
     for (const hit of exactStemHits) {
       if (hit.questionId !== subject.questionId) {
-        // If stem is identical but correct answer is different -> CONFLICT!
-        if (hit.answerKeyHash !== subject.answerKeyHash) {
+        const isSameKeyHash = hit.answerKeyHash === subject.answerKeyHash;
+        const isSemanticKeyMatch =
+          isSameKeyHash ||
+          (hit.canonicalCorrectAnswer && subject.canonicalCorrectAnswer
+            ? isAnswerKeySemanticallyEqual(subject.canonicalCorrectAnswer, hit.canonicalCorrectAnswer)
+            : false);
+
+        // If stem is identical but correct answer genuinely differs -> CONFLICT!
+        if (!isSemanticKeyMatch) {
           context.candidates.set(hit.questionId, {
             fingerprint: hit,
             canonical: null,
@@ -68,17 +76,19 @@ export class S1ExactStage implements IDetectionStage {
           return;
         }
 
-        // Stem is identical and answer key is identical (distractor permutation variation)
+        // Stem is identical and answer key is identical (distractor permutation variation or identical)
         context.candidates.set(hit.questionId, {
           fingerprint: hit,
           canonical: null,
           lexicalJaccard: 1.0,
           semanticCosine: null,
           rerankScore: null,
-          relation: 'NEAR',
+          relation: 'EXACT',
           decidedBy: this.id,
           llm: null,
         });
+        context.final = true;
+        return;
       }
     }
   }

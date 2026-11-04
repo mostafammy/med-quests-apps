@@ -15,6 +15,7 @@ import type {
 } from '../../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
 import { ClinicalDiscriminatorExtractor } from '../ClinicalDiscriminatorExtractor.ts';
 import { LogisticScoreFusion } from '../LogisticScoreFusion.ts';
+import { isAnswerKeySemanticallyEqual } from '../answerKeySemantics.ts';
 
 export class S4DiscriminatorsStage implements IDetectionStage {
   public readonly id: QddStageId = 'S4_DISCRIMINATORS';
@@ -43,7 +44,14 @@ export class S4DiscriminatorsStage implements IDetectionStage {
       }
 
       // 2. Discriminators are identical. Check answer keys.
-      const sameAnswerKey = subject.answerKeyHash === cand.fingerprint.answerKeyHash;
+      const sameAnswerKey =
+        subject.answerKeyHash === cand.fingerprint.answerKeyHash ||
+        (cand.fingerprint.canonicalCorrectAnswer && subject.canonicalCorrectAnswer
+          ? isAnswerKeySemanticallyEqual(
+              subject.canonicalCorrectAnswer,
+              cand.fingerprint.canonicalCorrectAnswer
+            )
+          : false);
 
       // Rule B: Discriminators match, but answer keys differ on high similarity -> CONFLICT
       const similaritySignal = Math.max(cand.lexicalJaccard ?? 0, cand.semanticCosine ?? 0);

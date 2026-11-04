@@ -1,47 +1,36 @@
 /**
  * Presentation Component: AdminAiQuestionParserLab
- * World-Class AI Question Ingestion, Formatting & Anti-Hallucination Inspection Chamber
- * Designed with Apple Human Interface Guidelines:
- * - Fluid spring animations, glassmorphism, clarity, depth, and precision.
- * - Dynamic AI Model selection (Gemini 2.5 Pro/Flash, Groq 120B/20B, Claude 3.7 Sonnet, DeepSeek R1).
- * - Autonomous Curriculum Taxonomy Assignment with AI Gap Analysis (Subject/Chapter Proposals).
- * - Pre-approval anti-hallucination inspection drawer before committing to the Global Bank.
- * - Single-item and batch verification prompt exports for cross-model auditing.
+ * Design System: Apple Human Interface Guidelines (macOS Sequoia / iPadOS Spatial Studio)
+ * Layer: UI / Features / Admin / AI Question Parser
+ *
+ * Provides Apple-Caliber Direct Text Ingestion & Anti-Hallucination Staging Studio:
+ * - Dynamic Island & Neural Bus Agent Orchestration with live 60fps Siri waveform
+ * - Master-Detail Spatial Split Stage (zero vertical scroll fatigue!)
+ * - Segmented tabs for SBA, Curriculum Alignment, Quorum, and Deduplication (QDD)
+ * - Persistent floating command dock for instant batch commits
+ * - Strict adherence to SOLID principles and OOP modularity
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useTransition, useRef } from 'react';
 import {
   Sparkles,
   ShieldCheck,
-  ShieldAlert,
-  AlertOctagon,
-  Send,
   CheckCircle2,
   AlertTriangle,
-  Copy,
-  Check,
-  Trash2,
-  Edit3,
   Lock,
-  ChevronDown,
-  ChevronUp,
-  FileText,
-  CheckSquare,
-  Square,
+  Check,
   Cpu,
   LogIn,
   Sliders,
-  FolderPlus,
   BookOpen,
   HelpCircle,
   X,
-  Layers,
-  ArrowRight,
-  RotateCcw,
+  FileText,
   Scale,
-  Loader2,
   StopCircle,
-  Info,
+  LayoutGrid,
+  Columns,
+  ChevronDown,
 } from 'lucide-react';
 import { useAuthStore } from '../../../../application/stores/useAuthStore.ts';
 import { useAdminAiQuestionParserStore } from '../../../../application/stores/useAdminAiQuestionParserStore.ts';
@@ -51,10 +40,12 @@ import { edgeQuestionBankGateway } from '../../../../infrastructure/questionBank
 import defaultCvsBank from '../../../../../content/cvs/dist/bank.v1.json';
 import { curriculumTaxonomyRegistry } from '../../../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
 import { AppleIntelligenceAgentOrchestrator } from './AppleIntelligenceAgentOrchestrator.tsx';
-import { DuplicateBadge } from '../../qdd/DuplicateBadge.tsx';
+import { StagingMasterRail } from './StagingMasterRail.tsx';
+import { StagingDetailCanvas } from './StagingDetailCanvas.tsx';
+import { FloatingBatchCommandBar } from './FloatingBatchCommandBar.tsx';
 import { DuplicateCompareSheet } from '../../qdd/DuplicateCompareSheet.tsx';
 import type { ParsedQuestionItem } from '../../../../domain/questionBank/aiQuestionParser/types.ts';
-import type { ChoiceId, Question } from '../../../../domain/model/types.ts';
+import type { Question } from '../../../../domain/model/types.ts';
 import type { CloudProviderId } from '../../../../domain/ai/settings.ts';
 
 interface ModelOption {
@@ -194,7 +185,6 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     commitFeedback,
     isCheckingDuplication,
     saveAllUnique,
-    sendToApprovalQueue,
     parseRawQuestions,
     toggleQuestionSelection,
     selectAll,
@@ -214,12 +204,60 @@ export const AdminAiQuestionParserLab: React.FC = () => {
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
   const [copiedBatchPrompt, setCopiedBatchPrompt] = useState(false);
   const [editingTempId, setEditingTempId] = useState<string | null>(null);
-  const [expandedRationales, setExpandedRationales] = useState<Set<string>>(new Set());
   const [isElevating, setIsElevating] = useState(false);
   const [isModelModalOpen, setIsModelModalOpen] = useState(false);
-  const [taxonomyEditTempId, setTaxonomyEditTempId] = useState<string | null>(null);
   const [proposalToast, setProposalToast] = useState<string | null>(null);
   const [, setTaxonomyRevision] = useState(0);
+
+  // Apple Spatial Layout State
+  const [selectedQuestionIndex, setSelectedQuestionIndex] = useState(0);
+  const [viewMode, setViewMode] = useState<'split' | 'list'>('split');
+  const [, startTransition] = useTransition();
+
+  // Automatic Smooth Scrolling Refs
+  const pipelineOrchestratorRef = useRef<HTMLDivElement>(null);
+  const stagingStudioRef = useRef<HTMLDivElement>(null);
+  const prevIsParsingRef = useRef(isParsing);
+
+  // When user clicks Parse, smoothly glide down to the live neural orchestrator
+  const handleParseQuestions = () => {
+    parseRawQuestions();
+    setTimeout(() => {
+      if (pipelineOrchestratorRef.current) {
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        pipelineOrchestratorRef.current.scrollIntoView({
+          behavior: prefersReducedMotion ? 'auto' : 'smooth',
+          block: 'center',
+        });
+      }
+    }, 120);
+  };
+
+  // When parsing completes, automatically glide smoothly to the Pre-Approval Staging Studio
+  useEffect(() => {
+    const wasParsing = prevIsParsingRef.current;
+    prevIsParsingRef.current = isParsing;
+
+    if (wasParsing && !isParsing && parsedQuestions.length > 0) {
+      const timer = setTimeout(() => {
+        if (stagingStudioRef.current) {
+          const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          stagingStudioRef.current.scrollIntoView({
+            behavior: prefersReducedMotion ? 'auto' : 'smooth',
+            block: 'start',
+          });
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isParsing, parsedQuestions.length]);
+
+  // Reset selected question index if questions change
+  useEffect(() => {
+    if (selectedQuestionIndex >= parsedQuestions.length && parsedQuestions.length > 0) {
+      setSelectedQuestionIndex(0);
+    }
+  }, [parsedQuestions.length, selectedQuestionIndex]);
 
   // Subscribe to registry expansions
   useEffect(() => {
@@ -228,6 +266,43 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     });
     return unsub;
   }, []);
+
+  // Global Keyboard Navigation (J/K or Up/Down between questions, Cmd+Enter to commit)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + Enter to commit
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        if (!isCommitting && selectedTempIds.size > 0) {
+          e.preventDefault();
+          commitToGlobalQuestionBank(true);
+        }
+        return;
+      }
+
+      // Do not navigate if user is typing in input or textarea
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      if (parsedQuestions.length > 1) {
+        if (e.key === 'j' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          startTransition(() => {
+            setSelectedQuestionIndex((prev) => Math.min(prev + 1, parsedQuestions.length - 1));
+          });
+        } else if (e.key === 'k' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          startTransition(() => {
+            setSelectedQuestionIndex((prev) => Math.max(prev - 1, 0));
+          });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [parsedQuestions.length, isCommitting, selectedTempIds.size, commitToGlobalQuestionBank]);
 
   const isAdmin = authState.status === 'authenticated-active' && authState.user.role === 'admin';
 
@@ -286,13 +361,6 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     setTimeout(() => setCopiedBatchPrompt(false), 2500);
   };
 
-  const toggleRationaleExpand = (tempId: string) => {
-    const next = new Set(expandedRationales);
-    if (next.has(tempId)) next.delete(tempId);
-    else next.add(tempId);
-    setExpandedRationales(next);
-  };
-
   const handleApproveProposal = (tempId: string, type: 'subject' | 'chapter', name: string) => {
     approveTaxonomyProposal(tempId, type);
     setProposalToast(`Successfully approved and registered "${name}" into the active curriculum!`);
@@ -302,7 +370,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
   const isAutoCurriculumMode = targetSubjectId === 'auto' || targetSubjectId === 'all';
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-8 animate-in fade-in duration-300 pb-20">
       {/* HEADER BANNER */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-6 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 bg-gradient-to-br from-white/90 via-white/50 to-zinc-50/80 dark:from-zinc-900/80 dark:via-zinc-900/50 dark:to-zinc-950/80 backdrop-blur-2xl shadow-xl">
         <div className="space-y-1">
@@ -336,7 +404,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
               AI Reasoning Engine & Dynamic Curriculum Targeting
             </h2>
           </div>
-          <span className="text-[11px] text-zinc-400 font-medium">Apple HIG Cupertino Deck</span>
+          <span className="text-[11px] text-zinc-400 font-medium font-mono">Apple HIG Cupertino Deck</span>
         </div>
 
         {/* 2-Column Responsive Deck */}
@@ -422,7 +490,6 @@ export const AdminAiQuestionParserLab: React.FC = () => {
             </div>
 
             {isAutoCurriculumMode ? (
-              /* Auto Intelligent Classification Mode Card */
               <div className="p-3 rounded-xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-pink-500/10 border border-purple-500/20 flex items-start gap-3">
                 <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
                   <BookOpen className="w-4 h-4" />
@@ -439,7 +506,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                   <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
                     The AI dynamically inspects each clinical vignette and assigns the exact Subject &
                     Chapter from our registered curriculum. If a question addresses unmapped medical
-                    territory (e.g. Pharmacology or Pathology), the AI proposes a formal curriculum expansion.
+                    territory, the AI proposes a formal curriculum expansion.
                   </p>
                   <div className="flex items-center gap-2 pt-1 flex-wrap">
                     {currentSubjects.map((s) => (
@@ -455,9 +522,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                 </div>
               </div>
             ) : (
-              /* Manual Targeting Mode - Subject & Chapter Selectors */
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                {/* Subject Selector */}
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
                     Subject Scope
@@ -476,7 +541,6 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Chapter Selector */}
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
                     Chapter Scope
@@ -649,9 +713,9 @@ export const AdminAiQuestionParserLab: React.FC = () => {
 
             <button
               type="button"
-              onClick={parseRawQuestions}
+              onClick={handleParseQuestions}
               disabled={isParsing || !rawInputText.trim()}
-              className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:opacity-95 shadow-md shadow-purple-500/25 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:opacity-95 shadow-md shadow-purple-500/25 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed apple-spring-transform"
             >
               <Sparkles className="w-4 h-4" />
               <span>
@@ -667,14 +731,16 @@ export const AdminAiQuestionParserLab: React.FC = () => {
 
         {/* APPLE INTELLIGENCE INTERACTIVE NEURAL ORCHESTRATOR */}
         {agentTelemetry && (
-          <AppleIntelligenceAgentOrchestrator
-            telemetry={agentTelemetry}
-            isParsing={isParsing}
-            onAbort={abortCurrentExecution}
-            activeModelName={activeModel.name}
-            stemMode={stemMode}
-            enableConsensusCheck={enableConsensusCheck}
-          />
+          <div ref={pipelineOrchestratorRef} className="scroll-mt-6">
+            <AppleIntelligenceAgentOrchestrator
+              telemetry={agentTelemetry}
+              isParsing={isParsing}
+              onAbort={abortCurrentExecution}
+              activeModelName={activeModel.name}
+              stemMode={stemMode}
+              enableConsensusCheck={enableConsensusCheck}
+            />
+          </div>
         )}
 
         {error && (
@@ -685,33 +751,20 @@ export const AdminAiQuestionParserLab: React.FC = () => {
         )}
       </div>
 
-      {/* INSPECTION & PRE-APPROVAL STAGING DRAWER */}
+      {/* INSPECTION & PRE-APPROVAL STAGING STUDIO */}
       {parsedQuestions.length > 0 && (
-        <div className="space-y-6 animate-in slide-in-from-bottom duration-300">
+        <div ref={stagingStudioRef} className="space-y-6 animate-in slide-in-from-bottom duration-300 scroll-mt-6">
           {/* Header & Global Batch Actions */}
           <div className="p-6 rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl shadow-lg space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800/80 pb-4">
               <div>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
                   <h2 className="text-base font-bold font-heading text-zinc-900 dark:text-zinc-50">
                     Pre-Approval Inspection Queue ({parsedQuestions.length} Items)
                   </h2>
                   <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                     {selectedTempIds.size} Selected
                   </span>
-                  {(() => {
-                    const duplicateCount = parsedQuestions.filter((q) => {
-                      const rel = q.qddVerdict?.relation;
-                      return rel === 'EXACT' || rel === 'NEAR' || rel === 'CONFLICT';
-                    }).length;
-                    if (duplicateCount === 0) return null;
-                    return (
-                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 inline-flex items-center gap-1.5 shadow-2xs">
-                        <ShieldAlert className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                        <span>{duplicateCount} Duplicate Held for Approval</span>
-                      </span>
-                    );
-                  })()}
                 </div>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                   Inspect the structured questions below before committing to the Global Question Bank.
@@ -719,869 +772,213 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                 </p>
               </div>
 
-              {/* Batch Action Toolbar */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {(() => {
-                  const duplicateCount = parsedQuestions.filter((q) => {
-                    const rel = q.qddVerdict?.relation;
-                    return rel === 'EXACT' || rel === 'NEAR' || rel === 'CONFLICT';
-                  }).length;
-                  const selectedDuplicateCount = parsedQuestions.filter((q) => {
-                    const rel = q.qddVerdict?.relation;
-                    return (
-                      selectedTempIds.has(q.tempId) &&
-                      (rel === 'EXACT' || rel === 'NEAR' || rel === 'CONFLICT')
-                    );
-                  }).length;
-
-                  return (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => selectAll(selectedTempIds.size !== parsedQuestions.length)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer"
-                      >
-                        {selectedTempIds.size === parsedQuestions.length ? 'Deselect All' : 'Select All Unique'}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleCopyBatchPrompt}
-                        title="Copy a single comprehensive prompt for all selected questions to cross-examine with other LLMs"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer"
-                      >
-                        {copiedBatchPrompt ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-500" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5 text-purple-500" />
-                        )}
-                        <span>{copiedBatchPrompt ? 'Batch Prompt Copied!' : 'Copy Batch Prompt'}</span>
-                      </button>
-
-                      {duplicateCount > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => sendToApprovalQueue()}
-                          disabled={isCommitting}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-sm transition-all cursor-pointer disabled:opacity-50"
-                          title="Route all duplicate or conflicting questions to the Governance Review Queue for formal faculty approval"
-                        >
-                          <Send className="w-3.5 h-3.5" />
-                          <span>Send Duplicates ({duplicateCount}) to Approvals</span>
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => saveAllUnique()}
-                        disabled={isCommitting || isCheckingDuplication || parsedQuestions.length === 0}
-                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Automatically skip all questions flagged as duplicates or conflicts and commit only unique items to the bank"
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        <span>
-                          {isCommitting ? 'Saving…' : 'Save all unique'}
-                        </span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => commitToGlobalQuestionBank(true)}
-                        disabled={isCommitting || selectedTempIds.size === 0 || selectedDuplicateCount > 0}
-                        className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                          selectedDuplicateCount > 0
-                            ? 'bg-rose-600 hover:bg-rose-500'
-                            : 'bg-emerald-600 hover:bg-emerald-500 shadow-sm'
-                        }`}
-                        title={
-                          selectedDuplicateCount > 0
-                            ? `${selectedDuplicateCount} duplicate question(s) selected. Direct commit is locked; route to approval queue instead.`
-                            : undefined
-                        }
-                      >
-                        {selectedDuplicateCount > 0 ? (
-                          <AlertOctagon className="w-3.5 h-3.5" />
-                        ) : (
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                        )}
-                        <span>
-                          {isCommitting
-                            ? 'Committing...'
-                            : selectedDuplicateCount > 0
-                            ? `Commit Locked (${selectedDuplicateCount} Duplicate)`
-                            : `Approve & Commit (${selectedTempIds.size}) to Bank`}
-                        </span>
-                      </button>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-          </div>
-
-          {/* CURRICULUM AUTO-CLASSIFIER BATCH OVERVIEW DECK */}
-          <div className="p-4 rounded-2xl border border-purple-500/20 bg-gradient-to-r from-purple-500/10 via-indigo-500/5 to-cyan-500/10 backdrop-blur-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-purple-500/20">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-purple-900 dark:text-purple-200">
-                    Autonomous Curriculum Auto-Classifier Scope
-                  </h3>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-bold">
-                    100% Items Classified
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-600 dark:text-zinc-400 flex-wrap">
-                  <span>Target Block: <strong className="text-zinc-900 dark:text-zinc-100 font-semibold">{parsedQuestions[0]?.taxonomyClassification?.blockName || 'Cardiovascular System (CVS) - Block 206'}</strong></span>
-                  <span>•</span>
-                  <span>{parsedQuestions.length} Question(s) Grounded to Active Syllabus</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              {Array.from(new Set(parsedQuestions.map((q) => q.question.subjectId))).map((subjId) => {
-                const count = parsedQuestions.filter((q) => q.question.subjectId === subjId).length;
-                const meta = SUBJECT_META[subjId] || { icon: '📚', badgeColor: 'bg-zinc-500/10 text-zinc-700' };
-                return (
-                  <span
-                    key={subjId}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-white/80 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 shadow-2xs"
+              {/* View Switcher: Split Stage (Spatial) vs Stacked List */}
+              <div className="flex items-center gap-2">
+                <div className="inline-flex p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/70 dark:border-zinc-700 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('split')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                      viewMode === 'split'
+                        ? 'bg-white dark:bg-zinc-700 text-purple-600 dark:text-purple-300 shadow-2xs'
+                        : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
+                    }`}
                   >
-                    <span>{meta.icon}</span>
-                    <span className="capitalize">{subjId}: {count}</span>
-                  </span>
-                );
-              })}
+                    <Columns className="w-3.5 h-3.5" />
+                    <span>Split Stage</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('list')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                      viewMode === 'list'
+                        ? 'bg-white dark:bg-zinc-700 text-purple-600 dark:text-purple-300 shadow-2xs'
+                        : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
+                    }`}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span>Stacked List</span>
+                  </button>
+                </div>
+              </div>
             </div>
+
+            {/* CURRICULUM AUTO-CLASSIFIER BATCH OVERVIEW DECK */}
+            <div className="p-4 rounded-2xl border border-purple-500/20 bg-gradient-to-r from-purple-500/10 via-indigo-500/5 to-cyan-500/10 backdrop-blur-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-purple-500/20">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-purple-900 dark:text-purple-200">
+                      Autonomous Curriculum Auto-Classifier Scope
+                    </h3>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-bold">
+                      100% Items Classified
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-600 dark:text-zinc-400 flex-wrap">
+                    <span>Target Block: <strong className="text-zinc-900 dark:text-zinc-100 font-semibold">{parsedQuestions[0]?.taxonomyClassification?.blockName || 'Cardiovascular System (CVS) - Block 206'}</strong></span>
+                    <span>•</span>
+                    <span>{parsedQuestions.length} Question(s) Grounded to Active Syllabus</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {Array.from(new Set(parsedQuestions.map((q) => q.question.subjectId))).map((subjId) => {
+                  const count = parsedQuestions.filter((q) => q.question.subjectId === subjId).length;
+                  const meta = SUBJECT_META[subjId] || { icon: '📚', badgeColor: 'bg-zinc-500/10 text-zinc-700' };
+                  return (
+                    <span
+                      key={subjId}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-white/80 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 shadow-2xs"
+                    >
+                      <span>{meta.icon}</span>
+                      <span className="capitalize">{subjId}: {count}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+
+            {commitFeedback && (
+              <div
+                className={`p-4 rounded-2xl border text-xs flex items-center gap-2 ${
+                  commitFeedback.type === 'success'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300'
+                }`}
+              >
+                {commitFeedback.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+                )}
+                <span className="font-medium">{commitFeedback.message}</span>
+              </div>
+            )}
           </div>
 
-          {commitFeedback && (
-            <div
-              className={`p-4 rounded-2xl border text-xs flex items-center gap-2 ${
-                commitFeedback.type === 'success'
-                  ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300'
-                  : 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300'
-              }`}
-            >
-              {commitFeedback.type === 'success' ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+          {/* MASTER-DETAIL SPLIT STAGE STUDIO (ZERO SCROLLING) */}
+          {viewMode === 'split' ? (
+            <div className="flex flex-col lg:flex-row gap-5 items-start">
+              {/* Left Navigator Rail */}
+              <StagingMasterRail
+                questions={parsedQuestions}
+                selectedIndex={selectedQuestionIndex}
+                onSelectIndex={(idx) => {
+                  startTransition(() => {
+                    setSelectedQuestionIndex(idx);
+                  });
+                }}
+                selectedTempIds={selectedTempIds}
+                onToggleSelect={(tempId) => toggleQuestionSelection(tempId)}
+                isCheckingDuplication={isCheckingDuplication}
+                onInspectDuplication={(item) => setInspectingQuestionItem(item)}
+                subjectMetaMap={SUBJECT_META}
+              />
+
+              {/* Right Detail Workspace Canvas */}
+              {parsedQuestions[selectedQuestionIndex] ? (
+                <StagingDetailCanvas
+                  item={parsedQuestions[selectedQuestionIndex]}
+                  index={selectedQuestionIndex}
+                  totalCount={parsedQuestions.length}
+                  isEditing={editingTempId === parsedQuestions[selectedQuestionIndex].tempId}
+                  onToggleEdit={() => {
+                    const currentId = parsedQuestions[selectedQuestionIndex].tempId;
+                    setEditingTempId(editingTempId === currentId ? null : currentId);
+                  }}
+                  onDelete={() => removeParsedQuestion(selectedQuestionIndex)}
+                  onCopyPrompt={() =>
+                    handleCopySinglePrompt(
+                      selectedQuestionIndex,
+                      parsedQuestions[selectedQuestionIndex].tempId
+                    )
+                  }
+                  isPromptCopied={copiedPromptId === parsedQuestions[selectedQuestionIndex].tempId}
+                  onToggleStemFormat={() => toggleStemFormat(selectedQuestionIndex)}
+                  onUpdateStem={(stem) => updateQuestionStem(selectedQuestionIndex, stem)}
+                  onUpdateChoice={(cId, text, rat) =>
+                    updateChoice(selectedQuestionIndex, cId, text, rat)
+                  }
+                  onSetKeyedChoice={(cId) => setKeyedCorrectChoice(selectedQuestionIndex, cId)}
+                  onUpdateExplanation={(exp) => updateExplanation(selectedQuestionIndex, exp)}
+                  onUpdateTaxonomy={(sub, chap) =>
+                    updateQuestionTaxonomy(selectedQuestionIndex, sub, chap)
+                  }
+                  onApproveProposal={(type, name) =>
+                    handleApproveProposal(
+                      parsedQuestions[selectedQuestionIndex].tempId,
+                      type,
+                      name
+                    )
+                  }
+                  onRunConsensus={() => runSingleQuestionConsensus(selectedQuestionIndex)}
+                  isVerifyingConsensus={isVerifyingConsensusIndex === selectedQuestionIndex}
+                  onInspectDuplication={(item) => setInspectingQuestionItem(item)}
+                  isCheckingDuplication={isCheckingDuplication}
+                  subjectMetaMap={SUBJECT_META}
+                />
               ) : (
-                <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+                <div className="flex-1 p-12 text-center text-xs text-zinc-400 bg-white/70 dark:bg-zinc-900/70 rounded-3xl border border-zinc-200 dark:border-zinc-800">
+                  Select a question from the rail to inspect.
+                </div>
               )}
-              <span className="font-medium">{commitFeedback.message}</span>
+            </div>
+          ) : (
+            /* STACKED LIST VIEW (COLLAPSIBLE CARDS) */
+            <div className="space-y-4">
+              {parsedQuestions.map((item, idx) => (
+                <StagingDetailCanvas
+                  key={item.tempId}
+                  item={item}
+                  index={idx}
+                  totalCount={parsedQuestions.length}
+                  isEditing={editingTempId === item.tempId}
+                  onToggleEdit={() => {
+                    setEditingTempId(editingTempId === item.tempId ? null : item.tempId);
+                  }}
+                  onDelete={() => removeParsedQuestion(idx)}
+                  onCopyPrompt={() => handleCopySinglePrompt(idx, item.tempId)}
+                  isPromptCopied={copiedPromptId === item.tempId}
+                  onToggleStemFormat={() => toggleStemFormat(idx)}
+                  onUpdateStem={(stem) => updateQuestionStem(idx, stem)}
+                  onUpdateChoice={(cId, text, rat) => updateChoice(idx, cId, text, rat)}
+                  onSetKeyedChoice={(cId) => setKeyedCorrectChoice(idx, cId)}
+                  onUpdateExplanation={(exp) => updateExplanation(idx, exp)}
+                  onUpdateTaxonomy={(sub, chap) => updateQuestionTaxonomy(idx, sub, chap)}
+                  onApproveProposal={(type, name) => handleApproveProposal(item.tempId, type, name)}
+                  onRunConsensus={() => runSingleQuestionConsensus(idx)}
+                  isVerifyingConsensus={isVerifyingConsensusIndex === idx}
+                  onInspectDuplication={(itemToInspect) => setInspectingQuestionItem(itemToInspect)}
+                  isCheckingDuplication={isCheckingDuplication}
+                  subjectMetaMap={SUBJECT_META}
+                />
+              ))}
             </div>
           )}
 
-          {/* QUESTIONS LIST */}
-          <div className="space-y-4">
-            {parsedQuestions.map((item, idx) => {
-              const isSelected = selectedTempIds.has(item.tempId);
-              const isEditing = editingTempId === item.tempId;
-              const isTaxonomyEditing = taxonomyEditTempId === item.tempId;
-              const isRationaleExpanded = expandedRationales.has(item.tempId);
-              const isPromptCopied = copiedPromptId === item.tempId;
-              const classification = item.taxonomyClassification;
-
-              const subjectMeta =
-                SUBJECT_META[item.question.subjectId] || {
-                  icon: '📚',
-                  badgeColor: 'bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-500/25',
-                };
-
-              const isExactDuplicate = item.qddVerdict?.relation === 'EXACT';
-              const isConflictDuplicate = item.qddVerdict?.relation === 'CONFLICT';
-              const isNearDuplicate = item.qddVerdict?.relation === 'NEAR';
-              const isDuplicateOrConflict = isExactDuplicate || isConflictDuplicate || isNearDuplicate;
-              const firstCand = item.qddVerdict?.candidates[0];
-
-              return (
-                <div
-                  key={item.tempId}
-                  className={`p-6 rounded-3xl border transition-all space-y-4 ${
-                    isConflictDuplicate
-                      ? 'border-2 border-rose-500/80 dark:border-rose-500/80 bg-rose-50/20 dark:bg-rose-950/20 shadow-md ring-2 ring-rose-500/20'
-                      : isExactDuplicate
-                      ? 'border-2 border-amber-500/80 dark:border-amber-500/80 bg-amber-50/20 dark:bg-amber-950/20 shadow-md ring-2 ring-amber-500/20'
-                      : isNearDuplicate
-                      ? 'border-2 border-amber-400/60 dark:border-amber-600/60 bg-amber-50/10 dark:bg-amber-950/10 shadow-sm'
-                      : isSelected
-                      ? 'border-purple-300 dark:border-purple-800 bg-white/90 dark:bg-zinc-900/90 shadow-md'
-                      : 'border-zinc-200/80 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/60 opacity-80'
-                  }`}
-                >
-                  {/* Card Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800/80 pb-4">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => toggleQuestionSelection(item.tempId)}
-                        className="cursor-pointer text-purple-600 dark:text-purple-400"
-                      >
-                        {isSelected ? (
-                          <CheckSquare className="w-4 h-4" />
-                        ) : (
-                          <Square className="w-4 h-4 text-zinc-400" />
-                        )}
-                      </button>
-
-                      <span className="text-xs font-mono font-bold text-zinc-400">#{idx + 1}</span>
-
-                      {/* Missing Answer Badge / Verification Badge */}
-                      {item.aiGeneratedAnswerKey ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                          <AlertTriangle className="w-3 h-3 text-amber-500" />
-                          Answer Key Inferred by AI
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                          <Check className="w-3 h-3 text-emerald-500" />
-                          Author Key Verified
-                        </span>
-                      )}
-
-                      {/* QDD Duplication Status Badge */}
-                      <DuplicateBadge
-                        verdict={item.qddVerdict}
-                        isChecking={isCheckingDuplication || item.isCheckingDuplication}
-                        onInspect={() => setInspectingQuestionItem(item)}
-                      />
-
-                      {/* Dynamic Curriculum Classification Breadcrumb */}
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${subjectMeta.badgeColor}`}
-                        >
-                          <span>{subjectMeta.icon}</span>
-                          <span className="capitalize">{item.question.subjectId}</span>
-                        </span>
-                        <ArrowRight className="w-3 h-3 text-zinc-400" />
-                        <span className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
-                          {classification?.chapterName || item.question.chapterId}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Quick Item Actions */}
-                    <div className="flex items-center gap-2 self-end sm:self-center">
-                      {/* Copy Professional Prompt Icon */}
-                      <button
-                        type="button"
-                        onClick={() => handleCopySinglePrompt(idx, item.tempId)}
-                        title="Copy Verification Prompt for Cross-Testing with ChatGPT or Claude (Includes Block, Subject, & Chapter Grounding)"
-                        className="flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-medium border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer shadow-xs"
-                      >
-                        {isPromptCopied ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-500" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5 text-purple-500" />
-                        )}
-                        <span className="text-[11px] font-semibold">
-                          {isPromptCopied ? 'Copied Prompt with Scope!' : 'Copy Verification Prompt'}
-                        </span>
-                      </button>
-
-                      {/* Inline Edit Toggle */}
-                      <button
-                        type="button"
-                        onClick={() => setEditingTempId(isEditing ? null : item.tempId)}
-                        className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
-                          isEditing
-                            ? 'bg-purple-100 dark:bg-purple-950 border-purple-300 dark:border-purple-700 text-purple-600'
-                            : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800'
-                        }`}
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-
-                      {/* Delete */}
-                      <button
-                        type="button"
-                        onClick={() => removeParsedQuestion(idx)}
-                        className="p-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-400 hover:text-rose-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* PROMINENT COLLISION / DUPLICATE ALERT BANNER */}
-                  {isDuplicateOrConflict && (
-                    <div
-                      className={`p-4 rounded-2xl border transition-all ${
-                        isConflictDuplicate
-                          ? 'bg-rose-500/10 dark:bg-rose-950/30 border-rose-500/40 text-rose-900 dark:text-rose-200 shadow-sm'
-                          : isExactDuplicate
-                          ? 'bg-amber-500/10 dark:bg-amber-950/30 border-amber-500/40 text-amber-900 dark:text-amber-200 shadow-sm'
-                          : 'bg-purple-500/10 dark:bg-purple-950/30 border-purple-500/30 text-purple-900 dark:text-purple-200 shadow-sm'
-                      }`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div className="flex items-start gap-3">
-                          <div
-                            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${
-                              isConflictDuplicate
-                                ? 'bg-rose-600 text-white'
-                                : isExactDuplicate
-                                ? 'bg-amber-600 text-white'
-                                : 'bg-purple-600 text-white'
-                            }`}
-                          >
-                            {isConflictDuplicate ? (
-                              <AlertOctagon className="w-5 h-5" />
-                            ) : isExactDuplicate ? (
-                              <ShieldAlert className="w-5 h-5" />
-                            ) : (
-                              <AlertTriangle className="w-5 h-5" />
-                            )}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-black uppercase tracking-wider">
-                                {isConflictDuplicate
-                                  ? 'Answer Contradiction with Existing Question'
-                                  : isExactDuplicate
-                                  ? 'Question Already Exists in Global Bank'
-                                  : 'Likely Duplicate / High Content Overlap'}
-                              </span>
-                              <span
-                                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase border ${
-                                  isConflictDuplicate
-                                    ? 'bg-rose-500/20 text-rose-800 dark:text-rose-200 border-rose-500/40'
-                                    : 'bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-500/40'
-                                }`}
-                              >
-                                Direct Commit Locked • Approval Required
-                              </span>
-                            </div>
-                            <p className="text-xs mt-1 opacity-90 leading-relaxed">
-                              {isConflictDuplicate
-                                ? `Identical question stem exists in the Global Bank, but the correct keyed answer contradicts bank item ${firstCand?.matchedQuestionId || ''}. Cannot be directly committed.`
-                                : isExactDuplicate
-                                ? `Matches canonical bank question ${firstCand?.matchedQuestionId || ''} (${Math.round((firstCand?.signals?.lexicalJaccard ?? 1) * 100)}% lexical match). Held from bank commit to prevent duplication.`
-                                : `High similarity (${Math.round((firstCand?.signals?.lexicalJaccard ?? 0.8) * 100)}%) detected with bank question ${firstCand?.matchedQuestionId || ''}.`}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
-                          <button
-                            type="button"
-                            onClick={() => setInspectingQuestionItem(item)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/80 dark:bg-zinc-800/80 hover:bg-white dark:hover:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 shadow-2xs transition-all cursor-pointer"
-                          >
-                            <Scale className="w-3.5 h-3.5 text-purple-500" />
-                            <span>Compare Diff</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => sendToApprovalQueue(item.tempId)}
-                            disabled={isCommitting}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-xs transition-all cursor-pointer disabled:opacity-50"
-                          >
-                            <Send className="w-3.5 h-3.5" />
-                            <span>Send for Approval</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* DEDICATED AUTONOMOUS CURRICULUM AUTO-CLASSIFIER RESULT LENS */}
-                  <div className="p-4 rounded-2xl border border-purple-500/25 bg-gradient-to-r from-purple-500/5 via-indigo-500/5 to-cyan-500/5 dark:from-purple-950/20 dark:via-zinc-900/40 dark:to-cyan-950/20 backdrop-blur-md space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-purple-200/50 dark:border-purple-800/40 pb-2.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-xs">
-                          <Sparkles className="w-3.5 h-3.5" />
-                        </div>
-                        <span className="text-xs font-extrabold uppercase tracking-wider text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
-                          Autonomous Curriculum Auto-Classifier Result
-                        </span>
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                          {classification?.confidenceScore || 95}% Match Confidence
-                        </span>
-                        {classification?.isNewDomainSuggested && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 animate-pulse">
-                            Curriculum Gap Detected
-                          </span>
-                        )}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setTaxonomyEditTempId(isTaxonomyEditing ? null : item.tempId)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold text-purple-600 dark:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 transition-all cursor-pointer self-start sm:self-auto"
-                      >
-                        <Sliders className="w-3 h-3" />
-                        <span>{isTaxonomyEditing ? 'Close Re-Assignment' : 'Re-Assign Taxonomy'}</span>
-                      </button>
-                    </div>
-
-                    {/* 3-Pill Taxonomy Grid: Block, Subject, Chapter */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      {/* 1. Target Block */}
-                      <div className="p-3 rounded-xl bg-white/90 dark:bg-zinc-800/90 border border-zinc-200/70 dark:border-zinc-700/60 shadow-2xs space-y-1">
-                        <div className="flex items-center justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                          <span>Target Block</span>
-                          <span className="text-xs">🫀</span>
-                        </div>
-                        <div
-                          className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate"
-                          title={classification?.blockName || 'Cardiovascular System (CVS) - Block 206'}
-                        >
-                          {classification?.blockName || 'Cardiovascular System (CVS) - Block 206'}
-                        </div>
-                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
-                          Integrated Organ System
-                        </div>
-                      </div>
-
-                      {/* 2. Target Subject */}
-                      <div className="p-3 rounded-xl bg-white/90 dark:bg-zinc-800/90 border border-zinc-200/70 dark:border-zinc-700/60 shadow-2xs space-y-1">
-                        <div className="flex items-center justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                          <span>Target Subject</span>
-                          <span className="text-xs">{subjectMeta.icon}</span>
-                        </div>
-                        <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate capitalize">
-                          {classification?.subjectName || item.question.subjectId}
-                        </div>
-                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
-                          Academic Discipline
-                        </div>
-                      </div>
-
-                      {/* 3. Target Chapter */}
-                      <div className="p-3 rounded-xl bg-white/90 dark:bg-zinc-800/90 border border-zinc-200/70 dark:border-zinc-700/60 shadow-2xs space-y-1">
-                        <div className="flex items-center justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                          <span>Target Chapter</span>
-                          <span className="text-xs">📖</span>
-                        </div>
-                        <div
-                          className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate"
-                          title={classification?.chapterName || item.question.chapterId}
-                        >
-                          {classification?.chapterName || item.question.chapterId}
-                        </div>
-                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
-                          Curriculum Syllabus Topic
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Classification Rationale callout */}
-                    {classification?.rationale && (
-                      <div className="flex items-start gap-2 text-xs text-zinc-600 dark:text-zinc-400 bg-white/60 dark:bg-zinc-800/60 p-2.5 rounded-xl border border-zinc-200/60 dark:border-zinc-700/50">
-                        <Info className="w-3.5 h-3.5 text-purple-500 shrink-0 mt-0.5" />
-                        <div className="leading-relaxed">
-                          <strong className="text-zinc-900 dark:text-zinc-200 font-semibold">Classification Evidence: </strong>
-                          {classification.rationale}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Curriculum Gap Action Banner if suggested */}
-                    {classification?.isNewDomainSuggested && (
-                      <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-amber-900 dark:text-amber-200">
-                        <div className="flex items-start gap-2.5 text-xs">
-                          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                          <div>
-                            <div className="font-bold">Proposed Curriculum Expansion</div>
-                            <div className="text-[11px] opacity-90">{classification.rationale}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {classification.newSubjectProposal && (
-                            <button
-                              type="button"
-                              onClick={() => handleApproveProposal(item.tempId, 'subject', classification.newSubjectProposal!.name)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 shadow-xs cursor-pointer transition-all"
-                            >
-                              <FolderPlus className="w-3.5 h-3.5" />
-                              <span>Approve Subject</span>
-                            </button>
-                          )}
-                          {classification.newChapterProposal && (
-                            <button
-                              type="button"
-                              onClick={() => handleApproveProposal(item.tempId, 'chapter', classification.newChapterProposal!.name)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow-xs cursor-pointer transition-all"
-                            >
-                              <Layers className="w-3.5 h-3.5" />
-                              <span>Approve Chapter</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Inline Re-assignment Drawer */}
-                    {isTaxonomyEditing && (
-                      <div className="p-3.5 rounded-xl bg-white dark:bg-zinc-800 border border-purple-300 dark:border-purple-700/80 shadow-xs grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in duration-200">
-                        <div>
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                            Reassign Subject
-                          </label>
-                          <select
-                            value={item.question.subjectId}
-                            onChange={(e) => {
-                              const newSub = e.target.value;
-                              const firstChap = curriculumTaxonomyRegistry.getChapters(newSub)[0]?.id || 'cvs-ana-heart-mediastinum';
-                              updateQuestionTaxonomy(idx, newSub, firstChap);
-                            }}
-                            className="w-full text-xs mt-1 p-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-850 font-medium"
-                          >
-                            {currentSubjects.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {SUBJECT_META[s.id]?.icon || '📚'} {s.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                            Reassign Chapter
-                          </label>
-                          <select
-                            value={item.question.chapterId}
-                            onChange={(e) => {
-                              updateQuestionTaxonomy(idx, item.question.subjectId, e.target.value);
-                            }}
-                            className="w-full text-xs mt-1 p-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-850 font-medium"
-                          >
-                            {curriculumTaxonomyRegistry.getChapters(item.question.subjectId).map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Question Stem */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                          Question Stem
-                        </label>
-                        {item.originalRawStem && item.question.stem !== item.originalRawStem && (
-                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-                            USMLE Vignette Active
-                          </span>
-                        )}
-                        {item.originalRawStem && item.question.stem === item.originalRawStem && (
-                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20">
-                            Verbatim Raw Stem
-                          </span>
-                        )}
-                      </div>
-
-                      {(item.originalRawStem || item.enrichedVignetteStem) && (
-                        <button
-                          type="button"
-                          onClick={() => toggleStemFormat(idx)}
-                          title="Switch between author's original verbatim question and USMLE clinical vignette"
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors cursor-pointer"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                          <span>
-                            {item.originalRawStem && item.question.stem === item.originalRawStem
-                              ? 'Switch to USMLE Vignette'
-                              : 'Revert to Original Raw Text'}
-                          </span>
-                        </button>
-                      )}
-                    </div>
-                    {isEditing ? (
-                      <div>
-                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                          Stem Text
-                        </label>
-                        <textarea
-                          rows={3}
-                          value={item.question.stem}
-                          onChange={(e) => updateQuestionStem(idx, e.target.value)}
-                          className="w-full text-xs p-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium"
-                        />
-                      </div>
-                    ) : (
-                      <p className="text-xs sm:text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-relaxed">
-                        {item.question.stem}
-                      </p>
-                    )}
-
-                    {/* Choices Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                      {item.question.choices.map((c) => {
-                        const isCorrect = c.isCorrect;
-                        return (
-                          <div
-                            key={c.id}
-                            className={`p-3 rounded-2xl border transition-all ${
-                              isCorrect
-                                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-950 dark:text-emerald-200'
-                                : 'bg-zinc-50 dark:bg-zinc-800/40 border-zinc-200/60 dark:border-zinc-700/60 text-zinc-800 dark:text-zinc-200'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                                    isCorrect
-                                      ? 'bg-emerald-600 text-white'
-                                      : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
-                                  }`}
-                                >
-                                  {c.id.toUpperCase()}
-                                </span>
-
-                                {isEditing ? (
-                                  <input
-                                    type="text"
-                                    value={c.text}
-                                    onChange={(e) => updateChoice(idx, c.id as ChoiceId, e.target.value, c.rationale)}
-                                    className="text-xs p-1 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800"
-                                  />
-                                ) : (
-                                  <span className="text-xs font-semibold">{c.text}</span>
-                                )}
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {isEditing ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setKeyedCorrectChoice(idx, c.id as ChoiceId)}
-                                    className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
-                                      isCorrect
-                                        ? 'bg-emerald-600 text-white'
-                                        : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400'
-                                    }`}
-                                  >
-                                    {isCorrect ? 'Correct Key' : 'Set as Key'}
-                                  </button>
-                                ) : (
-                                  isCorrect && (
-                                    <span className="text-[10px] font-extrabold uppercase text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                                      Keyed Answer
-                                    </span>
-                                  )
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Rationale Display */}
-                            {isRationaleExpanded && (
-                              <div className="mt-2 pt-2 border-t border-zinc-200/50 dark:border-zinc-700/40 text-[11px] text-zinc-600 dark:text-zinc-400">
-                                <span className="font-semibold text-zinc-900 dark:text-zinc-200">
-                                  Rationale:
-                                </span>{' '}
-                                {isEditing ? (
-                                  <textarea
-                                    rows={2}
-                                    value={c.rationale}
-                                    onChange={(e) => updateChoice(idx, c.id as ChoiceId, c.text, e.target.value)}
-                                    className="w-full text-xs p-1.5 mt-1 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800"
-                                  />
-                                ) : (
-                                  c.rationale || 'No rationale available.'
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Toggle Rationales & Explanation */}
-                    <div className="flex items-center justify-between text-xs pt-1">
-                      <button
-                        type="button"
-                        onClick={() => toggleRationaleExpand(item.tempId)}
-                        className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        {isRationaleExpanded ? (
-                          <>
-                            <ChevronUp className="w-3.5 h-3.5" />
-                            Hide Distractor Rationales & Explanation
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown className="w-3.5 h-3.5" />
-                            Inspect Distractor Rationales & Explanation
-                          </>
-                        )}
-                      </button>
-
-                      <span className="text-[11px] text-zinc-400 font-mono">
-                        Concept: {item.question.concept} • Difficulty {item.question.difficulty}
-                      </span>
-                    </div>
-
-                    {/* Expanded Explanation */}
-                    {isRationaleExpanded && (
-                      <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-700/50 space-y-2">
-                        <div className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
-                          Clinical Explanation & Pathophysiology
-                        </div>
-                        {isEditing ? (
-                          <textarea
-                            rows={3}
-                            value={item.question.explanation}
-                            onChange={(e) => updateExplanation(idx, e.target.value)}
-                            className="w-full text-xs p-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800"
-                          />
-                        ) : (
-                          <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                            {item.question.explanation}
-                          </p>
-                        )}
-                        {item.question.evidence && item.question.evidence[0] && (
-                          <div className="text-[10px] text-zinc-400 italic pt-1">
-                            Grounding: {item.question.evidence[0].sourceName} ({item.question.evidence[0].location})
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* MULTI-MODEL CONSENSUS & ACCURACY AUDIT PANEL */}
-                    <div className="pt-2">
-                      {item.consensusSummary ? (
-                        <div className="p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-800/40 space-y-3">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <Scale className="w-4 h-4 text-purple-500" />
-                              <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                                Multi-Model Quorum Consensus
-                              </span>
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                  item.consensusSummary.consensusVerdict === 'unanimous_agreement'
-                                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
-                                    : item.consensusSummary.consensusVerdict === 'majority_consensus'
-                                    ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25'
-                                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25'
-                                }`}
-                              >
-                                {item.consensusSummary.consensusVerdict === 'unanimous_agreement' && '✅ 100% Unanimous Agreement'}
-                                {item.consensusSummary.consensusVerdict === 'majority_consensus' && `✨ Majority Quorum (${Math.round(item.consensusSummary.agreementRatio * 100)}%)`}
-                                {item.consensusSummary.consensusVerdict === 'discrepancy_detected' && '⚠️ Model Discrepancy Detected'}
-                                {item.consensusSummary.consensusVerdict === 'insufficient_quorum' && 'Quorum Undetermined'}
-                              </span>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => runSingleQuestionConsensus(idx)}
-                              disabled={isVerifyingConsensusIndex === idx}
-                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 transition-colors cursor-pointer disabled:opacity-50"
-                            >
-                              <RotateCcw className={`w-3 h-3 ${isVerifyingConsensusIndex === idx ? 'animate-spin' : ''}`} />
-                              <span>{isVerifyingConsensusIndex === idx ? 'Re-checking Quorum...' : 'Re-verify with Ensemble'}</span>
-                            </button>
-                          </div>
-
-                          <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                            {item.consensusSummary.consensusRationale}
-                          </p>
-
-                          {/* Individual Model Cards Grid */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-1">
-                            {item.consensusSummary.modelVerdicts.map((v) => {
-                              const isSuccess = v.status === 'success';
-                              const isConsensusWinner = isSuccess && v.selectedChoiceId === item.consensusSummary?.consensusChoiceId;
-                              return (
-                                <div
-                                  key={v.modelId}
-                                  className={`p-2.5 rounded-xl border text-xs flex flex-col justify-between space-y-1 ${
-                                    !isSuccess
-                                      ? 'bg-rose-500/5 dark:bg-rose-950/20 border-rose-300 dark:border-rose-900/60 opacity-80'
-                                      : isConsensusWinner
-                                      ? 'bg-white dark:bg-zinc-800/90 border-zinc-200 dark:border-zinc-700/80 shadow-2xs'
-                                      : 'bg-amber-500/5 dark:bg-amber-950/20 border-amber-500/30'
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between gap-1">
-                                    <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300 truncate max-w-[120px]">
-                                      {v.modelName}
-                                    </span>
-                                    {isSuccess ? (
-                                      <span
-                                        className={`px-1.5 py-0.2 rounded text-[10px] font-extrabold ${
-                                          isConsensusWinner
-                                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                                            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                                        }`}
-                                      >
-                                        Key: ({v.selectedChoiceId.toUpperCase()})
-                                      </span>
-                                    ) : (
-                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25">
-                                        {v.status === 'timeout' ? 'Timed Out' : 'Offline / Failed'}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 line-clamp-2">
-                                    {v.clinicalRationale}
-                                  </p>
-                                  <div className="flex items-center justify-between text-[9px] text-zinc-400 pt-1 font-mono">
-                                    <span>{isSuccess ? `Conf: ${v.confidenceScore}%` : 'Unvoted'}</span>
-                                    <span>{v.latencyMs}ms</span>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ) : (
-                        /* On-Demand Double Check Button */
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 rounded-2xl border border-zinc-200/70 dark:border-zinc-800 bg-white/50 dark:bg-zinc-800/30">
-                          <div className="flex items-center gap-2">
-                            <Scale className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                            <span className="text-xs text-zinc-600 dark:text-zinc-300">
-                              Double-check answer accuracy across independent AI models before approving?
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => runSingleQuestionConsensus(idx)}
-                            disabled={isVerifyingConsensusIndex === idx}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-purple-600 dark:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 transition-all cursor-pointer disabled:opacity-50 shrink-0"
-                          >
-                            {isVerifyingConsensusIndex === idx ? (
-                              <>
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                <span>Running Quorum...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Scale className="w-3.5 h-3.5" />
-                                <span>Double Check with Ensemble</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {/* FLOATING PERSISTENT BATCH COMMAND BAR */}
+          <FloatingBatchCommandBar
+            totalCount={parsedQuestions.length}
+            selectedCount={selectedTempIds.size}
+            isCommitting={isCommitting}
+            isCheckingDuplication={isCheckingDuplication}
+            copiedBatchPrompt={copiedBatchPrompt}
+            onToggleSelectAll={() => selectAll(selectedTempIds.size !== parsedQuestions.length)}
+            onCopyBatchPrompt={handleCopyBatchPrompt}
+            onSaveAllUnique={() => saveAllUnique()}
+            onCommitToBank={() => commitToGlobalQuestionBank(true)}
+          />
         </div>
       )}
 
       {/* FEEDBACK TOAST */}
       {proposalToast && (
-        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-2xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom duration-300">
+        <div className="fixed bottom-24 right-6 z-50 p-4 rounded-2xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom duration-300">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
           <span>{proposalToast}</span>
         </div>

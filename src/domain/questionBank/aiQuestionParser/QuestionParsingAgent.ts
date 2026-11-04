@@ -466,6 +466,7 @@ CRITICAL CLINICAL & PEDAGOGICAL REQUIREMENTS:
    - Exactly 4 choices with ids 'a', 'b', 'c', 'd'.
    - The correct choice MUST have isCorrect: true and an authoritative clinical rationale.
    - The other 3 choices MUST have isCorrect: false and distinct distractor rationales explaining why they are plausible but wrong.
+   - If raw input contains 5 choices (A through E), preserve the correct choice and select the 3 most plausible distractors to form exactly 4 standard options. NEVER merge Option E into Option D's text!
 5. EXPLANATION:
    - Deep pathophysiological mechanism, cardinal presentation, diagnostic pearl, and guideline recommendation.
 6. METADATA:
@@ -646,11 +647,13 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
             if (verbatimStem.length >= 15) {
               q.stem = verbatimStem;
             }
-            if (extracted.rawChoices.length === 4 && Array.isArray(q.choices) && q.choices.length === 4) {
+            if (extracted.rawChoices.length >= 4 && Array.isArray(q.choices) && q.choices.length === 4) {
               q.choices = q.choices.map((c: any, cIdx: number) => {
                 const matchRaw =
                   extracted.rawChoices.find((rc) => rc.id === c.id) || extracted.rawChoices[cIdx];
-                return matchRaw?.text ? { ...c, text: matchRaw.text } : c;
+                let text = matchRaw?.text ? matchRaw.text.trim() : c.text;
+                text = text.replace(/\s+(?:[([{\s]*[e-f][)\]}:.]|[e-f]\s*[-–—]+)\s+.*$/i, '').trim();
+                return text ? { ...c, text } : c;
               });
             }
           }
@@ -985,17 +988,57 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
   }
 
   /**
-   * Scans text for explicit indications of correct answer.
+   * Splits an option string that may contain inline subsequent option letters
+   * (e.g. "PCR detection of viral RNA in serum E. ST elevation on ECG"
+   * or "A. opt1 B. opt2 C. opt3 D. opt4 E. opt5").
    */
-  private detectExplicitAnswerKey(text: string): { found: boolean; choiceId: ChoiceId | null } {
-    const keyMatch = text.match(/(?:Answer|Ans|Correct(?:\s*Answer)?|Key|Option)\s*[:=-]?\s*\(?([A-D])\)?/i);
-    if (keyMatch) {
-      return { found: true, choiceId: keyMatch[1].toLowerCase() as ChoiceId };
+  private splitInlineChoices(
+    initialLetter: string,
+    initialText: string
+  ): Array<{ id: string; text: string }> {
+    const results: Array<{ id: string; text: string }> = [];
+    const inlineMarkerRegex = /\s+(?:(?:\(([B-F1-5])\)|([B-F1-5])[)\]}:.]|[B-F1-5]\s*[-–—]+))\s+/gi;
+
+    let lastIdx = 0;
+    let currentId = initialLetter.toLowerCase();
+    let m: RegExpExecArray | null;
+
+    while ((m = inlineMarkerRegex.exec(initialText)) !== null) {
+      const seg = initialText.slice(lastIdx, m.index).trim();
+      if (seg) {
+        results.push({ id: currentId, text: seg });
+      }
+      const rawNext = (m[1] || m[2] || '').toLowerCase();
+      let nextId = rawNext;
+      if (rawNext === '1') nextId = 'a';
+      else if (rawNext === '2') nextId = 'b';
+      else if (rawNext === '3') nextId = 'c';
+      else if (rawNext === '4') nextId = 'd';
+      else if (rawNext === '5') nextId = 'e';
+      currentId = nextId;
+      lastIdx = inlineMarkerRegex.lastIndex;
     }
 
-    const asteriskMatch = text.match(/\*\s*\(?([A-D])\)?/i);
+    const tail = initialText.slice(lastIdx).trim();
+    if (tail || results.length === 0) {
+      results.push({ id: currentId, text: tail });
+    }
+
+    return results;
+  }
+
+  /**
+   * Scans text for explicit indications of correct answer.
+   */
+  private detectExplicitAnswerKey(text: string): { found: boolean; choiceId: ChoiceId | 'e' | null } {
+    const keyMatch = text.match(/\b(?:Answer|Ans|Correct(?:\s*Answer)?|Key|Option)\b\s*[:=-]?\s*\(?([A-E])\)?(?!\w)/i);
+    if (keyMatch) {
+      return { found: true, choiceId: keyMatch[1].toLowerCase() as ChoiceId | 'e' };
+    }
+
+    const asteriskMatch = text.match(/(?:^|\s)\*\s*\(?([A-E])\)?(?!\w)/i);
     if (asteriskMatch) {
-      return { found: true, choiceId: asteriskMatch[1].toLowerCase() as ChoiceId };
+      return { found: true, choiceId: asteriskMatch[1].toLowerCase() as ChoiceId | 'e' };
     }
 
     return { found: false, choiceId: null };
@@ -1010,12 +1053,12 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     let detectedExplanation = '';
 
     const explanationRegex = /^(?:Explanation|Rationale|Note|Why)[:\s]+(.*)$/i;
-    const answerKeyLineRegex = /^(?:Answer|Ans|Correct(?:\s*Answer)?|Key|Option)\s*[:=-]?\s*\(?[A-D]\)?$/i;
+    const answerKeyLineRegex = /^(?:Answer|Ans|Correct(?:\s*Answer)?|Key|Option)\s*[:=-]?\s*\(?[A-E]\)?$/i;
 
-    // Detect if the block uses explicit lettered choices (A., B., C., D., (A), A), A - etc.)
+    // Detect if the block uses explicit lettered choices (A., B., C., D., E., (A), A), A - etc.)
     const hasExplicitLetteredChoices = lines
       .slice(1)
-      .some((l) => /^(?:[([{\s]*[A-D][)\]}:.]|[A-D]\s*[-–—]+)\s+\S/i.test(l));
+      .some((l) => /^(?:[([{\s]*[A-E][)\]}:.]|[A-E]\s*[-–—]+)\s+\S/i.test(l));
 
     let inChoices = false;
     let inExplanation = false;
@@ -1027,10 +1070,10 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
         return null;
       }
 
-      // 1. Delimited: A., A), (A), [A], A: (or 1-4 ONLY when no lettered choices exist in block)
+      // 1. Delimited: A., A), (A), [A], A: (or 1-5 ONLY when no lettered choices exist in block)
       const delimRegex = hasExplicitLetteredChoices
-        ? /^[([{\s]*([A-D])[)\]}:.]\s*(.*)$/i
-        : /^[([{\s]*([A-D1-4])[)\]}:.]\s*(.*)$/i;
+        ? /^[([{\s]*([A-E])[)\]}:.]\s*(.*)$/i
+        : /^[([{\s]*([A-E1-5])[)\]}:.]\s*(.*)$/i;
       const delimMatch = line.match(delimRegex);
       if (delimMatch) {
         return { letterOrNum: delimMatch[1].toLowerCase(), text: delimMatch[2].trim() };
@@ -1038,8 +1081,8 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
 
       // 2. Dash delimited: A - text, A -- text
       const dashRegex = hasExplicitLetteredChoices
-        ? /^([A-D])\s*[-–—]+\s+(.*)$/i
-        : /^([A-D1-4])\s*[-–—]+\s+(.*)$/i;
+        ? /^([A-E])\s*[-–—]+\s+(.*)$/i
+        : /^([A-E1-5])\s*[-–—]+\s+(.*)$/i;
       const dashMatch = line.match(dashRegex);
       if (dashMatch) {
         return { letterOrNum: dashMatch[1].toLowerCase(), text: dashMatch[2].trim() };
@@ -1048,7 +1091,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
       // 3. Bare letter without delimiter (e.g. "B Option", "C Option", or "A Option")
       // Only consider if block does NOT already use explicit punctuated lettered choices
       if (!hasExplicitLetteredChoices) {
-        const bareMatch = line.match(/^([A-D])\s+([A-Z0-9].*)$/);
+        const bareMatch = line.match(/^([A-E])\s+([A-Z0-9].*)$/);
         if (bareMatch) {
           const letter = bareMatch[1].toLowerCase();
           const rest = bareMatch[2].trim();
@@ -1061,7 +1104,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
             return null;
           }
 
-          // For B, C, D followed by Capital/Number
+          // For B, C, D, E followed by Capital/Number
           if (currentlyInChoices || rawChoices.length > 0) {
             return { letterOrNum: letter, text: rest };
           }
@@ -1097,15 +1140,32 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
         else if (letterOrNum === '2') letter = 'b';
         else if (letterOrNum === '3') letter = 'c';
         else if (letterOrNum === '4') letter = 'd';
+        else if (letterOrNum === '5') letter = 'e';
 
-        rawChoices.push({
-          id: letter,
-          text: match.text,
-        });
+        const splitItems = this.splitInlineChoices(letter, match.text);
+        for (const item of splitItems) {
+          rawChoices.push(item);
+        }
       } else if (!inChoices) {
         stemLines.push(line);
       } else if (rawChoices.length > 0) {
-        rawChoices[rawChoices.length - 1].text += ' ' + line;
+        const trimmedLine = line.trim();
+        const inlineStartMatch = trimmedLine.match(/^(?:(?:\(([B-F1-5])\)|([B-F1-5])[)\]}:.]|[B-F1-5]\s*[-–—]+))\s+(.*)$/i);
+        if (inlineStartMatch) {
+          const rawNext = (inlineStartMatch[1] || inlineStartMatch[2] || '').toLowerCase();
+          let nextId = rawNext;
+          if (rawNext === '1') nextId = 'a';
+          else if (rawNext === '2') nextId = 'b';
+          else if (rawNext === '3') nextId = 'c';
+          else if (rawNext === '4') nextId = 'd';
+          else if (rawNext === '5') nextId = 'e';
+          const splitItems = this.splitInlineChoices(nextId, inlineStartMatch[3] || '');
+          for (const item of splitItems) {
+            rawChoices.push(item);
+          }
+        } else {
+          rawChoices[rawChoices.length - 1].text += ' ' + line;
+        }
       }
     }
 
@@ -1135,18 +1195,32 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
    */
   private standardizeChoices(
     rawChoices: Array<{ id: string; text: string }>,
-    explicitCorrectId: ChoiceId | null,
+    explicitCorrectId: ChoiceId | 'e' | null,
     matchedBankQuestion?: Question
   ) {
     const defaultIds: ChoiceId[] = ['a', 'b', 'c', 'd'];
-    const targetKey = explicitCorrectId || 'a';
+    let targetKey: ChoiceId = (explicitCorrectId as ChoiceId) || 'a';
+
+    let effectiveChoices = [...rawChoices];
+    if (explicitCorrectId === 'e') {
+      const choiceE = rawChoices.find((c) => c.id === 'e');
+      if (choiceE) {
+        effectiveChoices = effectiveChoices.filter((c) => c.id !== 'd');
+        effectiveChoices.push({ id: 'd', text: choiceE.text });
+        targetKey = 'd';
+      }
+    }
 
     return defaultIds.map((id, idx) => {
-      const found = rawChoices.find((c) => c.id === id) || rawChoices[idx];
-      const text =
+      const found = effectiveChoices.find((c) => c.id === id) || effectiveChoices[idx];
+      let text =
         found?.text?.trim() ||
         matchedBankQuestion?.choices?.[idx]?.text ||
         `Plausible clinical alternative option ${id.toUpperCase()}`;
+
+      // Clean any accidental trailing option marker (e.g. " E. ST elevation")
+      text = text.replace(/\s+(?:[([{\s]*[e-f][)\]}:.]|[e-f]\s*[-–—]+)\s+.*$/i, '').trim();
+
       const isCorrect = id === targetKey;
 
       const bankChoiceMatch = matchedBankQuestion?.choices?.find(
@@ -1181,7 +1255,8 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     const choices = ids.map((id, idx) => {
       const c = rawChoices.find((rc) => String(rc?.id || '').toLowerCase() === id) || rawChoices[idx] || {};
       const isCorrect = hasCorrect ? c.isCorrect === true : idx === 0;
-      const text = typeof c.text === 'string' && c.text.trim() ? c.text.trim() : `Option ${id.toUpperCase()}`;
+      let text = typeof c.text === 'string' && c.text.trim() ? c.text.trim() : `Option ${id.toUpperCase()}`;
+      text = text.replace(/\s+(?:[([{\s]*[e-f][)\]}:.]|[e-f]\s*[-–—]+)\s+.*$/i, '').trim();
       const rationale =
         typeof c.rationale === 'string' && c.rationale.trim().length >= 5
           ? c.rationale.trim()

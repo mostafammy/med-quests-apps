@@ -86,6 +86,7 @@ export interface QuestionFingerprintRecord {
   stemHash: string;
   itemHash: string;
   answerKeyHash: string;
+  canonicalCorrectAnswer?: string;
   minhash: Uint32Array | number[];
   lshBands: string[];
   discriminators: any[];

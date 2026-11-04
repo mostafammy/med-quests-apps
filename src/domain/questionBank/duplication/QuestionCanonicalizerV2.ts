@@ -49,9 +49,9 @@ export class QuestionCanonicalizerV2 implements IQuestionCanonicalizer {
     // Strip leading question numbers like "1.", "1-", "Q1:", "(1)"
     text = text.replace(/^(?:(?:question|item|q)\s*\d+\s*[:.)-]\s*|\(\d+\)\s*|\d+\s*[.):-]\s+)/i, '');
 
-    // Strip multiple-choice leading labels like "a)", "b.", "(c)", "d:"
+    // Strip multiple-choice leading labels like "a)", "b.", "(c)", "d:", "(e)"
     // Crucial: Must NOT strip the English article "A" in "A 45-year-old male..."
-    text = text.replace(/^(?:\(?[a-d]\)[.:\s-]*|[a-d][.:-]\s+)/i, '');
+    text = text.replace(/^(?:\(?[a-e]\)[.:\s-]*|[a-e][.:-]\s+)/i, '');
 
     // Collapse all whitespace and control characters into single spaces
     text = text.replace(/[\s\u0000-\u001f\u007f-\u009f]+/g, ' ').trim();
@@ -67,7 +67,10 @@ export class QuestionCanonicalizerV2 implements IQuestionCanonicalizer {
    * so "Blood culture." and "Blood culture" yield identical canonical choice & answerKey hashes.
    */
   public normalizeChoiceText(rawChoiceText: string): string {
-    return this.normalizeText(rawChoiceText).replace(/[.]+$/, '').trim();
+    let text = this.normalizeText(rawChoiceText);
+    // Strip trailing choice tags (e.g. "... in serum E. ST elevation on ECG" -> "... in serum")
+    text = text.replace(/\s+(?:[([{\s]*[e-f][)\]}:.]|[e-f]\s*[-–—]+)\s+.*$/i, '');
+    return text.replace(/[.]+$/, '').trim();
   }
 
   public async canonicalize(question: Question): Promise<CanonicalQuestion> {

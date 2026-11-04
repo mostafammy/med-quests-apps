@@ -234,4 +234,91 @@ describe('LLM path → QDD (regression for silent "1 unique")', () => {
     const govQueue = useBankGovernanceStore.getState().reviewQueue;
     expect(govQueue.length).toBeGreaterThan(0);
   });
+
+  it('correctly handles viral myocarditis question with trailing "E. ST elevation on ECG" without false CONFLICT', async () => {
+    const MYOCARDITIS_STEM =
+      'Which of the following findings would most strongly support the diagnosis of viral myocarditis over bacterial myocarditis?';
+
+    const bankMyocarditis: Question = {
+      id: 'q-parsed-1701010101001-1',
+      blockId: 'cvs',
+      subjectId: 'pathology',
+      chapterId: 'cvs-pat-myocarditis',
+      topicId: 'cvs-pat-myocarditis/clinical-review',
+      concept: 'Viral Myocarditis Diagnosis',
+      type: 'single-best-answer',
+      stem: MYOCARDITIS_STEM,
+      choices: [
+        { id: 'a', text: 'Presence of pericardial effusion', isCorrect: false, rationale: 'Non-specific finding.' },
+        { id: 'b', text: 'Positive blood cultures', isCorrect: false, rationale: 'Supports bacterial etiology.' },
+        { id: 'c', text: 'Elevated CRP and leukocytosis', isCorrect: false, rationale: 'Non-specific inflammatory markers.' },
+        { id: 'd', text: 'PCR detection of viral RNA in serum', isCorrect: true, rationale: 'Confirms viral etiology.' },
+      ],
+      explanation: 'PCR detection of viral genetic material is definitive.',
+      mnemonic: null,
+      examTip: 'PCR for viral myocarditis',
+      difficulty: 2,
+      cognitiveLevel: 'understanding',
+      highYield: true,
+      origin: 'authored-grounded',
+      evidence: [
+        {
+          chunkId: 'chunk-myo-1',
+          sourceName: 'Robbins Basic Pathology',
+          location: 'Chapter 12',
+          quote: 'PCR detection of viral genome confirms viral myocarditis etiology.',
+          kind: 'text',
+        },
+      ],
+      status: 'active',
+      bankVersion: 1,
+    };
+
+    // User input where Option E is inline after Option D
+    const RAW_INLINE_E = `${MYOCARDITIS_STEM}
+A. Presence of pericardial effusion
+B. Positive blood cultures
+C. Elevated CRP and leukocytosis
+D. PCR detection of viral RNA in serum E. ST elevation on ECG
+Answer: D`;
+
+    const agent = new QuestionParsingAgent();
+    const resultInline = await agent.parseRawQuestions({
+      rawText: RAW_INLINE_E,
+      providerId: 'gemini',
+      modelId: 'gemini-2.5-flash',
+      existingQuestions: [bankMyocarditis],
+    });
+
+    expect(resultInline.items.length).toBe(1);
+    const itemInline = resultInline.items[0];
+    expect(itemInline.question.choices[3].text).toBe('PCR detection of viral RNA in serum');
+    expect(itemInline.question.choices[3].isCorrect).toBe(true);
+    expect(itemInline.qddVerdict?.relation).toBe('EXACT');
+    expect(itemInline.qddVerdict?.relation).not.toBe('CONFLICT');
+
+    // User input where Option E is on a separate line
+    const RAW_SEPARATE_E = `${MYOCARDITIS_STEM}
+A. Presence of pericardial effusion
+B. Positive blood cultures
+C. Elevated CRP and leukocytosis
+D. PCR detection of viral RNA in serum
+E. ST elevation on ECG
+Answer: D`;
+
+    const resultSeparate = await agent.parseRawQuestions({
+      rawText: RAW_SEPARATE_E,
+      providerId: 'gemini',
+      modelId: 'gemini-2.5-flash',
+      existingQuestions: [bankMyocarditis],
+    });
+
+    expect(resultSeparate.items.length).toBe(1);
+    const itemSeparate = resultSeparate.items[0];
+    expect(itemSeparate.question.choices.length).toBe(4);
+    expect(itemSeparate.question.choices[3].text).toBe('PCR detection of viral RNA in serum');
+    expect(itemSeparate.question.choices[3].isCorrect).toBe(true);
+    expect(itemSeparate.qddVerdict?.relation).toBe('EXACT');
+    expect(itemSeparate.qddVerdict?.relation).not.toBe('CONFLICT');
+  });
 });
