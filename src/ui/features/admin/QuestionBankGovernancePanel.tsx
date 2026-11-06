@@ -25,7 +25,8 @@ import { useBankGovernanceStore } from '../../../application/stores/useBankGover
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 import { useAuthStore } from '../../../application/stores/useAuthStore.ts';
 import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
-import { CVS_TAXONOMY } from '../../../domain/taxonomy/cvsTaxonomy.ts';
+import { compositionRoot } from '../../../application/composition/clientCompositionRoot.ts';
+import type { BlockId } from '../../../domain/curriculum/ids.ts';
 import { AiPromptStudioModal } from './AiPromptStudioModal.tsx';
 import { AdminExportBankModal } from './AdminExportBankModal.tsx';
 import type {
@@ -35,6 +36,8 @@ import type {
 
 export const QuestionBankGovernancePanel: React.FC = () => {
   const {
+    activeBlockId,
+    setActiveBlockId,
     activeWorkspaceTab,
     reviewQueue,
     catalogQuestions,
@@ -103,8 +106,10 @@ export const QuestionBankGovernancePanel: React.FC = () => {
   const [isPromptStudioOpen, setIsPromptStudioOpen] = useState(false);
 
   useEffect(() => {
-    loadGovernanceData('cvs');
-  }, [loadGovernanceData]);
+    loadGovernanceData(activeBlockId);
+  }, [loadGovernanceData, activeBlockId]);
+
+  const currentSubjects = compositionRoot.catalog.subjects(activeBlockId);
 
   const filteredCatalog = getFilteredCatalog();
   const filteredQueue = getFilteredQueue();
@@ -127,8 +132,8 @@ export const QuestionBankGovernancePanel: React.FC = () => {
     }
     try {
       setIsResettingCache(true);
-      const res = await resetLocalBankToGlobal('cvs');
-      await loadGovernanceData('cvs');
+      const res = await resetLocalBankToGlobal(activeBlockId);
+      await loadGovernanceData(activeBlockId);
       setResetFeedback(`Local cache reset: ${res.resetCount} items restored (Rev #${res.revision})`);
       setTimeout(() => setResetFeedback(null), 5000);
     } catch {
@@ -307,7 +312,7 @@ export const QuestionBankGovernancePanel: React.FC = () => {
     <div className="space-y-6">
       {/* 1. Header & Navigation Pills */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-3xl bg-white/60 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 backdrop-blur-xl">
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setWorkspaceTab('review-queue')}
             className={`py-2 px-4 rounded-2xl text-xs font-bold flex items-center space-x-2 transition-all cursor-pointer ${
@@ -336,6 +341,23 @@ export const QuestionBankGovernancePanel: React.FC = () => {
             <BookOpen className="w-4 h-4" />
             <span>Global Bank Curator ({catalogQuestions.length})</span>
           </button>
+
+          {/* Block Selector */}
+          <div className="flex items-center space-x-1.5 pl-2 sm:border-l border-zinc-200 dark:border-zinc-800">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Block:</span>
+            <select
+              value={activeBlockId}
+              aria-label="Select Curriculum Block"
+              onChange={(e) => setActiveBlockId(e.target.value as BlockId)}
+              className="py-1.5 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden cursor-pointer"
+            >
+              {compositionRoot.catalog.list().map((pack) => (
+                <option key={pack.manifest.block.id} value={pack.manifest.block.id}>
+                  {pack.manifest.block.code}: {pack.manifest.block.name.en}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
@@ -392,7 +414,7 @@ export const QuestionBankGovernancePanel: React.FC = () => {
           </button>
 
           <button
-            onClick={() => loadGovernanceData('cvs')}
+            onClick={() => loadGovernanceData(activeBlockId)}
             disabled={isLoading}
             className="py-2 px-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center space-x-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all cursor-pointer"
           >
@@ -799,7 +821,7 @@ export const QuestionBankGovernancePanel: React.FC = () => {
 
             {showAuditBoard && (
               <div className="pt-2">
-                <QddAuditBoard blockId="cvs" />
+                <QddAuditBoard blockId={activeBlockId} />
               </div>
             )}
           </div>
@@ -853,9 +875,9 @@ export const QuestionBankGovernancePanel: React.FC = () => {
                 className="py-2 px-3 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white/90 dark:bg-zinc-800/90 text-xs font-medium text-zinc-700 dark:text-zinc-300 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 cursor-pointer"
               >
                 <option value="all">All Subjects</option>
-                {CVS_TAXONOMY.subjects.map((s) => (
+                {currentSubjects.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name}
+                    {s.name.en}
                   </option>
                 ))}
               </select>
@@ -1179,9 +1201,9 @@ export const QuestionBankGovernancePanel: React.FC = () => {
                     onChange={(e) => setEditSubjectId(e.target.value)}
                     className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 p-2.5 bg-zinc-50/50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden capitalize"
                   >
-                    {CVS_TAXONOMY.subjects.map((s) => (
+                    {currentSubjects.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name}
+                        {s.name.en}
                       </option>
                     ))}
                   </select>
@@ -1600,6 +1622,7 @@ export const QuestionBankGovernancePanel: React.FC = () => {
       <AiPromptStudioModal
         isOpen={isPromptStudioOpen}
         onClose={() => setIsPromptStudioOpen(false)}
+        blockId={activeBlockId}
         onInsertExample={(exampleJson) => {
           setCreateJsonInput(exampleJson);
           setIsCreateModalOpen(true);
@@ -1611,7 +1634,7 @@ export const QuestionBankGovernancePanel: React.FC = () => {
         <AdminExportBankModal
           isOpen={isExportModalOpen}
           onClose={() => setIsExportModalOpen(false)}
-          blockId="cvs"
+          blockId={activeBlockId}
         />
       )}
     </div>
