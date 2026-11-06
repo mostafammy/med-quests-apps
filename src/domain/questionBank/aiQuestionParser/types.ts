@@ -5,6 +5,7 @@
  */
 
 import type { Question, ChoiceId, SubjectId, ChapterId } from '../../model/types.ts';
+import type { BlockId } from '../../curriculum/ids.ts';
 import type { CloudProviderId } from '../../ai/settings.ts';
 import type { TaxonomyClassificationResult } from '../../taxonomy/CurriculumClassificationAgent.ts';
 import type { DuplicationVerdict } from '../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
@@ -90,6 +91,7 @@ export interface RawQuestionParseRequest {
   readonly rawText: string;
   readonly providerId: CloudProviderId;
   readonly modelId: string;
+  readonly targetBlockId?: BlockId;
   readonly targetSubjectId?: SubjectId | 'auto';
   readonly targetChapterId?: ChapterId | 'auto';
   readonly stemMode?: QuestionStemMode;
