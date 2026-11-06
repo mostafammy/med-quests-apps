@@ -2,10 +2,13 @@ import React, { useEffect, Suspense, lazy } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { 
   Heart, 
+  Brain,
   X
 } from 'lucide-react';
 import { DesktopNavBar } from './navigation/DesktopNavBar.tsx';
 import { MobileBottomDock } from './navigation/MobileBottomDock.tsx';
+import { BlockSwitcher } from './navigation/BlockSwitcher.tsx';
+import { SessionLeaveConfirmDialog } from './navigation/SessionLeaveConfirmDialog.tsx';
 import { ThemeToggle } from './ThemeToggle';
 import { LocaleToggle } from './LocaleToggle.tsx';
 import { CopilotTriggerButton } from '../features/copilot/CopilotTriggerButton.tsx';
@@ -16,6 +19,7 @@ import { QuestionBankStatusPill } from '../features/questionBank/QuestionBankSta
 import { useCopilotStore } from '../../application/stores/useCopilotStore.ts';
 import { useAuthStore } from '../../application/stores/useAuthStore.ts';
 import { useLocaleStore } from '../../application/stores/useLocaleStore.ts';
+import { useActiveBlock } from '../../application/stores/useBlockContextStore.ts';
 
 const AuthSecurityModal = lazy(() =>
   import('../features/auth/AuthSecurityModal.tsx').then((m) => ({ default: m.AuthSecurityModal }))
@@ -29,7 +33,15 @@ export const Shell: React.FC = () => {
   const { setSurface } = useCopilotStore();
   const { authState, notificationToast, clearToast } = useAuthStore();
   const { t, initLocale } = useLocaleStore();
+  const { block, status } = useActiveBlock();
   const isAdmin = authState.status === 'authenticated-active' && authState.user.role === 'admin';
+  const isSwitching = status === 'switching' || status === 'hydrating';
+
+  // Bind active block accent to document root for seamless CSS token adaptation
+  useEffect(() => {
+    const accent = block?.presentation.accent || 'rose';
+    document.documentElement.setAttribute('data-block-accent', accent);
+  }, [block?.presentation.accent]);
 
   useEffect(() => {
     return initLocale();
@@ -63,7 +75,18 @@ export const Shell: React.FC = () => {
           {/* Left: Logo & Platform Name (Aligned to Far-Left) */}
           <NavLink to="/" className="flex items-center space-x-2 sm:space-x-2.5 rtl:space-x-reverse group cursor-pointer shrink-0 apple-tap">
             <div className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-indigo-700 dark:from-blue-500 dark:to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
-              <Heart className="w-4 h-4 sm:w-5 sm:h-5 fill-current animate-heartbeat" />
+              <div className="relative w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+                <Heart
+                  className={`w-4 h-4 sm:w-5 sm:h-5 fill-current absolute transition-opacity duration-200 motion-reduce:transition-none ${
+                    block?.presentation.glyph === 'brain' ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100 animate-heartbeat'
+                  }`}
+                />
+                <Brain
+                  className={`w-4 h-4 sm:w-5 sm:h-5 fill-current absolute transition-opacity duration-200 motion-reduce:transition-none ${
+                    block?.presentation.glyph === 'brain' ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+                  }`}
+                />
+              </div>
               <span className="absolute -inset-0.5 rounded-xl sm:rounded-2xl bg-blue-400/30 blur-xs -z-10 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
             <div>
@@ -79,8 +102,11 @@ export const Shell: React.FC = () => {
           {/* Center Navigation: Apple-Caliber Adaptive Fluid Segmented Nav with Progressive Overflow */}
           <DesktopNavBar isAdmin={isAdmin} t={t} />
 
-          {/* Right Header: Identity & Edge Pill, AI Co-Pilot, Theme Switcher & Block Switcher */}
+          {/* Right Header: Curriculum Block Switcher, Identity & Edge Pill, AI Co-Pilot, Theme Switcher */}
           <div className="flex items-center gap-1 sm:gap-2 min-w-0 shrink-0">
+            {/* Curriculum Block Switcher */}
+            <BlockSwitcher />
+
             {/* Bilingual Language Switcher */}
             <LocaleToggle />
 
@@ -97,10 +123,22 @@ export const Shell: React.FC = () => {
             <QuestionBankStatusPill />
           </div>
         </div>
+
+        {/* Inline hairline progress during block switching (FR-033) */}
+        {isSwitching && (
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500/20 overflow-hidden">
+            <div className="w-full h-full bg-blue-500 animate-pulse" />
+          </div>
+        )}
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 w-full pb-24 md:pb-8">
+      {/* Main Content Area: Dimmed during switching per FR-033 */}
+      <main
+        aria-busy={isSwitching}
+        className={`flex-1 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 w-full pb-24 md:pb-8 transition-opacity duration-200 ${
+          isSwitching ? 'opacity-60 pointer-events-none' : 'opacity-100'
+        }`}
+      >
         {/* Account Restriction Alert */}
         <AccountRestrictedBanner />
 
@@ -136,6 +174,8 @@ export const Shell: React.FC = () => {
       <Suspense fallback={null}>
         <AdminGovernanceDrawer />
       </Suspense>
+      {/* Mid-Session Switch Protection Dialog (User Story 4) */}
+      <SessionLeaveConfirmDialog />
     </div>
   );
 };
