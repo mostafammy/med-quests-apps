@@ -4,6 +4,7 @@
  * SPEC-010: Multi-Block Curriculum Architecture
  */
 
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import type { BlockId } from '../../domain/curriculum/ids.ts';
 import type { BlockManifest } from '../../domain/curriculum/schemas.ts';
@@ -175,20 +176,34 @@ export function useActiveBlock() {
  * Hook: Access the active block's taxonomy mapped for UI views (Dashboard, TestHub, etc.)
  */
 export function useActiveTaxonomy(): Taxonomy {
+  const isSsr = typeof window === 'undefined' || typeof document === 'undefined';
   const { manifest } = useActiveBlock();
-  const locale = (typeof window === 'undefined' || typeof document === 'undefined')
+  const locale = isSsr
     ? useLocaleStore.getState().locale
     : useLocaleStore((s) => s.locale);
 
-  if (!manifest) {
-    // Fallback if catalog not yet hydrated
-    const cvsPack = (typeof compositionRoot !== 'undefined' && compositionRoot?.catalog)
-      ? compositionRoot.catalog.get('cvs' as BlockId)
-      : null;
-    if (cvsPack) {
-      return LegacyTaxonomyAdapter.manifestToTaxonomy(cvsPack.manifest, locale);
+  if (isSsr) {
+    if (!manifest) {
+      const cvsPack = (typeof compositionRoot !== 'undefined' && compositionRoot?.catalog)
+        ? compositionRoot.catalog.get('cvs' as BlockId)
+        : null;
+      if (cvsPack) {
+        return LegacyTaxonomyAdapter.manifestToTaxonomy(cvsPack.manifest, locale);
+      }
     }
+    return LegacyTaxonomyAdapter.manifestToTaxonomy(manifest!, locale);
   }
 
-  return LegacyTaxonomyAdapter.manifestToTaxonomy(manifest!, locale);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  return useMemo(() => {
+    if (!manifest) {
+      const cvsPack = (typeof compositionRoot !== 'undefined' && compositionRoot?.catalog)
+        ? compositionRoot.catalog.get('cvs' as BlockId)
+        : null;
+      if (cvsPack) {
+        return LegacyTaxonomyAdapter.manifestToTaxonomy(cvsPack.manifest, locale);
+      }
+    }
+    return LegacyTaxonomyAdapter.manifestToTaxonomy(manifest!, locale);
+  }, [manifest, locale]);
 }

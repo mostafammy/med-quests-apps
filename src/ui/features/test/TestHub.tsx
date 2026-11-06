@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useActiveTaxonomy, useBlockContextStore } from '../../../application/stores/useBlockContextStore.ts';
 import { defaultBlockMementoStore } from '../../../infrastructure/curriculum/LocalStorageBlockMementoStore.ts';
@@ -55,14 +55,20 @@ export const TestHub: React.FC = () => {
       if (match) return match.id;
     }
     const memento = defaultBlockMementoStore.load(activeBlockId);
-    if (memento?.testHub?.subjectId && taxonomy.subjects.some((s) => s.id === memento.testHub.subjectId)) {
+    if (
+      memento?.testHub?.subjectId &&
+      (memento.testHub.subjectId === 'all' || taxonomy.subjects.some((s) => s.id === memento.testHub.subjectId))
+    ) {
       return memento.testHub.subjectId;
     }
     return 'all';
   });
   const [selectedChapter, setSelectedChapter] = useState<string>(() => {
     const memento = defaultBlockMementoStore.load(activeBlockId);
-    if (memento?.testHub?.chapterId && taxonomy.chapters.some((c) => c.id === memento.testHub.chapterId)) {
+    if (
+      memento?.testHub?.chapterId &&
+      (memento.testHub.chapterId === 'all' || taxonomy.chapters.some((c) => c.id === memento.testHub.chapterId))
+    ) {
       return memento.testHub.chapterId;
     }
     return 'all';
@@ -83,36 +89,57 @@ export const TestHub: React.FC = () => {
     refreshStats(questions, activeBlockId);
   }, [questions, refreshStats, activeBlockId]);
 
-  // Sync with search params or memento when activeBlockId or params change
+  // 1. Sync when curriculum block changes (e.g. user toggles CVS <-> CNS)
+  const prevBlockIdRef = useRef(activeBlockId);
   useEffect(() => {
-    const subParam = searchParams.get('subject');
-    if (subParam) {
+    if (prevBlockIdRef.current !== activeBlockId) {
+      prevBlockIdRef.current = activeBlockId;
+      const memento = defaultBlockMementoStore.load(activeBlockId);
+      if (
+        memento?.testHub?.subjectId &&
+        (memento.testHub.subjectId === 'all' || taxonomy.subjects.some((s) => s.id === memento.testHub.subjectId))
+      ) {
+        setSelectedSubject(memento.testHub.subjectId);
+        setSelectedChapter(
+          memento.testHub.chapterId &&
+          (memento.testHub.chapterId === 'all' || taxonomy.chapters.some((c) => c.id === memento.testHub.chapterId))
+            ? memento.testHub.chapterId
+            : 'all'
+        );
+        setQuestionCount(memento.testHub.count ?? 20);
+        setHighYieldOnly(memento.testHub.highYieldOnly ?? false);
+      } else {
+        setSelectedSubject('all');
+        setSelectedChapter('all');
+      }
+    }
+  }, [activeBlockId, taxonomy.subjects, taxonomy.chapters]);
+
+  // 2. Sync when URL search parameter (?subject=...) changes
+  const subParam = searchParams.get('subject');
+  const prevSubParamRef = useRef(subParam);
+  useEffect(() => {
+    if (subParam && subParam !== prevSubParamRef.current) {
+      prevSubParamRef.current = subParam;
       const match = taxonomy.subjects.find(
         (s) => s.id.toLowerCase() === subParam.toLowerCase() || s.name.toLowerCase().includes(subParam.toLowerCase())
       );
       if (match) {
         setSelectedSubject(match.id);
         setSelectedChapter('all');
-        return;
       }
     }
-    const memento = defaultBlockMementoStore.load(activeBlockId);
-    if (memento?.testHub?.subjectId && taxonomy.subjects.some((s) => s.id === memento.testHub.subjectId)) {
-      setSelectedSubject(memento.testHub.subjectId);
-      setSelectedChapter(
-        memento.testHub.chapterId && taxonomy.chapters.some((c) => c.id === memento.testHub.chapterId)
-          ? memento.testHub.chapterId
-          : 'all'
-      );
-      setQuestionCount(memento.testHub.count ?? 20);
-      setHighYieldOnly(memento.testHub.highYieldOnly ?? false);
-    } else {
+  }, [subParam, taxonomy.subjects]);
+
+  // 3. Fallback: Reconcile if selectedSubject or selectedChapter became invalid for active taxonomy
+  useEffect(() => {
+    if (selectedSubject !== 'all' && !taxonomy.subjects.some((s) => s.id === selectedSubject)) {
       setSelectedSubject('all');
       setSelectedChapter('all');
     }
-  }, [searchParams, activeBlockId, taxonomy]);
+  }, [selectedSubject, taxonomy.subjects]);
 
-  // Persist filter changes to memento
+  // 4. Persist user filter choices to block memento
   useEffect(() => {
     defaultBlockMementoStore.save({
       blockId: activeBlockId,

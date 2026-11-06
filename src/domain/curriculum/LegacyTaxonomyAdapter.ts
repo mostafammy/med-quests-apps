@@ -7,11 +7,23 @@
 import type { BlockManifest } from './schemas.ts';
 import type { Taxonomy, Block, Subject, Chapter, Topic } from '../model/types.ts';
 
+const taxonomyCache = new WeakMap<BlockManifest, Map<string, Taxonomy>>();
+
 export class LegacyTaxonomyAdapter {
   public static manifestToTaxonomy(
     manifest: BlockManifest,
     locale: 'en' | 'ar' = 'en'
   ): Taxonomy {
+    let byLocale = taxonomyCache.get(manifest);
+    if (!byLocale) {
+      byLocale = new Map<string, Taxonomy>();
+      taxonomyCache.set(manifest, byLocale);
+    }
+    const cached = byLocale.get(locale);
+    if (cached) {
+      return cached;
+    }
+
     const block: Block = {
       id: manifest.block.id,
       name: manifest.block.name[locale] || manifest.block.name.en,
@@ -45,11 +57,14 @@ export class LegacyTaxonomyAdapter {
       order: t.order,
     }));
 
-    return {
+    const result: Taxonomy = {
       block,
       subjects,
       chapters,
       topics,
     };
+
+    byLocale.set(locale, result);
+    return result;
   }
 }

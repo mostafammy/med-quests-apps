@@ -14,6 +14,8 @@ import { CurriculumLibrary } from '../../curriculum/CurriculumLibrary.tsx';
 import { useQuestionStore } from '../../../../application/stores/useQuestionStore.ts';
 import { useBlockContextStore } from '../../../../application/stores/useBlockContextStore.ts';
 import { defaultBlockMementoStore } from '../../../../infrastructure/curriculum/LocalStorageBlockMementoStore.ts';
+import { LegacyTaxonomyAdapter } from '../../../../domain/curriculum/LegacyTaxonomyAdapter.ts';
+import { compositionRoot } from '../../../../application/composition/clientCompositionRoot.ts';
 import { db } from '../../../../infrastructure/storage/db.ts';
 import defaultCvsBank from '../../../../../content/cvs/dist/bank.v1.json';
 import type { Question } from '../../../../domain/model/types.ts';
@@ -244,5 +246,15 @@ describe('SPEC-010: Multi-Subject Test Hub & Practice Modes (US3 & US8)', () => 
     const cnsMemento = defaultBlockMementoStore.load('cns' as BlockId);
     expect(cnsMemento?.testHub.subjectId).toBe('pharmacology');
     expect(cnsMemento?.testHub.count).toBe(30);
+  });
+
+  it('guarantees referential stability for LegacyTaxonomyAdapter.manifestToTaxonomy', () => {
+    const cnsPack = compositionRoot.catalog.get('cns' as BlockId);
+    expect(cnsPack).toBeDefined();
+
+    const t1 = LegacyTaxonomyAdapter.manifestToTaxonomy(cnsPack!.manifest, 'en');
+    const t2 = LegacyTaxonomyAdapter.manifestToTaxonomy(cnsPack!.manifest, 'en');
+    expect(t1).toBe(t2); // Identical reference prevents infinite re-render loops
+    expect(t1.subjects).toBe(t2.subjects);
   });
 });
