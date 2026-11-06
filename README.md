@@ -78,11 +78,21 @@ Engineered with **Apple Human Interface Guidelines (HIG)** aesthetic fidelity, s
    - [UX, Accessibility & Apple HIG Telemetry](#97-ux-accessibility--apple-hig-telemetry)
    - [Security, Privacy & Zero-Leakage Guarantee](#98-security-privacy--zero-leakage-guarantee)
    - [Known Limitations & Future Roadmap](#99-known-limitations--future-roadmap)
-10. [Local-First Persistence & Storage Topology](#local-first-persistence--storage-topology)
-11. [Repository Structure](#repository-structure)
-12. [Quality Engineering & Verification Matrix](#quality-engineering--verification-matrix)
-13. [Getting Started](#getting-started)
-14. [Normative Specification & Documentation](#normative-specification--documentation)
+10. [Deep Dive: Multi-Block Curriculum Architecture, Code-Split Dynamic Packs & Zero-Orphan Ingestion Engine (SPEC-010)](#deep-dive-multi-block-curriculum-architecture-code-split-dynamic-packs--zero-orphan-ingestion-engine-spec-010)
+   - [Why It Matters](#101-why-it-matters)
+   - [Architectural Topology & Dynamic Pack Loading (Diagram)](#102-architectural-topology--dynamic-pack-loading)
+   - [Lossless Block Switch & Session Leave Guard (Diagram)](#103-lossless-block-switch--session-leave-guard)
+   - [Direct JSON Ingestion & Fuzzy Taxonomy Healing Pipeline (Diagram)](#104-direct-json-ingestion--fuzzy-taxonomy-healing-pipeline)
+   - [Key Engineering Decisions](#105-key-engineering-decisions)
+   - [Reliability, Quality Gates & Failure Modes](#106-reliability-quality-gates--failure-modes)
+   - [UX, Accessibility & Apple HIG Standards](#107-ux-accessibility--apple-hig-standards)
+   - [Security & Privacy Boundary](#108-security--privacy-boundary)
+   - [Known Limitations & Future Roadmap](#109-known-limitations--future-roadmap)
+11. [Local-First Persistence & Storage Topology](#local-first-persistence--storage-topology)
+12. [Repository Structure](#repository-structure)
+13. [Quality Engineering & Verification Matrix](#quality-engineering--verification-matrix)
+14. [Getting Started](#getting-started)
+15. [Normative Specification & Documentation](#normative-specification--documentation)
 
 ---
 
@@ -1671,79 +1681,306 @@ Verified against the canonical 450-pair golden benchmark dataset ([`qdd-golden.v
 
 ---
 
-## Local-First Persistence & Storage Topology
+## 10. Deep Dive: Multi-Block Curriculum Architecture, Code-Split Dynamic Packs & Zero-Orphan Ingestion Engine (SPEC-010)
 
-Data is stored client-side in the browser via **IndexedDB (Dexie.js v6)** for privacy, instant launch, and full offline capability:
+> A modular, data-driven medical curriculum engine that lets learners switch between University & Board exam blocks with zero data loss, independent metric tracking, code-split bundle efficiency, and 100% fidelity direct JSON ingestion.
+
+### 10.1 Why It Matters
+
+- **Sequential Preclinical Study Without Data Contamination:** Medical students navigate medical school block by block (e.g. Cardiovascular System Block 206, followed by Central Nervous System Block 207, Respiratory, Renal). A single hardcoded block model forces either destructive database wipes or cross-block question leaks.
+- **Cognitive Metric Cleanliness:** Mastery percentages, accuracy, weak topic diagnostics, and due spaced-repetition reviews remain strictly isolated per curriculum block. A student's 40-day global habit streak persists, but mastering Heart Murmurs never falsely inflates their Cranial Nerve Tract score.
+- **Zero-Friction Ingestion with Zero Orphans:** Faculty and authors importing pre-structured JSON arrays enjoy instant ingestion without LLM hallucinations. Fuzzy token overlap heals legacy or slight chapter slug differences (e.g. `cns-ana-org-meninges-csf` → `cns-ana-embryology-meninges-csf`), satisfying all 9 Taxonomy Invariants (TI-1..TI-9).
+
+---
+
+### 10.2 Architectural Topology & Dynamic Pack Loading (Diagram)
+
+```mermaid
+flowchart TD
+    subgraph Presentation_Layer ["Presentation Layer (React 19 + Apple HIG)"]
+        UI_Switcher["BlockSwitcher & Sheet (WAI-ARIA listbox)"]
+        UI_LeaveGuard["SessionLeaveConfirmDialog (Lossless Prompt)"]
+        UI_Lab["AdminAiQuestionParserLab (Direct JSON Fast-Path)"]
+        UI_Hub["TestHub & QuickPractice (Block-Scoped)"]
+    end
+
+    subgraph Application_Layer ["Application Layer (Zustand & Use Cases)"]
+        UC_Switch["SwitchBlockUseCase"]
+        Store_Block["useBlockContextStore (activeBlockId)"]
+        Store_Stats["useStatsStore (Block-Scoped Metrics)"]
+        Store_Parser["useAdminAiQuestionParserStore"]
+        HP_Questions["QuestionHydrationParticipant"]
+        HP_Stats["StatsHydrationParticipant"]
+        HP_Memento["MementoHydrationParticipant"]
+    end
+
+    subgraph Domain_Layer ["Domain Layer (Pure TypeScript)"]
+        BC["BlockCatalog (IBlockCatalogReader)"]
+        TIV["TaxonomyIntegrityValidator (TI-1..TI-9)"]
+        QPA["QuestionParsingAgent (Direct JSON + Fuzzy Healer)"]
+        MSP["MetricScopePolicy (Global Streak vs Block Mastery)"]
+    end
+
+    subgraph Infrastructure_Layer ["Infrastructure & Persistence (Dexie v9 + Cloudflare)"]
+        VBPS["ViteBlockPackSource (Eager Manifests + Lazy Bundles)"]
+        Dexie_v9[("IndexedDB MedQuestsDB v9 (Compound Indexes)")]
+        Edge_D1[("Cloudflare D1 (block_id Partitioned)")]
+    end
+
+    UI_Switcher -->|"selectBlock(id)"| UC_Switch
+    UI_LeaveGuard -.->|"confirm leave"| UC_Switch
+    UC_Switch --> Store_Block
+    UC_Switch --> HP_Questions & HP_Stats & HP_Memento
+    HP_Questions -->|"loadBank(blockId)"| VBPS
+    HP_Stats -->|"readScoped(blockId)"| Dexie_v9
+    UI_Lab -->|"rawText (JSON / Text)"| QPA
+    QPA -->|"validate & heal"| BC
+    BC --> TIV
+    VBPS -->|"code-split chunk"| BC
+```
+
+The system employs **Hexagonal Architecture** to cleanly decouple curriculum metadata from presentation:
+1. **Eager Manifest Discovery:** Lightweight block manifests (`content/*/manifest.json`, $\le 8\text{ KB}$ gzipped total) load eagerly via [`ViteBlockPackSource`](src/infrastructure/curriculum/ViteBlockPackSource.ts), allowing the [`BlockCatalog`](src/domain/curriculum/BlockCatalog.ts) to populate available blocks instantly.
+2. **Lazy Chunk Splitting:** Heavy question banks (`content/*/dist/bank.v1.json`) are code-split into distinct Rollup chunks loaded on-demand only when a block is activated, preserving sub-2-second initial bundle hydration.
+3. **Compound Key Isolation:** Subjects use composite identities `SubjectRef = (blockId, subjectId)`. This allows common medical disciplines (`anatomy`, `physiology`) to exist across multiple blocks without identity collisions or database re-keying migrations.
+
+---
+
+### 10.3 Lossless Block Switch & Session Leave Guard (Diagram)
+
+```mermaid
+sequenceDiagram
+    actor Student
+    participant UI as BlockSwitcher / Sheet
+    participant Guard as DefaultSessionLeaveGuard
+    participant UC as SwitchBlockUseCase
+    participant PackSource as ViteBlockPackSource
+    participant Dexie as IndexedDB (Dexie v9)
+    participant Store as useBlockContextStore
+
+    Student->>UI: Select "Central Nervous System (Block 207)"
+    UI->>UC: execute("cns")
+    
+    alt In-Progress Active Session Detected
+        UC->>Guard: canLeaveSession()
+        Guard-->>UI: promptNeeded = true
+        UI-->>Student: Display SessionLeaveConfirmDialog
+        alt User Cancels
+            Student->>UI: Tap "Stay in Current Session"
+            UI->>UC: abortSwitch()
+            UC-->>UI: Operation aborted (State preserved)
+        else User Confirms
+            Student->>UI: Tap "Save & Switch"
+            UI->>UC: proceedWithSwitch()
+        end
+    end
+
+    Note over UC,Dexie: Transactional Atomic Hydration
+    UC->>Dexie: mementoStore.save("cvs", state)
+    UC->>PackSource: loadBank("cns")
+    alt Dynamic Import Failure
+        PackSource-->>UC: Chunk Load Error (Offline / Network drop)
+        UC->>UC: Rollback to "cvs"
+        UC-->>UI: Error banner: "Block load failed, kept CVS"
+    else Success (Chunk Loaded in <50ms)
+        PackSource-->>UC: bank.v1.json (CNS questions)
+        UC->>Dexie: Hydrate [blockId+questionId]
+        UC->>Store: setActiveBlockId("cns")
+        UC-->>UI: Switch Complete (Zero UI Flash)
+    end
+```
+
+The switching lifecycle guarantees zero data loss:
+- **Session Leave Guard ([`DefaultSessionLeaveGuard.ts`](src/application/curriculum/SwitchBlockUseCase.ts)):** An in-progress practice or exam session is never silently discarded. If a student taps the switcher mid-session, a modal prompts them with options to cancel or save state losslessly.
+- **Transactional Hydration Chain:** [`SwitchBlockUseCase`](src/application/curriculum/SwitchBlockUseCase.ts) coordinates four distinct participants: [`MementoHydrationParticipant`](src/application/curriculum/hydrationParticipants.ts) captures scroll/navigation state, [`QuestionHydrationParticipant`](src/application/curriculum/hydrationParticipants.ts) swaps active question memory, and [`StatsHydrationParticipant`](src/application/curriculum/hydrationParticipants.ts) isolates mastery metrics.
+- **Rollback Resilience:** If an asynchronous bank import fails (e.g. abrupt network disconnection), the use case rolls back atomically to the previously active block, preventing blank-screen states.
+
+---
+
+### 10.4 Direct JSON Ingestion & Fuzzy Taxonomy Healing Pipeline (Diagram)
+
+```mermaid
+flowchart LR
+    Input["Pasted Raw Text"] --> Sniffer{"Direct JSON<br/>Sniffer"}
+    
+    Sniffer -->|"Unstructured Plain Text"| NLP["NLP Block Segmentation<br/>(1. / Question 1:)"]
+    Sniffer -->|"Structured JSON Array<br/>[{ id, stem, ... }]"| FastPath["Direct JSON Fast-Path Engine<br/>(100% Data Fidelity)"]
+    
+    FastPath --> Norm["normalizeBlockId()<br/>(cns-neuroscience ➔ cns)"]
+    Norm --> Healer{"Fuzzy Taxonomy<br/>Reconciler"}
+    
+    Healer -->|"Exact Match"| Exact["Canonical Chapter / Topic"]
+    Healer -->|"Slug Variance (e.g. cns-ana-org-...)"| TokenMatch["Token Overlap Match<br/>(cns-ana-embryology-meninges-csf)"]
+    
+    Exact --> Zod["Zod QuestionSchema<br/>(Single-Best-Answer 4 Choices)"]
+    TokenMatch --> Zod
+    
+    Zod --> QDD["QDD Stage 06 Sieve<br/>(Scoped to blockId)"]
+    QDD --> Staging["Admin Staging Cockpit<br/>(Ready for 1-Click Commit)"]
+```
+
+When importing questions via [`AdminAiQuestionParserLab`](src/ui/features/admin/aiQuestionParser/AdminAiQuestionParserLab.tsx):
+- **Pre-Flight JSON Sniffer:** Automatically recognizes JSON arrays or objects, completely bypassing NLP regex tokenization. Authored stems, 4-choice options, correct keys, explanations, and evidence quotes are preserved with 100% data fidelity.
+- **Payload Block Normalization:** Translates non-canonical author slugs (e.g. `"cns-neuroscience"` → `'cns'`) and synchronizes the UI target dropdown automatically on paste.
+- **Fuzzy Taxonomy Healing:** Scans candidate chapters within the subject using token overlap analysis. Mismatched slugs like `cns-ana-org-meninges-csf` automatically map to canonical `cns-ana-embryology-meninges-csf`, eliminating orphan questions and satisfying [`TaxonomyIntegrityValidator`](src/domain/curriculum/TaxonomyIntegrityValidator.ts).
+
+---
+
+### 10.5 Key Engineering Decisions
+
+| Decision | Rationale | Trade-off |
+|---|---|---|
+| **Composite Keys `SubjectRef = (blockId, subjectId)`** | Prevents cross-block collisions between generic disciplines (`anatomy`, `physiology`) without re-keying historical published questions. | Queries filtering by subject must provide a `blockId` parameter. |
+| **Persisted State + Deep Link Adapter (`?block=cns`)** | Maintains single source of truth in local storage without forcing an application-wide URL route rewrite (`/b/:blockId/*`). | Deep links apply once at boot and strip query parameters after hydration. |
+| **Bifurcated Metric Scope (`MetricScopePolicy`)** | Preserves student study habit momentum (global daily goal and streak) while keeping clinical accuracy and mastery block-specific. | Requires two distinct metric calculation pipelines in `useStatsStore`. |
+| **Eager Manifests + Code-Split Bank Chunks** | Prevents bundle bloat as the platform expands from 1 to 10+ curriculum blocks; initial load stays $\le 8\text{ KB}$ gz. | Switching to an uncached block requires an asynchronous $< 50\text{ ms}$ chunk fetch. |
+| **Pre-Flight Direct JSON Fast-Path** | Completely eliminates LLM hallucination and stem truncation when importing pre-authored JSON question batches. | Requires JSON syntax validation prior to unstructured regex fallback. |
+
+---
+
+### 10.6 Reliability, Quality Gates & Failure Modes
+
+- **Storage Isolation & Dexie v9 Compound Indexes:** Upgraded Dexie.js from v8 to v9 ([`db.ts`](src/infrastructure/storage/db.ts)), introducing compound indexes:
+  - `questions`: `[blockId+subjectId]`, `[blockId+chapterId]`
+  - `attempts`: `[blockId+questionId]`, `[blockId+answeredAt]`
+  - `reviewCards`: `[blockId+nextReviewDate]`, `[blockId+questionId]`
+  - `srsCards`: `[blockId+topicId]`
+- **Taxonomy Invariants (TI-1 through TI-9):** Pure domain validator ([`TaxonomyIntegrityValidator.ts`](src/domain/curriculum/TaxonomyIntegrityValidator.ts)) enforces strict hierarchy constraints at build time and runtime:
+  - `TI-1`: Unique IDs across catalog.
+  - `TI-3` & `TI-4`: Every chapter maps to an existing subject and carries a `${blockId}-` prefix.
+  - `TI-5`: Topic IDs map to valid chapters.
+  - `TI-6`: Contiguous order values ($1 \dots n$).
+  - `TI-8`: Zero orphan questions in canonical banks (`partitionBank`).
+- **Automated Validation Gates:**
+  - `pnpm blocks:validate` runs [`validate-blocks.ts`](scripts/blocks/validate-blocks.ts) on CI, verifying all manifests and banks with zero warnings.
+  - `pnpm blocks:ratchet` runs [`ratchet-cvs-literals.ts`](scripts/blocks/ratchet-cvs-literals.ts), guaranteeing that hardcoded `'cvs'` string literals can only decrease over time (baseline ratchet threshold: 130; currently 113, down from 491).
+- **Test Coverage:** 62 test files and 396 Vitest tests passing in under 5.2 seconds, covering multi-block isolation, rapid switching concurrency, and Dexie v8→v9 migration integrity.
+
+---
+
+### 10.7 UX, Accessibility & Apple HIG Standards
+
+- **Adaptive Switcher Visibility:** The [`BlockSwitcher`](src/ui/app/navigation/BlockSwitcher.tsx) renders in the header navigation only when $\ge 2$ blocks are accessible to the user (published blocks for students; beta blocks for faculty and administrators). A CVS-only student sees a pixel-identical, distraction-free interface.
+- **WAI-ARIA 1.2 Listbox Semantics:** The [`BlockSwitcherSheet`](src/ui/app/navigation/BlockSwitcherSheet.tsx) implements full keyboard accessibility:
+  - `Tab` / `Enter` opens the switcher.
+  - `↑` / `↓` traverses block options with `aria-selected` tracking.
+  - `Enter` confirms selection; `Esc` dismisses the sheet with focus returned to the trigger button.
+- **Haptic & Spatial Feedback:** Uses Apple-style spring animations (`cubic-bezier(0.16, 1, 0.3, 1)`), blurred backdrop filters (`backdrop-blur-xl`), and high-contrast accessibility tokens conforming to WCAG 2.1 AA.
+- **Dynamic AI Persona & Tool Scoping:** The agentic copilot dynamically loads block-specific system prompts ([`systemPromptBuilder.ts`](src/domain/ai/systemPromptBuilder.ts)), transforming from Cardiovascular Pathophysiology Specialist (`cvs-faculty-v1`) into CNS Clinical Neuroanatomy Specialist (`cns-faculty-v1`), exposing only curriculum-relevant diagnostic tools.
+
+---
+
+### 10.8 Security & Privacy Boundary
+
+- **Block-Scoped Edge Gateway:** All Edge Worker routes ([`worker/index.ts`](src/worker/index.ts)) accept a validated `?block=` parameter matching the catalog regex `/^[a-z0-9-]+$/`. Unregistered or unauthorized block identifiers are rejected with `404 Not Found`.
+- **Zero-Contamination Cloud Sync:** The delta-sync protocol stores revision counters per block (`bankSyncMeta` IndexedDB table). Commits and reviews in CNS never alter or advance CVS synchronization revision vectors.
+- **Client-Side Privacy:** Student attempts, notes, bookmarks, and Socratic debriefs remain isolated in client-side IndexedDB, partition-keyed by `blockId`.
+
+---
+
+### 10.9 Known Limitations & Future Roadmap
+
+- **Cross-Block Comprehensive Mocks (SPEC-011):** Current exam sessions are strictly constrained to a single active block. Multi-block integrated exams (e.g. combined CVS + CNS Step 1 simulations) are architected at the domain layer and scheduled for SPEC-011.
+- **Route-Prefix URLs:** Active block identity is persisted in application state with boot-time deep linking (`?block=cns`). A full `/b/:blockId/*` router prefix is deferred to future releases.
+- **Automated Faculty Proposal Merging:** When the AI Question Parser proposes a new curriculum chapter, faculty approve it via one click into local dynamic taxonomy; automated Edge D1 manifest pull-request creation remains on the roadmap.
+
+---
+
+## 11. Local-First Persistence & Storage Topology
+
+Data is stored client-side in the browser via **IndexedDB (Dexie.js v9)** for privacy, instant launch, and full offline capability:
 
 ```
-IndexedDB: MedQuestsDB (v6)
-├── questions                 # Canonical USMLE vignettes, psychometrics, provenanceScope
-├── attempts                  # Exam attempts, single-strike answers, mode, confidence
-├── reviewCards               # Spaced repetition intervals, due dates, lapses
+IndexedDB: MedQuestsDB (v9)
+├── questions                 # Canonical USMLE vignettes, psychometrics, [blockId+subjectId], [blockId+chapterId]
+├── attempts                  # Exam attempts, single-strike answers, mode, [blockId+questionId], [blockId+answeredAt]
+├── reviewCards               # Spaced repetition intervals, due dates, lapses, [blockId+nextReviewDate]
 ├── bookmarks                 # Bookmarked question IDs
 ├── notes                     # Student clinical notes per vignette
 ├── aiSettings                # Engine preferences, model IDs, API keys, chatLanguage
 ├── aiThreads                 # Multi-turn conversation histories
-├── srsCards                  # High-yield topic flashcards
+├── srsCards                  # High-yield topic flashcards, [blockId+topicId]
 ├── aiCache                   # Namespaced Socratic power actions (${qid}:${action}:${lang})
-├── bankSyncMeta              # Cloud delta sync revision counters and ETags
+├── bankSyncMeta              # Cloud delta sync revision counters and ETags per blockId
 ├── studioSubmissions         # Global question bank review tickets and reviewer notes
 └── aiModelMetrics            # Two-tier telemetry records (latency, status, throughput)
 ```
 
 ---
 
-## Repository Structure
+## 12. Repository Structure
 
 ```
 Med Quests Apps/
-├── .specify/                               # Spec-Kit memory & configuration
-├── .agents/                                # Autonomous engineering agents
-├── BRD.md                                  # Business & Engineering Requirements (1,300+ lines)
-├── specs/                                  # Formal Architecture Specs & Plans
-│   └── 004-bilingual-i18n-ai-localization/ # Bilingual Spec, Plan & Contracts
+├── content/                                  # DATA-DRIVEN CURRICULUM PACKS
+│   ├── cns/                                  # Central Nervous System (Block 207)
+│   │   ├── manifest.json                     # Zod BlockManifest (Subjects, Chapters, Topics, AI Profile)
+│   │   └── dist/bank.v1.json                 # Asynchronously Code-Split Question Bank
+│   └── cvs/                                  # Cardiovascular System (Block 206)
+│       ├── manifest.json                     # Canonical CVS Manifest
+│       └── dist/bank.v1.json                 # Canonical CVS Seed Bank
+├── docs/                                     # Developer & Author Guides
+│   └── authoring-new-curriculum-blocks.md   # Step-by-Step Curriculum Authoring Guide
+├── scripts/                                  # CI & Quality Ratchet Automation
+│   └── blocks/                               # validate-blocks.ts & ratchet-cvs-literals.ts
+├── specs/                                    # Formal Architecture Specs & Plans
+│   ├── 004-bilingual-i18n-ai-localization/   # Bilingual Spec, Plan & Contracts
+│   ├── 005-global-question-bank-governance/  # Editorial Governance Spec & Contracts
+│   ├── 006-psychometric-choice-entropy.../   # Choice Entropy & Spatial Presentation Spec
+│   ├── 009-question-duplication-detection.../# QDD Multi-Stage Semantic Sieve Spec
+│   └── 010-multi-block-curriculum-arch.../   # Multi-Block Curriculum Spec, Plan & Contracts
 ├── src/
-│   ├── domain/                             # PURE DOMAIN LAYER (Zero external dependencies)
-│   │   ├── i18n/                           # ScriptDetector, Dictionaries (en, ar), Types
-│   │   ├── ai/                             # ChatLanguagePolicy, SystemPromptBuilder, Tools
-│   │   ├── questionBank/                   # Catalog models & psychometrics
-│   │   └── auth/                           # Role schemas & RBAC contracts
-│   ├── application/                        # APPLICATION STATE LAYER
-│   │   └── stores/                         # useLocaleStore, useAiSettingsStore, useCopilotStore
-│   ├── infrastructure/                     # ADAPTERS & INFRASTRUCTURE
-│   │   ├── ai/                             # AgenticOrchestrator, EngineRegistry (Groq, Gemini)
-│   │   ├── storage/                        # Dexie.js IndexedDB schema & migrations
-│   │   └── questionBank/                   # JSON bank loader & integrity gate
-│   └── ui/                                 # PRESENTATION LAYER (Apple HIG)
-│       ├── app/                            # Shell, Navigation, LocaleToggle
-│       └── features/                       # Copilot, Session Player, Studio, Reports
+│   ├── domain/                               # PURE DOMAIN LAYER (Zero external dependencies)
+│   │   ├── curriculum/                       # BlockCatalog, TaxonomyIntegrityValidator, BootResolver
+│   │   ├── questionBank/                     # Catalog models, QDD Sieve, AI Ingestion Agent
+│   │   ├── taxonomy/                         # CurriculumTaxonomyRegistry & ClassificationAgent
+│   │   ├── ai/                               # LanguagePolicy, SystemPromptBuilder, ToolRegistry
+│   │   └── i18n/                             # ScriptDetector, Dictionaries (en, ar), Types
+│   ├── application/                          # APPLICATION STATE & USE CASE LAYER
+│   │   ├── curriculum/                       # SwitchBlockUseCase, HydrationParticipants, LeaveGuard
+│   │   └── stores/                           # useBlockContextStore, useQuestionStore, useStatsStore
+│   ├── infrastructure/                       # ADAPTERS & INFRASTRUCTURE
+│   │   ├── curriculum/                       # ViteBlockPackSource (Eager Manifests + Lazy Chunks)
+│   │   ├── storage/                          # Dexie.js v9 IndexedDB Schema & Compound Migrations
+│   │   └── ai/                               # AgenticOrchestrator, EngineRegistry (Groq, Gemini)
+│   └── ui/                                   # PRESENTATION LAYER (Apple HIG)
+│       ├── app/navigation/                   # BlockSwitcher, BlockSwitcherSheet, LeaveDialog
+│       └── features/                         # TestHub, QuestionStudio, ParserLab, Copilot
 ```
 
 ---
 
-## Quality Engineering & Verification Matrix
+## 13. Quality Engineering & Verification Matrix
 
 Quality is enforced via automated continuous testing with zero warnings or loose types:
 
 ```bash
-# Execute full Vitest suite (100% green)
+# Execute full Vitest suite (100% green across 62 test files)
 pnpm test
 
 # Run strict TypeScript compiler checks and Vite production bundle
 pnpm build
+
+# Validate curriculum pack manifests and bank integrity (TI-1..TI-9)
+pnpm blocks:validate
+
+# Enforce non-regression ratchet on hardcoded block literals
+pnpm blocks:ratchet
 ```
 
 | Verification Check | Standard | Result |
 | :--- | :--- | :--- |
-| **Unit & Integration Suite** | Vitest 3.2.7 | **30 / 30 passed (184 tests green)** |
-| **Type Integrity** | TypeScript 5.7 (`tsc -b`) | **0 errors (Strict Null Checks)** |
-| **Production Build** | Vite 6.4.5 + Rollup | **1.85s build time, clean chunks** |
+| **Unit & Integration Suite** | Vitest 3.2.7 | **62 / 62 test files passed (396 tests green)** |
+| **Type Integrity** | TypeScript 5.7 (`tsc -b`) | **0 errors (Strict Null Checks, Branded IDs)** |
+| **Production Build** | Vite 6.4.5 + Rollup | **2.32s build time, code-split dynamic chunks** |
+| **Curriculum Taxonomy Integrity** | Taxonomy Invariants TI-1..TI-9 | **0 warnings across CVS and CNS packs** |
+| **Code Hygiene Ratchet** | CI Literal Threshold $\le 130$ | **113 active literals (down from 491 baseline)** |
 | **Internationalization** | Compile-Time LSP Checks | **100% Key Parity (`en` $\leftrightarrow$ `ar`)** |
 | **Psychometric Choice Entropy** | Pearson χ² & Shannon Entropy | **χ² = 0.000, p = 1.000 (Exact 53/53/53/53)** |
 
 ---
 
-## Getting Started
+## 14. Getting Started
 
 ### Prerequisites
 - **Node.js**: `v20.x` or higher
@@ -1761,15 +1998,19 @@ pnpm install
 # Start local development server
 pnpm dev
 
-# Run test suite
+# Run full test suite
 pnpm test
 ```
 
 ---
 
-## Normative Specification & Documentation
+## 15. Normative Specification & Documentation
 
 - [BRD.md](BRD.md) — Normative Business & Engineering Requirements Document
+- [Multi-Block Curriculum Architecture Spec (SPEC-010)](specs/010-multi-block-curriculum-architecture/spec.md)
+- [Multi-Block Curriculum Port Contracts](specs/010-multi-block-curriculum-architecture/contracts/multi-block-curriculum-ports.ts)
+- [Authoring New Curriculum Blocks Guide](docs/authoring-new-curriculum-blocks.md)
+- [Multi-Stage Question Duplication Detection Engine (SPEC-009)](specs/009-question-duplication-detection-engine/spec.md)
 - [Psychometric Choice Entropy & Spatial Presentation Spec (SPEC-006)](specs/006-psychometric-choice-entropy-and-spatial-presentation/spec.md)
 - [Psychometric Choice Entropy Port Contracts](specs/006-psychometric-choice-entropy-and-spatial-presentation/contracts/choice-entropy-ports.ts)
 - [Global Question Bank & Editorial Governance Spec (SPEC-005)](specs/005-global-question-bank-governance/spec.md)
