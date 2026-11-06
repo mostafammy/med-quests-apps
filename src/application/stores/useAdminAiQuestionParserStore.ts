@@ -22,11 +22,15 @@ import { useAuthStore } from './useAuthStore.ts';
 import { useBankGovernanceStore } from './useBankGovernanceStore.ts';
 import { useQuestionStore } from './useQuestionStore.ts';
 
+import { LEGACY_DEFAULT_BLOCK_ID, type BlockId } from '../../domain/curriculum/ids.ts';
+import { compositionRoot } from '../composition/clientCompositionRoot.ts';
+
 interface AdminAiQuestionParserStoreState {
   // Input & Configuration
   rawInputText: string;
   selectedProvider: CloudProviderId;
   selectedModelId: string;
+  targetBlockId: BlockId;
   targetSubjectId: string;
   targetChapterId: string;
   stemMode: QuestionStemMode;
@@ -47,6 +51,7 @@ interface AdminAiQuestionParserStoreState {
   // Actions
   setRawInputText: (text: string) => void;
   setSelectedModel: (provider: CloudProviderId, modelId: string) => void;
+  setTargetBlockId: (blockId: BlockId) => void;
   setStemMode: (mode: QuestionStemMode) => void;
   setEnableConsensusCheck: (enable: boolean) => void;
   setTargetTaxonomy: (subjectId: string, chapterId: string) => void;
@@ -83,13 +88,13 @@ async function getMergedBankQuestions(): Promise<Question[]> {
 }
 
 /** Schema-valid copy for QDD: one malformed LLM item must never void the whole batch. */
-function toQddProbe(q: Question, bankIdSet?: Set<string>, idx = 0): Question {
-  const valid = QuestionSchema.safeParse(q).success ? q : parsingAgent.repairQuestionToSchema(q);
+function toQddProbe(q: Question, bankIdSet?: Set<string>, idx = 0, blockId: BlockId = LEGACY_DEFAULT_BLOCK_ID): Question {
+  const valid = QuestionSchema.safeParse(q).success ? q : parsingAgent.repairQuestionToSchema(q, blockId);
   const safeId = bankIdSet?.has(valid.id) ? `${valid.id}-probe-${idx + 1}` : valid.id;
   return {
     ...valid,
     id: safeId,
-    blockId: 'cvs',
+    blockId,
   };
 }
 
@@ -111,6 +116,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
   rawInputText: '',
   selectedProvider: 'gemini',
   selectedModelId: 'gemini-2.5-flash',
+  targetBlockId: LEGACY_DEFAULT_BLOCK_ID,
   targetSubjectId: 'auto',
   targetChapterId: 'auto',
   stemMode: 'verbatim',
@@ -127,10 +133,35 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
   commitFeedback: null,
   isCheckingDuplication: false,
 
-  setRawInputText: (rawInputText) => set({ rawInputText }),
+  setRawInputText: (rawInputText) => {
+    // Auto-detect target block from pasted structured JSON or content hints
+    const cnsMatch =
+      /"(?:blockId|id)"\s*:\s*"q?-(?:cns|cns-neuroscience)/i.test(rawInputText) ||
+      /"blockId"\s*:\s*"(?:cns|cns-neuroscience)"/i.test(rawInputText);
+    const cvsMatch =
+      /"(?:blockId|id)"\s*:\s*"q?-(?:cvs)/i.test(rawInputText) ||
+      /"blockId"\s*:\s*"(?:cvs|cardiovascular)"/i.test(rawInputText);
+
+    if (cnsMatch && get().targetBlockId !== 'cns') {
+      set({ rawInputText, targetBlockId: 'cns' as BlockId });
+      void get().runBatchDuplicationCheck();
+      return;
+    }
+    if (cvsMatch && get().targetBlockId !== LEGACY_DEFAULT_BLOCK_ID) {
+      set({ rawInputText, targetBlockId: LEGACY_DEFAULT_BLOCK_ID });
+      void get().runBatchDuplicationCheck();
+      return;
+    }
+    set({ rawInputText });
+  },
 
   setSelectedModel: (selectedProvider, selectedModelId) =>
     set({ selectedProvider, selectedModelId }),
+
+  setTargetBlockId: (targetBlockId: BlockId) => {
+    set({ targetBlockId, targetSubjectId: 'auto', targetChapterId: 'auto' });
+    get().runBatchDuplicationCheck();
+  },
 
   setStemMode: (stemMode) => set({ stemMode }),
 
@@ -194,12 +225,14 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
 
     try {
       const bankQuestions = await getMergedBankQuestions();
+      const currentBlockId = get().targetBlockId || LEGACY_DEFAULT_BLOCK_ID;
 
       const result = await parsingAgent.parseRawQuestions(
         {
           rawText: rawInputText,
           providerId: selectedProvider,
           modelId: selectedModelId,
+          targetBlockId: currentBlockId,
           stemMode,
           enableConsensusCheck,
           existingQuestions: bankQuestions,
@@ -217,6 +250,12 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
           error: 'Could not extract valid question structure from input. Check format and try again.',
         });
         return;
+      }
+
+      // Automatically synchronize targetBlockId if parsed questions belong to a detected block
+      const detectedBlockId = result.items[0]?.question?.blockId;
+      if (detectedBlockId && detectedBlockId !== currentBlockId) {
+        set({ targetBlockId: detectedBlockId as BlockId });
       }
 
       // Pre-select ONLY safe non-duplicate questions by default (Stage 06 verdicts are already attached)
@@ -269,16 +308,17 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
 
     const bankQuestions = await getMergedBankQuestions();
     const bankIdSet = new Set(bankQuestions.map((q) => q.id));
+    const targetBlockId = get().targetBlockId || LEGACY_DEFAULT_BLOCK_ID;
 
     let edgeVerdicts: any[] = [];
     try {
-      const questionsPayload = parsedQuestions.map((q, idx) => toQddProbe(q.question, bankIdSet, idx));
+      const questionsPayload = parsedQuestions.map((q, idx) => toQddProbe(q.question, bankIdSet, idx, targetBlockId));
       const res = await fetch('/api/qdd/check-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           questions: questionsPayload,
-          scope: { kind: 'block', blockId: 'cvs' },
+          scope: { kind: 'block', blockId: targetBlockId },
         }),
       });
 
@@ -296,8 +336,8 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
     try {
       const engine = await createClientQddEngine(bankQuestions);
       const current = get().parsedQuestions;
-      const questionsPayload = current.map((q, idx) => toQddProbe(q.question, bankIdSet, idx));
-      const res = await engine.checkBatch(questionsPayload, { kind: 'block', blockId: 'cvs' });
+      const questionsPayload = current.map((q, idx) => toQddProbe(q.question, bankIdSet, idx, targetBlockId));
+      const res = await engine.checkBatch(questionsPayload, { kind: 'block', blockId: targetBlockId });
       if (!res.ok) {
         console.error('[useAdminAiQuestionParserStore] QDD batch rejected input:', res.error);
       }
@@ -459,7 +499,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       });
 
       if (res.ok) {
-        await useBankGovernanceStore.getState().loadGovernanceData('cvs');
+        await useBankGovernanceStore.getState().loadGovernanceData(get().targetBlockId || LEGACY_DEFAULT_BLOCK_ID);
 
         const routedIds = new Set(itemsToRoute.map((i) => i.tempId));
         const remaining = parsedQuestions.filter((item) => !routedIds.has(item.tempId));
@@ -610,8 +650,15 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
     const subjObj = subjects.find((s) => s.id === subjectId);
     const chapObj = chapters.find((c) => c.id === chapterId);
 
+    const targetBlockId = get().targetBlockId || ('cvs' as BlockId);
+    const pack = compositionRoot.catalog.get(targetBlockId);
+    const blockName = pack
+      ? `${pack.manifest.block.name.en} (${pack.manifest.block.shortName}) - ${pack.manifest.block.code}`
+      : 'Cardiovascular System (CVS) - Block 206';
+
     const updatedQ: Question = {
       ...questions[index].question,
+      blockId: targetBlockId,
       subjectId,
       chapterId,
       topicId: `${chapterId}/core-concepts`,
@@ -621,8 +668,8 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       ...questions[index],
       question: updatedQ,
       taxonomyClassification: {
-        blockId: 'cvs',
-        blockName: 'Cardiovascular System (CVS) - Block 206',
+        blockId: targetBlockId,
+        blockName,
         subjectId,
         subjectName: subjObj?.name || subjectId,
         chapterId,
@@ -783,7 +830,8 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
         } catch {
           // Ignore IndexedDB write error in non-browser environment
         }
-        await useQuestionStore.getState().loadQuestions('cvs');
+        const commitBlockId = (itemsToCommit[0]?.question?.blockId || get().targetBlockId || 'cvs') as BlockId;
+        await useQuestionStore.getState().loadQuestions(commitBlockId);
 
         // Clear committed items from list
         const remaining = parsedQuestions.filter(
