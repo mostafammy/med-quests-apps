@@ -1,0 +1,629 @@
+{
+  "schemaVersion": 1,
+  "block": {
+    "id": "cvs",
+    "code": "Block 206",
+    "name": {
+      "en": "Cardiovascular System",
+      "ar": "الجهاز القلبي الوعائي"
+    },
+    "shortName": "CVS",
+    "description": {
+      "en": "Integrated Cardiovascular Block: Anatomy, Embryology, Histology, Microbiology & Physiology",
+      "ar": "مجمع الجهاز القلبي الوعائي: التشريح، الأجنة، الهستولوجيا، الميكروبيولوجيا والفسيولوجيا"
+    },
+    "status": "published",
+    "catalogOrder": 1,
+    "presentation": {
+      "glyph": "heart",
+      "accent": "rose"
+    },
+    "aiProfileId": "cvs-faculty-v1"
+  },
+  "subjects": [
+    {
+      "id": "anatomy",
+      "name": {
+        "en": "CVS Anatomy & Embryology",
+        "ar": "تشريح وأجنة الجهاز القلبي الوعائي"
+      },
+      "order": 1
+    },
+    {
+      "id": "histology",
+      "name": {
+        "en": "CVS Histology",
+        "ar": "هستولوجيا الجهاز القلبي الوعائي"
+      },
+      "order": 2
+    },
+    {
+      "id": "microbiology",
+      "name": {
+        "en": "CVS Microbiology",
+        "ar": "ميكروبيولوجيا الجهاز القلبي الوعائي"
+      },
+      "order": 3
+    },
+    {
+      "id": "physiology",
+      "name": {
+        "en": "CVS Physiology",
+        "ar": "فسيولوجيا الجهاز القلبي الوعائي"
+      },
+      "order": 4
+    }
+  ],
+  "chapters": [
+    {
+      "id": "cvs-ana-heart-mediastinum",
+      "subjectId": "anatomy",
+      "name": {
+        "en": "Heart & Mediastinum",
+        "ar": "القلب والمنصف"
+      },
+      "order": 1,
+      "sourceIds": ["SRC-CVS-ANA-01"]
+    },
+    {
+      "id": "cvs-ana-heart-dev",
+      "subjectId": "anatomy",
+      "name": {
+        "en": "Development of the Heart",
+        "ar": "تطور القلب والتشوهات الخلقية"
+      },
+      "order": 2,
+      "sourceIds": ["SRC-CVS-ANA-02"]
+    },
+    {
+      "id": "cvs-ana-fetal-circ-bv",
+      "subjectId": "anatomy",
+      "name": {
+        "en": "Fetal Circulation & Vascular Development",
+        "ar": "الدورة الدموية الجنينية وتطور الأوعية"
+      },
+      "order": 3,
+      "sourceIds": ["SRC-CVS-ANA-03"]
+    },
+    {
+      "id": "cvs-his-heart",
+      "subjectId": "histology",
+      "name": {
+        "en": "Histology of the Heart (L3)",
+        "ar": "هستولوجيا جدار القلب والألياف التوصيلية"
+      },
+      "order": 4,
+      "sourceIds": ["SRC-CVS-HIS-01"]
+    },
+    {
+      "id": "cvs-his-blood-vessels",
+      "subjectId": "histology",
+      "name": {
+        "en": "Histology of Blood Vessels (L24 & L25)",
+        "ar": "هستولوجيا الأوعية الدموية والشعيرات"
+      },
+      "order": 5,
+      "sourceIds": ["SRC-CVS-HIS-02"]
+    },
+    {
+      "id": "cvs-mic-rheumatic-fever",
+      "subjectId": "microbiology",
+      "name": {
+        "en": "Rheumatic Fever (L1)",
+        "ar": "الحمى الروماتيزمية ومعايير جونز"
+      },
+      "order": 6,
+      "sourceIds": ["SRC-CVS-MIC-01"]
+    },
+    {
+      "id": "cvs-mic-infective-endocarditis",
+      "subjectId": "microbiology",
+      "name": {
+        "en": "Infective Endocarditis (L2)",
+        "ar": "التهاب الشغاف العدوائي ومعايير ديوك"
+      },
+      "order": 7,
+      "sourceIds": ["SRC-CVS-MIC-01"]
+    },
+    {
+      "id": "cvs-mic-viral-myocarditis",
+      "subjectId": "microbiology",
+      "name": {
+        "en": "Viral Myocarditis (L3)",
+        "ar": "التهاب عضلة القلب الفيروسي"
+      },
+      "order": 8,
+      "sourceIds": ["SRC-CVS-MIC-01"]
+    },
+    {
+      "id": "cvs-phy-electrophysiology",
+      "subjectId": "physiology",
+      "name": {
+        "en": "Cardiac Electrophysiology & Conduction",
+        "ar": "كهروفسيولوجيا القلب وجهاز التوصيل"
+      },
+      "order": 9,
+      "sourceIds": ["SRC-CVS-PHY-01"]
+    },
+    {
+      "id": "cvs-phy-cardiac-cycle",
+      "subjectId": "physiology",
+      "name": {
+        "en": "Cardiac Cycle, Valve Dynamics & Heart Sounds",
+        "ar": "الدورة القلبية، ديناميكا الصمامات وأصوات القلب"
+      },
+      "order": 10,
+      "sourceIds": ["SRC-CVS-PHY-01"]
+    },
+    {
+      "id": "cvs-phy-hemodynamics-bp",
+      "subjectId": "physiology",
+      "name": {
+        "en": "Hemodynamics, Reflexes & Blood Pressure Regulation",
+        "ar": "الديناميكا الدموية، المنعكسات وضغط الدم"
+      },
+      "order": 11,
+      "sourceIds": ["SRC-CVS-PHY-01"]
+    }
+  ],
+  "topics": [
+    {
+      "id": "cvs-ana-pericardium",
+      "chapterId": "cvs-ana-heart-mediastinum",
+      "name": {
+        "en": "Pericardium & Sinuses",
+        "ar": "التامور والجيوب التامورية"
+      },
+      "order": 1
+    },
+    {
+      "id": "cvs-ana-chambers-ra-rv",
+      "chapterId": "cvs-ana-heart-mediastinum",
+      "name": {
+        "en": "Right Atrium & Right Ventricle",
+        "ar": "الأذين الأيمن والبطين الأيمن"
+      },
+      "order": 2
+    },
+    {
+      "id": "cvs-ana-chambers-la-lv",
+      "chapterId": "cvs-ana-heart-mediastinum",
+      "name": {
+        "en": "Left Atrium & Left Ventricle",
+        "ar": "الأذين الأيسر والبطين الأيسر"
+      },
+      "order": 3
+    },
+    {
+      "id": "cvs-ana-valves",
+      "chapterId": "cvs-ana-heart-mediastinum",
+      "name": {
+        "en": "Cardiac Valves & Fibrous Skeleton",
+        "ar": "صمامات القلب والهيكل الليفي"
+      },
+      "order": 4
+    },
+    {
+      "id": "cvs-ana-coronary-circulation",
+      "chapterId": "cvs-ana-heart-mediastinum",
+      "name": {
+        "en": "Coronary Arteries & Cardiac Veins",
+        "ar": "الشرايين التاجية والأوردة القلبية"
+      },
+      "order": 5
+    },
+    {
+      "id": "cvs-ana-conducting-system",
+      "chapterId": "cvs-ana-heart-mediastinum",
+      "name": {
+        "en": "Conducting System & Innervation",
+        "ar": "جهاز التوصيل والتعصيب القلبي"
+      },
+      "order": 6
+    },
+    {
+      "id": "cvs-ana-great-vessels",
+      "chapterId": "cvs-ana-heart-mediastinum",
+      "name": {
+        "en": "Great Vessels, Azygos & Thoracic Duct",
+        "ar": "الأوعية الكبرى، الوريد الفرد والقناة الصدرية"
+      },
+      "order": 7
+    },
+    {
+      "id": "cvs-ana-mediastinum-nerves",
+      "chapterId": "cvs-ana-heart-mediastinum",
+      "name": {
+        "en": "Mediastinal Nerves (Phrenic, Vagus, Sympathetic)",
+        "ar": "أعصاب المنصف (الحجابي، المبهم والودي)"
+      },
+      "order": 8
+    },
+    {
+      "id": "cvs-ana-heart-tube-folding",
+      "chapterId": "cvs-ana-heart-dev",
+      "name": {
+        "en": "Cardiogenic Area & Heart Tube Looping",
+        "ar": "المنطقة المولدة للقلب والتواء الأنبوب القلبي"
+      },
+      "order": 9
+    },
+    {
+      "id": "cvs-ana-atrial-septation",
+      "chapterId": "cvs-ana-heart-dev",
+      "name": {
+        "en": "Atrial Septation & Sinus Venosus",
+        "ar": "تشكل الحاجز الأذيني وتطور الجيب الوريدي"
+      },
+      "order": 10
+    },
+    {
+      "id": "cvs-ana-ventricular-septation",
+      "chapterId": "cvs-ana-heart-dev",
+      "name": {
+        "en": "Interventricular & Bulbus Cordis Septation",
+        "ar": "تشكل الحاجز بين البطينين والبصلة القلبية"
+      },
+      "order": 11
+    },
+    {
+      "id": "cvs-ana-great-arteries-dev",
+      "chapterId": "cvs-ana-heart-dev",
+      "name": {
+        "en": "Truncus Partitioning & Semilunar Valves",
+        "ar": "انقسام الجذع الشرياني والصمامات الهلالية"
+      },
+      "order": 12
+    },
+    {
+      "id": "cvs-ana-congenital-heart-anomalies",
+      "chapterId": "cvs-ana-heart-dev",
+      "name": {
+        "en": "Congenital Anomalies (ASD, VSD, TGA, Fallot)",
+        "ar": "التشوهات الخلقية (ASD, VSD, TGA, Fallot)"
+      },
+      "order": 13
+    },
+    {
+      "id": "cvs-ana-aortic-arches",
+      "chapterId": "cvs-ana-fetal-circ-bv",
+      "name": {
+        "en": "Aortic Arches Derivatives & Anomalies",
+        "ar": "مشتقات الأقواس الأبهرية وتشوهاتها"
+      },
+      "order": 14
+    },
+    {
+      "id": "cvs-ana-veins-dev",
+      "chapterId": "cvs-ana-fetal-circ-bv",
+      "name": {
+        "en": "Cardinal, Vitelline & Umbilical Veins (SVC/IVC)",
+        "ar": "الأوردة الأصلية، المحية والسرية"
+      },
+      "order": 15
+    },
+    {
+      "id": "cvs-ana-fetal-circulation-shunts",
+      "chapterId": "cvs-ana-fetal-circ-bv",
+      "name": {
+        "en": "Fetal Shunts & Circulatory Changes at Birth",
+        "ar": "التحويلات الجنينية وتغيرات الدورة عند الولادة"
+      },
+      "order": 16
+    },
+    {
+      "id": "cvs-his-heart-wall-layers",
+      "chapterId": "cvs-his-heart",
+      "name": {
+        "en": "Endocardium, Myocardium & Epicardium",
+        "ar": "الشغاف، عضلة القلب والنخاب"
+      },
+      "order": 17
+    },
+    {
+      "id": "cvs-his-purkinje-conduction",
+      "chapterId": "cvs-his-heart",
+      "name": {
+        "en": "Purkinje Fibres & Intercalated Discs",
+        "ar": "ألياف بركنجي والأقراص البينية"
+      },
+      "order": 18
+    },
+    {
+      "id": "cvs-his-cardiac-skeleton-valves",
+      "chapterId": "cvs-his-heart",
+      "name": {
+        "en": "Cardiac Skeleton & Valve Histology",
+        "ar": "هيكل القلب الليفي وهستولوجيا الصمامات"
+      },
+      "order": 19
+    },
+    {
+      "id": "cvs-his-vessel-layers",
+      "chapterId": "cvs-his-blood-vessels",
+      "name": {
+        "en": "Tunica Intima, Media & Adventitia",
+        "ar": "الغلالة الباطنة، المتوسطة والبرانية"
+      },
+      "order": 20
+    },
+    {
+      "id": "cvs-his-elastic-muscular-arteries",
+      "chapterId": "cvs-his-blood-vessels",
+      "name": {
+        "en": "Elastic Arteries, Muscular Arteries & Veins",
+        "ar": "الشرايين المرنة، الشرايين العضلية والأوردة"
+      },
+      "order": 21
+    },
+    {
+      "id": "cvs-his-capillaries-endothelium",
+      "chapterId": "cvs-his-blood-vessels",
+      "name": {
+        "en": "Capillary Types & Endothelial Functions",
+        "ar": "أنواع الشعيرات الدموية ووظائف البطانة"
+      },
+      "order": 22
+    },
+    {
+      "id": "cvs-his-specialized-vessels",
+      "chapterId": "cvs-his-blood-vessels",
+      "name": {
+        "en": "Carotid Sinus, Carotid Body & Umbilical Vessels",
+        "ar": "الجيب السباتي، الجسم السباتي والأوعية السرية"
+      },
+      "order": 23
+    },
+    {
+      "id": "cvs-mic-rf-etiology-mimicry",
+      "chapterId": "cvs-mic-rheumatic-fever",
+      "name": {
+        "en": "GAS, M Protein & Molecular Mimicry",
+        "ar": "المكورات العقدية، بروتين M والمحاكاة الجزيئية"
+      },
+      "order": 24
+    },
+    {
+      "id": "cvs-mic-rf-jones-criteria",
+      "chapterId": "cvs-mic-rheumatic-fever",
+      "name": {
+        "en": "Clinical Features, Pancarditis & JONES Criteria",
+        "ar": "المظاهر السريرية، التهاب القلب الشامل ومعايير جونز"
+      },
+      "order": 25
+    },
+    {
+      "id": "cvs-mic-rf-diagnosis-prevention",
+      "chapterId": "cvs-mic-rheumatic-fever",
+      "name": {
+        "en": "Diagnosis (ASO) & Secondary Prophylaxis",
+        "ar": "التشخيص (ASO) والوقاية الثانوية"
+      },
+      "order": 26
+    },
+    {
+      "id": "cvs-mic-ie-pathogens",
+      "chapterId": "cvs-mic-infective-endocarditis",
+      "name": {
+        "en": "Microbial Etiology (Viridans, S. aureus, Enterococci)",
+        "ar": "المسببات الميكروبية لالتهاب الشغاف"
+      },
+      "order": 27
+    },
+    {
+      "id": "cvs-mic-ie-pathogenesis-lesions",
+      "chapterId": "cvs-mic-infective-endocarditis",
+      "name": {
+        "en": "Vegetations, Duke Criteria & Peripheral Stigmata",
+        "ar": "التنبتات، معايير ديوك والعلامات المحيطية"
+      },
+      "order": 28
+    },
+    {
+      "id": "cvs-mic-myocarditis-causes",
+      "chapterId": "cvs-mic-viral-myocarditis",
+      "name": {
+        "en": "Viral Pathogens (Coxsackie B, Adenovirus, Parvo B19)",
+        "ar": "الفيروسات المسببة لالتهاب العضلة القلبية"
+      },
+      "order": 29
+    },
+    {
+      "id": "cvs-mic-myocarditis-clinic-diag",
+      "chapterId": "cvs-mic-viral-myocarditis",
+      "name": {
+        "en": "Pathology, Cardiac Enzymes & Clinical Presentation",
+        "ar": "الباثولوجيا، الإنزيمات القلبية والعرض السريري"
+      },
+      "order": 30
+    },
+    {
+      "id": "cvs-phy-conduction-system",
+      "chapterId": "cvs-phy-electrophysiology",
+      "name": {
+        "en": "Conduction System, Pacemaker Hierarchy & Autonomic Control",
+        "ar": "جهاز التوصيل، تسلسل النواظم والتحكم الذاتي"
+      },
+      "order": 31
+    },
+    {
+      "id": "cvs-phy-action-potentials",
+      "chapterId": "cvs-phy-electrophysiology",
+      "name": {
+        "en": "Ventricular & Nodal Action Potentials (Phases 0-4)",
+        "ar": "جهد الفعل العضلي والعقدي (الأطوار 0-4)"
+      },
+      "order": 32
+    },
+    {
+      "id": "cvs-phy-ionic-currents",
+      "chapterId": "cvs-phy-electrophysiology",
+      "name": {
+        "en": "Ion Channels, Refractory Periods & Antiarrhythmic Targets",
+        "ar": "القنوات الأيونية، فترات الحِران ومستهدفات الأدوية"
+      },
+      "order": 33
+    },
+    {
+      "id": "cvs-phy-cycle-phases",
+      "chapterId": "cvs-phy-cardiac-cycle",
+      "name": {
+        "en": "Cardiac Cycle Phases, Pressures & Ventricular Volumes",
+        "ar": "أطوار الدورة القلبية، الضغوط وأحجام البطين"
+      },
+      "order": 34
+    },
+    {
+      "id": "cvs-phy-heart-sounds",
+      "chapterId": "cvs-phy-cardiac-cycle",
+      "name": {
+        "en": "Heart Sounds (S1, S2, S3, S4) & Valvular Correlation",
+        "ar": "أصوات القلب (S1, S2, S3, S4) والارتباط الصمامي"
+      },
+      "order": 35
+    },
+    {
+      "id": "cvs-phy-chambers-valves",
+      "chapterId": "cvs-phy-cardiac-cycle",
+      "name": {
+        "en": "Cardiac Chamber Flow, Septation & Valvular Gating",
+        "ar": "تدفق الحجرات القلبية وبوابات الصمامات"
+      },
+      "order": 36
+    },
+    {
+      "id": "cvs-phy-arterial-venous-hemodynamics",
+      "chapterId": "cvs-phy-hemodynamics-bp",
+      "name": {
+        "en": "Arterial vs. Venous Hemodynamics, Resistance & Capacitance",
+        "ar": "الديناميكا الشريانية والوريدية، المقاومة والسعة"
+      },
+      "order": 37
+    },
+    {
+      "id": "cvs-phy-baroreceptor-reflex",
+      "chapterId": "cvs-phy-hemodynamics-bp",
+      "name": {
+        "en": "Baroreceptor Reflex & Autonomic Hemorrhage Responses",
+        "ar": "منعكس المستقبلات الضغطية واستجابات النزف"
+      },
+      "order": 38
+    },
+    {
+      "id": "cvs-phy-raas-endocrine-bp",
+      "chapterId": "cvs-phy-hemodynamics-bp",
+      "name": {
+        "en": "RAAS, Juxtaglomerular Renin, ADH & ANP Regulation",
+        "ar": "نظام الرينين-أنجيوتنسين وتنظيم ضغط الدم"
+      },
+      "order": 39
+    }
+  ],
+  "sources": [
+    {
+      "id": "SRC-CVS-ANA-01",
+      "subjectId": "anatomy",
+      "title": {
+        "en": "2nd Year CVS Anatomy of Heart and Mediastinum Handout",
+        "ar": "مذكرة تشريح القلب والمنصف - السنة الثانية"
+      },
+      "fileName": "2nd year cvs anatomy of heart and mediastnum hanout.pdf",
+      "format": "PDF",
+      "extent": {
+        "unit": "pages",
+        "count": 49
+      },
+      "highlights": ["Heart & Mediastinum", "Pericardium", "Chambers", "Coronary Vessels"]
+    },
+    {
+      "id": "SRC-CVS-ANA-02",
+      "subjectId": "anatomy",
+      "title": {
+        "en": "Development of the Heart & Congenital Anomalies",
+        "ar": "تطور القلب والتشوهات الخلقية"
+      },
+      "fileName": "Development of the heart.pdf",
+      "format": "PDF",
+      "extent": {
+        "unit": "pages",
+        "count": 16
+      },
+      "highlights": ["Cardiac Looping", "Atrial Septation", "ASDs & VSDs", "TGA"]
+    },
+    {
+      "id": "SRC-CVS-ANA-03",
+      "subjectId": "anatomy",
+      "title": {
+        "en": "Fetal Circulation and Blood Vessel Development",
+        "ar": "الدورة الدموية الجنينية وتطور الأوعية الدموية"
+      },
+      "fileName": "Fetal cirulation and BV development.pdf",
+      "format": "PDF",
+      "extent": {
+        "unit": "pages",
+        "count": 16
+      },
+      "highlights": ["Aortic Arches", "Cardinal Veins", "Fetal Shunts"]
+    },
+    {
+      "id": "SRC-CVS-HIS-01",
+      "subjectId": "histology",
+      "title": {
+        "en": "Histology of Cardiovascular System (Lecture 3)",
+        "ar": "هستولوجيا الجهاز القلبي الوعائي (المحاضرة 3)"
+      },
+      "fileName": "3- HISTOLOGY OF CVS ppt (1).pptx",
+      "format": "PPTX",
+      "extent": {
+        "unit": "slides",
+        "count": 16
+      },
+      "highlights": ["Heart Wall Layers", "Purkinje Fibres", "Intercalated Discs"]
+    },
+    {
+      "id": "SRC-CVS-HIS-02",
+      "subjectId": "histology",
+      "title": {
+        "en": "Histology of the Blood Vessels (Lectures 24 & 25)",
+        "ar": "هستولوجيا الأوعية الدموية (المحاضرتان 24 و 25)"
+      },
+      "fileName": "Histology of  the blood vessels 24&25.pptx",
+      "format": "PPTX",
+      "extent": {
+        "unit": "slides",
+        "count": 30
+      },
+      "highlights": ["Tunica Layers", "Capillaries", "Carotid Sinus/Body"]
+    },
+    {
+      "id": "SRC-CVS-MIC-01",
+      "subjectId": "microbiology",
+      "title": {
+        "en": "Handout CVS Microbiology: Rheumatic Fever, IE & Myocarditis",
+        "ar": "مذكرة ميكروبيولوجيا الجهاز القلبي الوعائي"
+      },
+      "fileName": "handout CVS microbiology.docx",
+      "format": "DOCX",
+      "extent": {
+        "unit": "lectures",
+        "count": 3
+      },
+      "highlights": ["GAS & Molecular Mimicry", "JONES Criteria", "Duke Criteria"]
+    },
+    {
+      "id": "SRC-CVS-PHY-01",
+      "subjectId": "physiology",
+      "title": {
+        "en": "CVS Physiology & Hemodynamics Self-Assessment Guide",
+        "ar": "دليل التقييم الذاتي لفسيولوجيا القلب والديناميكا الدموية"
+      },
+      "fileName": "CVS Self-Assessment Curriculum Guide.pdf",
+      "format": "PDF",
+      "extent": {
+        "unit": "pages",
+        "count": 24
+      },
+      "highlights": ["Cardiac Electrophysiology", "Cardiac Cycle & Heart Sounds", "Hemodynamics & BP Regulation"]
+    }
+  ]
+}
