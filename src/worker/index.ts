@@ -12,12 +12,13 @@ import type {
 import { QuestionCanonicalHasher } from '../domain/questionBank/canonicalHasher.ts';
 import { computeGlobalBankKpis } from '../domain/questionBank/questionSpecifications.ts';
 import { QuestionSchema } from '../domain/model/types.ts';
-import defaultCvsBank from '../../content/cvs/dist/bank.v1.json';
 import type { Question } from '../domain/model/types.ts';
 import type { GovernedQuestion } from '../../specs/005-global-question-bank-governance/contracts/question-bank-governance-ports.ts';
 import { EdgeObservabilitySnapshotBuilder } from '../domain/observability/edgeObservabilityEngine.ts';
 import { handleQddRoutes } from './routes/qdd.ts';
 import { createWorkerQddEngine, upsertQuestionFingerprintToD1 } from './qdd/compositionRoot.ts';
+import { EdgeBlockGuard, type EdgeBlockD1Row } from './curriculum/EdgeBlockGuard.ts';
+import { WorkerSeedBankRegistry } from './curriculum/WorkerSeedBankRegistry.ts';
 
 export interface Env {
   CLOUDFLARE_API_TOKEN?: string;
@@ -152,6 +153,82 @@ export default {
     if (url.pathname.startsWith('/api/qdd')) {
       const qddRes = await handleQddRoutes(request, env, url);
       if (qddRes) return qddRes;
+    }
+
+    // Multi-Block Curriculum Catalog Route (/api/v1/blocks and /api/blocks)
+    if ((url.pathname === '/api/v1/blocks' || url.pathname === '/api/blocks') && request.method === 'GET') {
+      const viewerRole = (request.headers.get('x-user-role') || 'student-pro') as string;
+      try {
+        let rows: { results: EdgeBlockD1Row[] } = { results: [] };
+        if (env.MED_QUESTS_DB) {
+          rows = await env.MED_QUESTS_DB
+            .prepare(
+              'SELECT id, code, short_name, name_en, name_ar, status, catalog_order, manifest_hash, updated_at FROM curriculum_blocks ORDER BY catalog_order ASC'
+            )
+            .all<EdgeBlockD1Row>();
+        }
+
+        let blocks = rows?.results || [];
+        if (blocks.length === 0) {
+          blocks = [
+            {
+              id: 'cvs',
+              code: 'Block 206',
+              short_name: 'CVS',
+              name_en: 'Cardiovascular System',
+              name_ar: 'الجهاز القلبي الوعائي',
+              status: 'published',
+              catalog_order: 1,
+              manifest_hash: 'initial',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+            {
+              id: 'cns',
+              code: 'Block 207',
+              short_name: 'CNS',
+              name_en: 'Central Nervous System',
+              name_ar: 'الجهاز العصبي المركزي',
+              status: 'beta',
+              catalog_order: 2,
+              manifest_hash: 'initial',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          ] as any;
+        }
+
+        // Apply role-based visibility filtering (FR-050 / INV-5)
+        const isPrivileged = viewerRole === 'admin' || viewerRole === 'faculty-reviewer';
+        const filteredBlocks = isPrivileged
+          ? blocks
+          : blocks.filter((b) => b.status === 'published');
+
+        return new Response(JSON.stringify({ blocks: filteredBlocks }), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=300, stale-while-revalidate=60',
+          },
+        });
+      } catch {
+        return new Response(
+          JSON.stringify({
+            blocks: [
+              {
+                id: 'cvs',
+                code: 'Block 206',
+                short_name: 'CVS',
+                name_en: 'Cardiovascular System',
+                name_ar: 'الجهاز القلبي الوعائي',
+                status: 'published',
+                catalog_order: 1,
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Edge AI Inference Gateway (/api/ai/chat) via Cloudflare Workers AI
@@ -1243,8 +1320,14 @@ export default {
     }
 
     // 7. Global Question Bank: Downstream Delta-Sync (Read-Only)
-    if (url.pathname === '/api/bank/sync' && request.method === 'GET') {
-      const blockId = url.searchParams.get('block') || 'cvs';
+    if ((url.pathname === '/api/bank/sync' || url.pathname === '/api/v1/bank/sync') && request.method === 'GET') {
+      const rawBlock = url.searchParams.get('block');
+      const edgeBlockGuard = new EdgeBlockGuard(env.MED_QUESTS_DB);
+      const blockCheck = await edgeBlockGuard.requireKnownBlock(rawBlock);
+      if (!blockCheck.ok) {
+        return blockCheck.response;
+      }
+      const blockId = blockCheck.blockId;
       const sinceRev = Number(url.searchParams.get('sinceRev') || 0);
       const offset = Math.max(0, Number(url.searchParams.get('offset') || 0));
 
@@ -1269,7 +1352,7 @@ export default {
       // Lightweight periodic probe: revision + canonical count only (no question payloads).
       // This keeps the 60s background pulse / window-focus check cheap on mobile data.
       if (url.searchParams.get('probe') === '1') {
-        let canonicalCount = blockId === 'cvs' ? buildDefaultSeededBank().length : 0;
+        let canonicalCount = WorkerSeedBankRegistry.getSeedQuestions(blockId).length;
         if (env.MED_QUESTS_DB) {
           try {
             const countRow = await env.MED_QUESTS_DB.prepare(
@@ -1355,9 +1438,9 @@ export default {
         }
       }
 
-      // If D1 returned 0 rows on full reset (sinceRev === 0) for cvs, fallback to bundled seed
-      if (upserted.length === 0 && sinceRev === 0 && offset === 0 && blockId === 'cvs') {
-        upserted = buildDefaultSeededBank();
+      // If D1 returned 0 rows on full reset (sinceRev === 0), fallback to bundled seed for block
+      if (upserted.length === 0 && sinceRev === 0 && offset === 0) {
+        upserted = buildDefaultSeededBank(blockId);
       }
 
       return new Response(
@@ -1386,7 +1469,10 @@ export default {
     }
 
     // 8. Global Question Bank: Author Submission Queue
-    if (url.pathname === '/api/bank/submissions' && request.method === 'POST') {
+    if (
+      (url.pathname === '/api/bank/submissions' || url.pathname === '/api/v1/bank/submissions') &&
+      request.method === 'POST'
+    ) {
       const payload = (await request.json()) as any;
       const { questions, authorId, authorDisplayName, authorRole } = payload;
 
@@ -1400,6 +1486,16 @@ export default {
       const validation = validateQuestionBatch(questions, 20);
       if (!validation.ok) return validation.response;
       const validatedQuestions = validation.questions;
+
+      const targetBlockId = (url.searchParams.get('block') || validatedQuestions[0]?.blockId || 'cvs') as string;
+      const edgeBlockGuard = new EdgeBlockGuard(env.MED_QUESTS_DB);
+      const writeCheck = await edgeBlockGuard.requireWritableBlock(
+        targetBlockId as any,
+        (authorRole as any) || 'faculty-reviewer'
+      );
+      if (!writeCheck.ok) {
+        return writeCheck.response;
+      }
 
       const tickets: any[] = [];
       const duplicateQuestionIds: string[] = [];
@@ -1805,8 +1901,19 @@ export default {
     }
 
     // 11. Author: List My Submissions
-    if (url.pathname === '/api/bank/submissions/my' && request.method === 'GET') {
+    if (
+      (url.pathname === '/api/bank/submissions/my' || url.pathname === '/api/v1/bank/submissions/my') &&
+      request.method === 'GET'
+    ) {
       const authorId = url.searchParams.get('authorId');
+      const rawBlock = url.searchParams.get('block');
+      if (rawBlock) {
+        const edgeBlockGuard = new EdgeBlockGuard(env.MED_QUESTS_DB);
+        const blockCheck = await edgeBlockGuard.requireKnownBlock(rawBlock);
+        if (!blockCheck.ok) {
+          return blockCheck.response;
+        }
+      }
       let results: any[] = [];
 
       if (env.MED_QUESTS_DB && authorId) {
@@ -2470,11 +2577,13 @@ export default {
   },
 };
 
-function buildDefaultSeededBank(): GovernedQuestion[] {
-  if (!Array.isArray(defaultCvsBank)) return [];
+function buildDefaultSeededBank(blockId: string = 'cvs'): GovernedQuestion[] {
+  const seedQuestions = WorkerSeedBankRegistry.getSeedQuestions(blockId);
+  if (!Array.isArray(seedQuestions) || seedQuestions.length === 0) return [];
   const nowIso = new Date().toISOString();
-  return (defaultCvsBank as Question[]).map((q) => ({
+  return (seedQuestions as Question[]).map((q) => ({
     ...q,
+    blockId: q.blockId || (blockId as any),
     provenanceScope: 'global-canonical',
     editorialStatus: 'published',
     stemHash: QuestionCanonicalHasher.computeStemHashSync(q.stem),
@@ -2553,9 +2662,10 @@ async function ensureGlobalBankSeeded(
   db: NonNullable<Env['MED_QUESTS_DB']>,
   blockId: string
 ): Promise<void> {
-  if (blockId !== 'cvs' || !Array.isArray(defaultCvsBank)) return;
+  const seedQuestions = WorkerSeedBankRegistry.getSeedQuestions(blockId);
+  if (!Array.isArray(seedQuestions) || seedQuestions.length === 0) return;
 
-  const seeded = buildDefaultSeededBank();
+  const seeded = buildDefaultSeededBank(blockId);
   if (seeded.length === 0) return;
 
   // Idempotent seed reconciliation: insert missing seeds and reconcile rebalanced bankVersion
