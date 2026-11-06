@@ -8,7 +8,7 @@
  * Layer: UI / Features / QDD
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AlertTriangle,
   Play,
@@ -25,6 +25,8 @@ import type {
 } from '../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
 import { ClientQddAuditRunner } from '../../../domain/questionBank/duplication/ClientQddAuditRunner.ts';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
+import { compositionRoot } from '../../../application/composition/clientCompositionRoot.ts';
+import type { BlockId } from '../../../domain/curriculum/ids.ts';
 import defaultCvsBank from '../../../../content/cvs/dist/bank.v1.json';
 import type { Question } from '../../../domain/model/types.ts';
 
@@ -43,6 +45,14 @@ export const QddAuditBoard: React.FC<QddAuditBoardProps> = ({
   const [isResolving, setIsResolving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [inspectPair, setInspectPair] = useState<{ subjectId: string; matchedId: string } | null>(null);
+
+  // Clear stale state whenever block changes
+  useEffect(() => {
+    setActiveJob(null);
+    setClusters([]);
+    setFeedback(null);
+    setInspectPair(null);
+  }, [blockId]);
 
   // Poll or advance chunks when running
   const startAudit = async () => {
@@ -95,12 +105,20 @@ export const QddAuditBoard: React.FC<QddAuditBoardProps> = ({
     // 2. Seamless local-first in-browser fallback
     try {
       const storeQuestions = useQuestionStore.getState().questions;
-      const candidateQuestions: readonly Question[] =
-        storeQuestions.length > 0
-          ? storeQuestions
-          : Array.isArray(defaultCvsBank)
-          ? (defaultCvsBank as Question[])
-          : [];
+      let candidateQuestions: readonly Question[] = storeQuestions.filter(
+        (q) => (q.blockId || 'cvs') === blockId
+      );
+
+      if (candidateQuestions.length === 0) {
+        try {
+          const loaded = await compositionRoot.packSource.loadBank(blockId as BlockId);
+          candidateQuestions = loaded as Question[];
+        } catch {
+          if (Array.isArray(defaultCvsBank) && blockId === 'cvs') {
+            candidateQuestions = defaultCvsBank as Question[];
+          }
+        }
+      }
 
       const runner = new ClientQddAuditRunner();
       const result = await runner.runAudit(
@@ -327,15 +345,17 @@ export const QddAuditBoard: React.FC<QddAuditBoardProps> = ({
       {/* Comparison Modal when Inspecting a Pair */}
       {inspectPair && (() => {
         const allQuestions = useQuestionStore.getState().questions;
-        const fallbackQuestions = Array.isArray(defaultCvsBank) ? (defaultCvsBank as Question[]) : [];
+        const candidateQuestions = allQuestions.filter((q) => (q.blockId || 'cvs') === blockId);
+        const fallbackQuestions = Array.isArray(defaultCvsBank) && blockId === 'cvs' ? (defaultCvsBank as Question[]) : [];
         const subjectQ =
+          candidateQuestions.find((q) => q.id === inspectPair.subjectId) ||
           allQuestions.find((q) => q.id === inspectPair.subjectId) ||
           fallbackQuestions.find((q) => q.id === inspectPair.subjectId) || {
             id: inspectPair.subjectId,
             blockId,
             subjectId: 'anatomy',
-            chapterId: 'cvs-ana-heart-dev',
-            topicId: 'cvs-ana-heart-dev/core',
+            chapterId: `${blockId}-general-ch1`,
+            topicId: `${blockId}-general-ch1/core`,
             concept: 'Canonical Subject',
             type: 'single-best-answer' as const,
             stem: `Canonical item ${inspectPair.subjectId} clinical vignette.`,
@@ -366,13 +386,14 @@ export const QddAuditBoard: React.FC<QddAuditBoardProps> = ({
           };
 
         const matchedQ =
+          candidateQuestions.find((q) => q.id === inspectPair.matchedId) ||
           allQuestions.find((q) => q.id === inspectPair.matchedId) ||
           fallbackQuestions.find((q) => q.id === inspectPair.matchedId) || {
             id: inspectPair.matchedId,
             blockId,
             subjectId: 'anatomy',
-            chapterId: 'cvs-ana-heart-dev',
-            topicId: 'cvs-ana-heart-dev/core',
+            chapterId: `${blockId}-general-ch1`,
+            topicId: `${blockId}-general-ch1/core`,
             concept: 'Matched Duplicate Candidate',
             type: 'single-best-answer' as const,
             stem: `Duplicate candidate item ${inspectPair.matchedId} clinical vignette.`,
