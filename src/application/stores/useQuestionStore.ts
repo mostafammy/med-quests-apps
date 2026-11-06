@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { Question, QuestionSchema } from '../../domain/model/types.ts';
 import { db } from '../../infrastructure/storage/db.ts';
-import defaultCvsBank from '../../../content/cvs/dist/bank.v1.json';
+import { defaultViteBlockPackSource } from '../../infrastructure/curriculum/ViteBlockPackSource.ts';
+import { DexieBlockScopedQuestionRepository } from '../../infrastructure/storage/DexieBlockScopedRepositories.ts';
+import type { BlockId } from '../../domain/curriculum/ids.ts';
 import { edgeQuestionBankGateway } from '../../infrastructure/questionBank/edgeQuestionBankGateway.ts';
 import { NonDestructiveBankMergeStrategy } from '../../domain/questionBank/nonDestructiveMergeStrategy.ts';
 import { BankResetPlanner } from '../../domain/questionBank/bankResetPlanner.ts';
@@ -110,8 +112,8 @@ function enrichBundledQuestions(rawList: readonly Question[]): GovernedQuestion[
   }));
 }
 
-export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
-  questions: Array.isArray(defaultCvsBank) ? (defaultCvsBank as Question[]) : [],
+const useQuestionStoreBase = create<QuestionStoreState>((set, get) => ({
+  questions: [],
   activeBlockId: 'cvs',
   isLoading: false,
   isSyncing: false,
@@ -123,51 +125,60 @@ export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
   mySubmissions: [],
   error: null,
 
-  loadQuestions: async (blockId = 'cvs') => {
+  loadQuestions: async (blockId?: string) => {
+    const targetBlockId = (blockId || get().activeBlockId || 'cvs') as BlockId;
     set({ isLoading: true, error: null });
     try {
       // 1. Instant 0ms Local Hydration from IndexedDB
-      let stored = await db.questions.where('blockId').equals(blockId).toArray();
-      if (stored.length === 0 && blockId === 'cvs' && Array.isArray(defaultCvsBank)) {
-        const enrichedSeed = enrichBundledQuestions(defaultCvsBank as Question[]);
-        await db.questions.bulkPut(enrichedSeed as unknown as Question[]);
-        stored = enrichedSeed as unknown as Question[];
-      } else if (stored.length > 0 && blockId === 'cvs' && Array.isArray(defaultCvsBank)) {
+      const repo = new DexieBlockScopedQuestionRepository(targetBlockId);
+      let stored = (await repo.all()) as Question[];
+
+      if (stored.length === 0) {
+        const rawBank = await defaultViteBlockPackSource.loadBank(targetBlockId);
+        if (Array.isArray(rawBank) && rawBank.length > 0) {
+          const enrichedSeed = enrichBundledQuestions(rawBank as Question[]);
+          await repo.put(enrichedSeed as unknown as Question[]);
+          stored = enrichedSeed as unknown as Question[];
+        }
+      } else {
         // Non-destructive upgrade: Reconcile unedited canonical questions to bankVersion 2
-        const bundledMap = new Map((defaultCvsBank as Question[]).map((q) => [q.id, q]));
-        const toUpgrade: Question[] = [];
-        for (const q of stored) {
-          const governed = q as GovernedQuestion;
-          if (governed.provenanceScope !== 'local-custom' && (governed.bankVersion || 1) < 2) {
-            const bundled = bundledMap.get(q.id);
-            if (bundled && (bundled.bankVersion || 1) >= 2) {
-              toUpgrade.push({
-                ...q,
-                choices: bundled.choices,
-                bankVersion: bundled.bankVersion || 2,
-              });
+        const rawBank = await defaultViteBlockPackSource.loadBank(targetBlockId);
+        if (Array.isArray(rawBank) && rawBank.length > 0) {
+          const bundledMap = new Map((rawBank as Question[]).map((q) => [q.id, q]));
+          const toUpgrade: Question[] = [];
+          for (const q of stored) {
+            const governed = q as GovernedQuestion;
+            if (governed.provenanceScope !== 'local-custom' && (governed.bankVersion || 1) < 2) {
+              const bundled = bundledMap.get(q.id);
+              if (bundled && (bundled.bankVersion || 1) >= 2) {
+                toUpgrade.push({
+                  ...q,
+                  choices: bundled.choices,
+                  bankVersion: bundled.bankVersion || 2,
+                });
+              }
             }
           }
-        }
-        if (toUpgrade.length > 0) {
-          await db.questions.bulkPut(toUpgrade);
-          stored = await db.questions.where('blockId').equals(blockId).toArray();
+          if (toUpgrade.length > 0) {
+            await repo.put(toUpgrade);
+            stored = (await repo.all()) as Question[];
+          }
         }
       }
 
       // 2. Read local sync cursor (or initialize Rev #1 if missing)
-      const cursorRecord = await db.bankSyncMeta.get(blockId);
+      const cursorRecord = await db.bankSyncMeta.get(targetBlockId);
       const activeStored = filterActiveQuestions(stored);
       const cursor: BankSyncCursor = cursorRecord
         ? {
-            blockId,
+            blockId: targetBlockId,
             serverRevision: cursorRecord.serverRevision as BankRevisionNumber,
             lastSyncedAt: cursorRecord.lastSyncedAt,
             etag: cursorRecord.etag,
             totalCanonicalCount: cursorRecord.totalCanonicalCount,
           }
         : {
-            blockId,
+            blockId: targetBlockId,
             serverRevision: 1 as BankRevisionNumber,
             lastSyncedAt: new Date().toISOString(),
             etag: 'W/rev-1',
@@ -176,7 +187,7 @@ export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
 
       if (!cursorRecord) {
         await db.bankSyncMeta.put({
-          blockId,
+          blockId: targetBlockId,
           serverRevision: 1,
           lastSyncedAt: cursor.lastSyncedAt,
           etag: cursor.etag,
@@ -186,13 +197,13 @@ export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
 
       set({
         questions: activeStored,
-        activeBlockId: blockId,
+        activeBlockId: targetBlockId,
         syncCursor: cursor,
         isLoading: false,
       });
 
       // 3. Background non-blocking check for global updates (populates pendingDiffPreview if changes exist)
-      get().checkForGlobalUpdates(blockId);
+      get().checkForGlobalUpdates(targetBlockId);
     } catch (err) {
       set({ error: (err as Error).message, isLoading: false, syncPhase: 'error' });
     }
@@ -784,10 +795,13 @@ export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
         );
         revision = Number(deltaRes.value.revision);
         etag = deltaRes.value.etag;
-      } else if (blockId === 'cvs' && Array.isArray(defaultCvsBank)) {
-        canonicalQuestions = enrichBundledQuestions(defaultCvsBank as Question[]);
-        revision = Number(edgeQuestionBankGateway.getLocalRevision(blockId) || 1);
-        etag = `W/rev-${revision}`;
+      } else {
+        const rawBank = await defaultViteBlockPackSource.loadBank(blockId as BlockId);
+        if (Array.isArray(rawBank) && rawBank.length > 0) {
+          canonicalQuestions = enrichBundledQuestions(rawBank as Question[]);
+          revision = Number(edgeQuestionBankGateway.getLocalRevision(blockId) || 1);
+          etag = `W/rev-${revision}`;
+        }
       }
 
       // A failed/empty fetch must NEVER wipe a learner's bank.
@@ -894,6 +908,19 @@ export const useQuestionStore = create<QuestionStoreState>((set, get) => ({
     }
   },
 }));
+
+export const useQuestionStore = Object.assign(
+  function useQuestionStore<U = QuestionStoreState>(
+    selector?: (state: QuestionStoreState) => U
+  ): U {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      const state = useQuestionStoreBase.getState();
+      return selector ? selector(state) : (state as unknown as U);
+    }
+    return useQuestionStoreBase(selector as any);
+  },
+  useQuestionStoreBase
+) as typeof useQuestionStoreBase;
 
 // =========================================================================
 // BACKGROUND SYNC REVALIDATION ENGINE (Multi-tab, Admin Event, Focus & 60s Pulse)
