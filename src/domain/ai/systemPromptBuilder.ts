@@ -7,6 +7,8 @@ import type { SafeAiContext } from './context.ts';
 import type { ActiveQuestionTelemetry } from './telemetry.ts';
 import type { ResolvedChatLanguageContext } from '../i18n/types.ts';
 import { ChatLanguagePolicy } from './languagePolicy.ts';
+import type { BlockAiProfile } from '../curriculum/BlockAiProfileRegistry.ts';
+import { defaultBlockAiProfileRegistry } from '../curriculum/BlockAiProfileRegistry.ts';
 
 export class SystemPromptBuilder {
   private rolePersona: string = '';
@@ -15,11 +17,19 @@ export class SystemPromptBuilder {
   private toolProtocolSection: string = '';
   private languageDirectiveSection: string = '';
 
-  withRolePersona(): this {
-    this.rolePersona =
-      `You are an expert Socratic Medical Faculty Mentor and Cardiovascular Pathophysiologist on the Med Quests platform.\n` +
-      `Your goal is to build deep clinical reasoning and board exam (USMLE / Cardiovascular Board) mastery.\n` +
-      `Tone: Authoritative, encouraging, concise, high-yield, and focused on first-principles pathophysiology. Avoid pleasantries and fluff.`;
+  withRolePersona(profile?: BlockAiProfile): this {
+    if (profile) {
+      this.rolePersona =
+        `You are an expert ${profile.personaLabel} on the Med Quests platform.\n` +
+        `Specialty Domain: ${profile.specialtyLabel}.\n` +
+        `Your goal is to build deep clinical reasoning and board exam (${profile.boardContext}) mastery.\n` +
+        `Tone: Authoritative, encouraging, concise, high-yield, and focused on first-principles pathophysiology. Avoid pleasantries and fluff.`;
+    } else {
+      this.rolePersona =
+        `You are an expert Socratic Medical Faculty Mentor and Cardiovascular Pathophysiologist on the Med Quests platform.\n` +
+        `Your goal is to build deep clinical reasoning and board exam (USMLE / Cardiovascular Board) mastery.\n` +
+        `Tone: Authoritative, encouraging, concise, high-yield, and focused on first-principles pathophysiology. Avoid pleasantries and fluff.`;
+    }
     return this;
   }
 
@@ -160,18 +170,29 @@ export class SystemPromptBuilder {
     return this;
   }
 
-  withToolOrchestrationRules(): this {
+  withToolOrchestrationRules(profile?: BlockAiProfile): this {
+    const allowsHemodynamics = !profile || defaultBlockAiProfileRegistry.isToolAllowed(profile, 'simulate_hemodynamic_pv_loop');
+    const allowsNeuro = profile ? defaultBlockAiProfileRegistry.isToolAllowed(profile, 'localize_neuro_lesion') : false;
+
+    let clinicalTools = `- 'simulate_peer_cohort_difficulty': Call to show real student cohort pass rates and the #1 distractor trap.\n`;
+    if (allowsHemodynamics) {
+      clinicalTools += `- 'simulate_hemodynamic_pv_loop': Call when discussing valvular pathology (Aortic Stenosis, Aortic Regurg, Mitral Stenosis, Mitral Regurg, HCM) to render a Pressure-Volume loop diagram.\n`;
+      clinicalTools += `- 'calculate_cardiovascular_equation': Call when clinical formulas are needed (MAP, Fick CO, SVR, Gorlin AVA).\n`;
+    }
+    if (allowsNeuro) {
+      clinicalTools += `- 'localize_neuro_lesion': Call when localizing anatomical lesions based on focal neurological deficits.\n`;
+      clinicalTools += `- 'explain_cranial_nerve_pathway': Call to map brainstem and cranial nerve anatomical trajectories.\n`;
+    }
+
     this.toolProtocolSection =
       `AUTONOMOUS TOOL-CALLING PROTOCOL:\n` +
-      `You have access to 9 specialized tools. Choose when to invoke them to maximize student learning:\n\n` +
+      `You have access to specialized clinical and diagnostic tools. Choose when to invoke them to maximize student learning:\n\n` +
       `1. INVISIBLE BACKGROUND DIAGNOSTICS (Silent - Never shown to user):\n` +
       `- 'analyze_active_question_vignette': Call whenever you need structured breakdown of the chief complaint, hemodynamic status, and distractor trap map.\n` +
       `- 'inspect_student_cognitive_telemetry': Call when the student says they are stuck or hesitating to check their time and choice switches.\n` +
       `- 'detect_cognitive_bias_trap': Call when the student favors a wrong choice to identify Anchoring Bias, Premature Closure, Availability Heuristic, or Framing Effect.\n\n` +
       `2. CLINICAL & PATHOPHYSIOLOGICAL MODELING TOOLS (Visible Artifacts):\n` +
-      `- 'simulate_hemodynamic_pv_loop': Call when discussing valvular pathology (Aortic Stenosis, Aortic Regurg, Mitral Stenosis, Mitral Regurg, HCM) to render a Pressure-Volume loop diagram.\n` +
-      `- 'simulate_peer_cohort_difficulty': Call to show real student cohort pass rates and the #1 distractor trap.\n` +
-      `- 'calculate_cardiovascular_equation': Call when clinical formulas are needed (MAP, Fick CO, SVR, Gorlin AVA).\n\n` +
+      clinicalTools + `\n` +
       `3. ACTIVE MEMORY & ADAPTIVE REMEDIATION TOOLS (Visible Artifacts):\n` +
       `- 'formulate_clinical_memory_anchor': Call to create a memorable board mnemonic.\n` +
       `- 'prescribe_targeted_micro_curriculum': Call to generate a 3-step targeted remediation drill.\n\n` +
