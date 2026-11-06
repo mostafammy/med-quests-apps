@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CVS_TAXONOMY } from '../../../domain/taxonomy/cvsTaxonomy.ts';
+import { useActiveTaxonomy, useBlockContextStore } from '../../../application/stores/useBlockContextStore.ts';
+import { defaultBlockMementoStore } from '../../../infrastructure/curriculum/LocalStorageBlockMementoStore.ts';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 import { useStatsStore } from '../../../application/stores/useStatsStore.ts';
 import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
@@ -39,6 +40,8 @@ export const TestHub: React.FC = () => {
     resetSubjectStats 
   } = useStatsStore();
   const { t, isRtl } = useLocaleStore();
+  const taxonomy = useActiveTaxonomy();
+  const { activeBlockId } = useBlockContextStore();
 
   // Mode & configuration state
   const [selectedMode, setSelectedMode] = useState<TestMode>('practice');
@@ -46,44 +49,90 @@ export const TestHub: React.FC = () => {
   const [selectedSubject, setSelectedSubject] = useState<string>(() => {
     const subParam = searchParams.get('subject');
     if (subParam) {
-      const match = CVS_TAXONOMY.subjects.find(
+      const match = taxonomy.subjects.find(
         (s) => s.id.toLowerCase() === subParam.toLowerCase() || s.name.toLowerCase().includes(subParam.toLowerCase())
       );
       if (match) return match.id;
     }
+    const memento = defaultBlockMementoStore.load(activeBlockId);
+    if (memento?.testHub?.subjectId && taxonomy.subjects.some((s) => s.id === memento.testHub.subjectId)) {
+      return memento.testHub.subjectId;
+    }
     return 'all';
   });
-  const [selectedChapter, setSelectedChapter] = useState<string>('all');
-  const [questionCount, setQuestionCount] = useState<number | 'all'>(20);
-  const [highYieldOnly, setHighYieldOnly] = useState<boolean>(false);
+  const [selectedChapter, setSelectedChapter] = useState<string>(() => {
+    const memento = defaultBlockMementoStore.load(activeBlockId);
+    if (memento?.testHub?.chapterId && taxonomy.chapters.some((c) => c.id === memento.testHub.chapterId)) {
+      return memento.testHub.chapterId;
+    }
+    return 'all';
+  });
+  const [questionCount, setQuestionCount] = useState<number | 'all'>(() => {
+    const memento = defaultBlockMementoStore.load(activeBlockId);
+    return memento?.testHub?.count ?? 20;
+  });
+  const [highYieldOnly, setHighYieldOnly] = useState<boolean>(() => {
+    const memento = defaultBlockMementoStore.load(activeBlockId);
+    return memento?.testHub?.highYieldOnly ?? false;
+  });
   const [timedSprint, setTimedSprint] = useState<boolean>(false);
   const [showResetBankModal, setShowResetBankModal] = useState<boolean>(false);
 
   // Refresh attempts from IndexedDB on mount & question changes
   useEffect(() => {
-    refreshStats(questions);
-  }, [questions, refreshStats]);
+    refreshStats(questions, activeBlockId);
+  }, [questions, refreshStats, activeBlockId]);
 
-  // Sync with search params if they change
+  // Sync with search params or memento when activeBlockId or params change
   useEffect(() => {
     const subParam = searchParams.get('subject');
     if (subParam) {
-      const match = CVS_TAXONOMY.subjects.find(
+      const match = taxonomy.subjects.find(
         (s) => s.id.toLowerCase() === subParam.toLowerCase() || s.name.toLowerCase().includes(subParam.toLowerCase())
       );
       if (match) {
         setSelectedSubject(match.id);
         setSelectedChapter('all');
+        return;
       }
     }
-  }, [searchParams]);
+    const memento = defaultBlockMementoStore.load(activeBlockId);
+    if (memento?.testHub?.subjectId && taxonomy.subjects.some((s) => s.id === memento.testHub.subjectId)) {
+      setSelectedSubject(memento.testHub.subjectId);
+      setSelectedChapter(
+        memento.testHub.chapterId && taxonomy.chapters.some((c) => c.id === memento.testHub.chapterId)
+          ? memento.testHub.chapterId
+          : 'all'
+      );
+      setQuestionCount(memento.testHub.count ?? 20);
+      setHighYieldOnly(memento.testHub.highYieldOnly ?? false);
+    } else {
+      setSelectedSubject('all');
+      setSelectedChapter('all');
+    }
+  }, [searchParams, activeBlockId, taxonomy]);
+
+  // Persist filter changes to memento
+  useEffect(() => {
+    defaultBlockMementoStore.save({
+      blockId: activeBlockId,
+      testHub: {
+        subjectId: selectedSubject,
+        chapterId: selectedChapter,
+        count: questionCount,
+        highYieldOnly,
+      },
+      reviewTab: null,
+      savedAtIso: new Date().toISOString(),
+    });
+  }, [activeBlockId, selectedSubject, selectedChapter, questionCount, highYieldOnly]);
 
   // Filter available chapters by selected subject
   const availableChapters = useMemo(() => {
     return selectedSubject === 'all'
-      ? CVS_TAXONOMY.chapters
-      : CVS_TAXONOMY.chapters.filter((c) => c.subjectId === selectedSubject);
-  }, [selectedSubject]);
+      ? taxonomy.chapters
+      : taxonomy.chapters.filter((c) => c.subjectId === selectedSubject);
+  }, [selectedSubject, taxonomy.chapters]);
 
   // Curriculum scope coverage metrics (total, answered, fresh remaining, correct, incorrect)
   const scopeCoverage = useMemo(() => {
@@ -114,24 +163,24 @@ export const TestHub: React.FC = () => {
   // Dynamic human-readable label for the currently targeted category
   const selectedCategoryLabel = useMemo(() => {
     if (selectedChapter !== 'all') {
-      const ch = CVS_TAXONOMY.chapters.find((c) => c.id === selectedChapter);
+      const ch = taxonomy.chapters.find((c) => c.id === selectedChapter);
       if (ch) return ch.name;
     }
     if (selectedSubject !== 'all') {
-      const sub = CVS_TAXONOMY.subjects.find((s) => s.id === selectedSubject);
+      const sub = taxonomy.subjects.find((s) => s.id === selectedSubject);
       if (sub) return sub.name;
     }
-    return t.test.allSubjects;
-  }, [selectedSubject, selectedChapter, t]);
+    return t.test.allSubjects.replace('{blockName}', taxonomy.block.name);
+  }, [selectedSubject, selectedChapter, taxonomy, t]);
 
   // Subject statistics for badge counters
   const subjectCounts = useMemo(() => {
     const counts: Record<string, number> = { all: questions.length };
-    CVS_TAXONOMY.subjects.forEach((s) => {
+    taxonomy.subjects.forEach((s) => {
       counts[s.id] = questions.filter((q) => q.subjectId === s.id).length;
     });
     return counts;
-  }, [questions]);
+  }, [questions, taxonomy.subjects]);
 
   // Master launch handler
   const handleLaunchSession = (
@@ -239,10 +288,10 @@ export const TestHub: React.FC = () => {
           <div className="space-y-1">
             <div className="inline-flex items-center space-x-1.5 rtl:space-x-reverse px-2.5 py-0.5 rounded-full bg-blue-500/10 dark:bg-blue-400/15 border border-blue-500/20 dark:border-blue-400/30 text-blue-700 dark:text-blue-300 text-[11px] font-bold tracking-wide">
               <Compass className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-              <span>Cardiovascular Block 206 Exam Platform</span>
+              <span>{taxonomy.block.name} {taxonomy.block.code} Exam Platform</span>
             </div>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">
-              {t.test.hubTitle}
+              {t.test.hubTitle.replace('{blockName}', taxonomy.block.name)}
             </h1>
             <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-xl font-medium">
               {t.test.hubSubtitle}
@@ -647,7 +696,7 @@ export const TestHub: React.FC = () => {
                     : 'glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400/50 dark:hover:border-blue-500/40 hover:bg-blue-50/50 dark:hover:bg-blue-950/20'
                 }`}
               >
-                <span>{t.test.allSubjects}</span>
+                <span>{t.test.allSubjects.replace('{blockName}', taxonomy.block.name)}</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold transition-colors ${
                   selectedSubject === 'all' 
                     ? 'bg-blue-700 text-blue-100' 
@@ -657,7 +706,7 @@ export const TestHub: React.FC = () => {
                 </span>
               </button>
 
-              {CVS_TAXONOMY.subjects.map((sub) => (
+              {taxonomy.subjects.map((sub) => (
                 <button
                   key={sub.id}
                   type="button"
@@ -671,7 +720,7 @@ export const TestHub: React.FC = () => {
                       : 'glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400/50 dark:hover:border-blue-500/40 hover:bg-blue-50/50 dark:hover:bg-blue-950/20'
                   }`}
                 >
-                  <span>{sub.name.replace('CVS ', '')}</span>
+                  <span>{sub.name.replace(/^(CVS|CNS)\s+/, '')}</span>
                   <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold transition-colors ${
                     selectedSubject === sub.id 
                       ? 'bg-blue-700 text-blue-100' 
