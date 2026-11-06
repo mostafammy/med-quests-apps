@@ -1,9 +1,19 @@
 import { create } from 'zustand';
 import { db } from '../../infrastructure/storage/db.ts';
-import { Question, Attempt } from '../../domain/model/types.ts';
+import { Question, Attempt, Taxonomy, ReviewCard } from '../../domain/model/types.ts';
 import { CVS_TAXONOMY } from '../../domain/taxonomy/cvsTaxonomy.ts';
-import defaultCvsBank from '../../../content/cvs/dist/bank.v1.json';
 import { useQuestionStore } from './useQuestionStore.ts';
+import { useBlockContextStore } from './useBlockContextStore.ts';
+import { compositionRoot } from '../composition/clientCompositionRoot.ts';
+import { LegacyTaxonomyAdapter } from '../../domain/curriculum/LegacyTaxonomyAdapter.ts';
+import { useLocaleStore } from './useLocaleStore.ts';
+import {
+  DexieBlockScopedAttemptRepository,
+  DexieBlockScopedReviewCardRepository,
+  DexieBlockScopedSrsRepository,
+  DexieLearnerGlobalActivityReader,
+} from '../../infrastructure/storage/DexieBlockScopedRepositories.ts';
+import type { BlockId } from '../../domain/curriculum/ids.ts';
 
 export const LOCAL_TELEMETRY_STORAGE_KEY = 'medquests_local_study_telemetry_v1';
 
@@ -115,9 +125,9 @@ export interface StatsState {
   isLoading: boolean;
 
   // Actions
-  refreshStats: (questions?: Question[]) => Promise<void>;
-  resetStats: (questions?: Question[]) => Promise<void>;
-  resetSubjectStats: (subjectId: string, questions?: Question[]) => Promise<void>;
+  refreshStats: (questions?: Question[], blockId?: string) => Promise<void>;
+  resetStats: (questions?: Question[], blockId?: string) => Promise<void>;
+  resetSubjectStats: (subjectId: string, questions?: Question[], blockId?: string) => Promise<void>;
   getScopeCoverage: (
     questions: Question[],
     filter?: {
@@ -128,15 +138,18 @@ export interface StatsState {
   ) => ScopeCoverageSummary;
 }
 
-function buildDefaultSubjectReadiness(questions?: Question[]): Record<string, SubjectReadinessStat> {
+function buildDefaultSubjectReadiness(
+  taxonomy: Taxonomy = CVS_TAXONOMY,
+  questions?: Question[]
+): Record<string, SubjectReadinessStat> {
   const activeBank = (questions && questions.length > 0)
     ? questions
-    : (defaultCvsBank as Question[]);
+    : [];
   const result: Record<string, SubjectReadinessStat> = {};
 
-  for (const subj of CVS_TAXONOMY.subjects) {
+  for (const subj of taxonomy.subjects) {
     const subjQuestions = activeBank.filter((q) => q.subjectId === subj.id);
-    const chaptersCount = CVS_TAXONOMY.chapters.filter((c) => c.subjectId === subj.id).length;
+    const chaptersCount = taxonomy.chapters.filter((c) => c.subjectId === subj.id).length;
     result[subj.id] = {
       subjectId: subj.id,
       subjectName: subj.name,
@@ -196,7 +209,7 @@ function computeStreakAndTodayAttempts(attempts: Attempt[]): {
   return { streakDays, todayAttempts };
 }
 
-export const useStatsStore = create<StatsState>((set, get) => ({
+export const useStatsStoreBase = create<StatsState>((set, get) => ({
   totalAttempts: 0,
   totalAnsweredQuestions: 0,
   overallAccuracy: 0,
@@ -204,7 +217,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
   weakTopicsCount: 0,
   dueReviewsCount: 0,
   topicStats: [],
-  subjectReadiness: buildDefaultSubjectReadiness([]),
+  subjectReadiness: buildDefaultSubjectReadiness(CVS_TAXONOMY, []),
   mistakeQuestionIds: [],
   answeredQuestionIds: [],
   correctQuestionIds: [],
@@ -239,21 +252,33 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     stabilizedCards: 0,
     totalTrackedCards: 0,
   },
-  favoriteSubspecialty: 'Anatomy & Pericardium',
+  favoriteSubspecialty: 'Clinical Cardiology & Hemodynamics',
   isLoading: false,
 
-  refreshStats: async (questions?: Question[]) => {
+  refreshStats: async (questions?: Question[], blockId?: string) => {
     set({ isLoading: true });
     try {
+      const targetBlockId = (blockId || useBlockContextStore.getState().activeBlockId || 'cvs') as BlockId;
+      const pack = compositionRoot.catalog.get(targetBlockId);
+      const locale = useLocaleStore.getState().locale;
+      const taxonomy: Taxonomy = pack
+        ? LegacyTaxonomyAdapter.manifestToTaxonomy(pack.manifest, locale)
+        : CVS_TAXONOMY;
+
       const activeBank = (questions && questions.length > 0)
         ? questions
-        : (useQuestionStore.getState().questions.length > 0
-          ? useQuestionStore.getState().questions
-          : (defaultCvsBank as Question[]));
-      const [attempts, reviewCards, srsCards, aiMetrics] = await Promise.all([
-        db.attempts.toArray(),
-        db.reviewCards.toArray(),
-        db.srsCards.toArray().catch(() => []),
+        : useQuestionStore.getState().questions;
+
+      const attemptRepo = new DexieBlockScopedAttemptRepository(targetBlockId);
+      const reviewRepo = new DexieBlockScopedReviewCardRepository(targetBlockId);
+      const srsRepo = new DexieBlockScopedSrsRepository(targetBlockId);
+      const globalReader = new DexieLearnerGlobalActivityReader();
+
+      const [attempts, reviewCards, srsCards, globalAttempts, aiMetrics] = await Promise.all([
+        (attemptRepo.all().catch(() => []) as Promise<Attempt[]>),
+        (reviewRepo.all().catch(() => []) as Promise<ReviewCard[]>),
+        srsRepo.all().catch(() => []),
+        (globalReader.allAttempts().catch(() => []) as Promise<Attempt[]>),
         db.aiModelMetrics.toArray().catch(() => []),
       ]);
 
@@ -300,8 +325,11 @@ export const useStatsStore = create<StatsState>((set, get) => ({
         totalTrackedCards: reviewCards.length + srsCards.length,
       };
 
+      // Compute learner-global metrics from all attempts across blocks (ADR-010-05)
+      const { streakDays, todayAttempts } = computeStreakAndTodayAttempts(globalAttempts);
+
       if (attempts.length === 0) {
-        const initialTopicStats: TopicStat[] = CVS_TAXONOMY.topics.map((t) => ({
+        const initialTopicStats: TopicStat[] = taxonomy.topics.map((t) => ({
           topicId: t.id,
           topicName: t.name,
           chapterId: t.chapterId,
@@ -311,7 +339,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
           status: 'unattempted',
         }));
 
-        const zeroSubjectReadiness = buildDefaultSubjectReadiness(activeBank);
+        const zeroSubjectReadiness = buildDefaultSubjectReadiness(taxonomy, activeBank);
 
         set({
           totalAttempts: 0,
@@ -326,8 +354,8 @@ export const useStatsStore = create<StatsState>((set, get) => ({
           answeredQuestionIds: [],
           correctQuestionIds: [],
           avgPaceSeconds: 0,
-          streakDays: 0,
-          todayAttempts: 0,
+          streakDays,
+          todayAttempts,
           pacingQuadrants: { fastAccurate: 0, slowAccurate: 0, fastWrong: 0, slowWrong: 0 },
           instinctStats: { totalChanges: 0, changedToCorrect: 0, changedToWrong: 0 },
           confidenceCalibration: {
@@ -339,6 +367,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
             unsureWrong: 0,
           },
           retentionForecast,
+          favoriteSubspecialty: taxonomy.chapters[0]?.name || 'Clinical Core',
           isLoading: false,
         });
         return;
@@ -461,15 +490,13 @@ export const useStatsStore = create<StatsState>((set, get) => ({
       const avgPaceSeconds =
         validTimeCount > 0 ? Math.max(1, Math.round(totalValidTimeMs / validTimeCount / 1000)) : 0;
 
-      const { streakDays, todayAttempts } = computeStreakAndTodayAttempts(attempts);
-
-      // Favorite Subspecialty (Chapter with highest attempt volume)
-      let favoriteSubspecialty = 'Clinical Cardiology & Hemodynamics';
+      // Favorite Subspecialty (Chapter with highest attempt volume in active taxonomy)
+      let favoriteSubspecialty = taxonomy.chapters[0]?.name || 'Clinical Core';
       let maxChapterAttempts = 0;
       for (const [chapId, count] of chapterCountsMap.entries()) {
         if (count > maxChapterAttempts) {
           maxChapterAttempts = count;
-          const chapObj = CVS_TAXONOMY.chapters.find((c) => c.id === chapId);
+          const chapObj = taxonomy.chapters.find((c) => c.id === chapId);
           if (chapObj) {
             favoriteSubspecialty = chapObj.name;
           }
@@ -477,7 +504,7 @@ export const useStatsStore = create<StatsState>((set, get) => ({
       }
 
       let weakTopicsCount = 0;
-      const topicStats: TopicStat[] = CVS_TAXONOMY.topics.map((t) => {
+      const topicStats: TopicStat[] = taxonomy.topics.map((t) => {
         const stat = topicStatsMap.get(t.id);
         if (!stat || stat.total === 0) {
           return {
@@ -520,9 +547,9 @@ export const useStatsStore = create<StatsState>((set, get) => ({
       const incorrectSet = new Set(mistakeQuestionIds);
       const subjectReadiness: Record<string, SubjectReadinessStat> = {};
 
-      for (const subj of CVS_TAXONOMY.subjects) {
+      for (const subj of taxonomy.subjects) {
         const subjQuestions = activeBank.filter((q) => q.subjectId === subj.id);
-        const chaptersCount = CVS_TAXONOMY.chapters.filter((c) => c.subjectId === subj.id).length;
+        const chaptersCount = taxonomy.chapters.filter((c) => c.subjectId === subj.id).length;
         let answeredCount = 0;
         let correctCount = 0;
         let incorrectCount = 0;
@@ -674,44 +701,58 @@ export const useStatsStore = create<StatsState>((set, get) => ({
     };
   },
 
-  resetStats: async (questions?: Question[]) => {
+  resetStats: async (questions?: Question[], blockId?: string) => {
     set({ isLoading: true });
     try {
-      await db.attempts.clear();
-      await db.reviewCards.clear();
+      const targetBlockId = (blockId || useBlockContextStore.getState().activeBlockId || 'cvs') as BlockId;
+      await db.attempts.where('blockId').equals(targetBlockId).delete();
+      await db.reviewCards.where('blockId').equals(targetBlockId).delete();
+      await db.srsCards.where('blockId').equals(targetBlockId).delete();
       if (typeof window !== 'undefined') {
         localStorage.removeItem(LOCAL_TELEMETRY_STORAGE_KEY);
       }
       const activeBank = (questions && questions.length > 0)
         ? questions
-        : (useQuestionStore.getState().questions.length > 0
-          ? useQuestionStore.getState().questions
-          : (defaultCvsBank as Question[]));
-      await get().refreshStats(activeBank);
+        : useQuestionStore.getState().questions;
+      await get().refreshStats(activeBank, targetBlockId);
       broadcastTelemetryUpdate();
     } finally {
       set({ isLoading: false });
     }
   },
 
-  resetSubjectStats: async (subjectId: string, questions?: Question[]) => {
+  resetSubjectStats: async (subjectId: string, questions?: Question[], blockId?: string) => {
     set({ isLoading: true });
     try {
+      const targetBlockId = (blockId || useBlockContextStore.getState().activeBlockId || 'cvs') as BlockId;
       const activeBank = (questions && questions.length > 0)
         ? questions
-        : (useQuestionStore.getState().questions.length > 0
-          ? useQuestionStore.getState().questions
-          : (defaultCvsBank as Question[]));
+        : useQuestionStore.getState().questions;
       const subjectQIds = new Set(
         activeBank.filter((q) => q.subjectId === subjectId).map((q) => q.id)
       );
       if (subjectQIds.size > 0) {
-        await db.attempts.where('questionId').anyOf(Array.from(subjectQIds)).delete();
+        await db.attempts
+          .where('questionId')
+          .anyOf(Array.from(subjectQIds))
+          .filter((att) => att.blockId === targetBlockId)
+          .delete();
       }
-      await get().refreshStats(activeBank);
+      await get().refreshStats(activeBank, targetBlockId);
       broadcastTelemetryUpdate();
     } finally {
       set({ isLoading: false });
     }
   },
 }));
+
+export const useStatsStore = Object.assign(
+  function useStatsStore<U = StatsState>(selector?: (state: StatsState) => U): U {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      const state = useStatsStoreBase.getState();
+      return selector ? selector(state) : (state as unknown as U);
+    }
+    return useStatsStoreBase(selector as any);
+  },
+  useStatsStoreBase
+) as typeof useStatsStoreBase;
