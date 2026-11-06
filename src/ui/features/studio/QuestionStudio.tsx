@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { NavLink } from 'react-router-dom';
-import { CVS_TAXONOMY } from '../../../domain/taxonomy/cvsTaxonomy.ts';
+import { compositionRoot } from '../../../application/composition/clientCompositionRoot.ts';
+import { useBlockContextStore } from '../../../application/stores/useBlockContextStore.ts';
+import type { BlockId } from '../../../domain/curriculum/ids.ts';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 import { useAuthStore } from '../../../application/stores/useAuthStore.ts';
 import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
@@ -36,8 +38,51 @@ export const QuestionStudio: React.FC = () => {
   const { authState } = useAuthStore();
   const { t } = useLocaleStore();
 
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('anatomy');
-  const [selectedChapterId, setSelectedChapterId] = useState<string>('cvs-ana-heart-dev');
+  const activeAppBlockId = useBlockContextStore((s) => s.activeBlockId);
+  const [selectedBlockId, setSelectedBlockId] = useState<BlockId>((activeAppBlockId || 'cvs') as BlockId);
+
+  const availableBlocks = useMemo(() => {
+    return compositionRoot.catalog.list('faculty-reviewer');
+  }, []);
+
+  const activeBlockPack = useMemo(() => {
+    return compositionRoot.catalog.get(selectedBlockId);
+  }, [selectedBlockId]);
+
+  const blockSubjects = useMemo(() => {
+    return activeBlockPack?.manifest.subjects || [];
+  }, [activeBlockPack]);
+
+  const blockChapters = useMemo(() => {
+    return activeBlockPack?.manifest.chapters || [];
+  }, [activeBlockPack]);
+
+  const blockTopics = useMemo(() => {
+    return activeBlockPack?.manifest.topics || [];
+  }, [activeBlockPack]);
+
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(() => {
+    return blockSubjects[0]?.id || 'anatomy';
+  });
+  const [selectedChapterId, setSelectedChapterId] = useState<string>(() => {
+    return blockChapters[0]?.id || 'cvs-ana-heart-dev';
+  });
+
+  const handleBlockChange = (newBlockId: BlockId) => {
+    setSelectedBlockId(newBlockId);
+    const pack = compositionRoot.catalog.get(newBlockId);
+    if (pack) {
+      const firstSub = pack.manifest.subjects[0];
+      if (firstSub) {
+        setSelectedSubjectId(firstSub.id);
+        const firstChap = pack.manifest.chapters.find((c) => c.subjectId === firstSub.id);
+        if (firstChap) {
+          setSelectedChapterId(firstChap.id);
+        }
+      }
+    }
+  };
+
   const [copied, setCopied] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
   const [ingestStatus, setIngestStatus] = useState<{
@@ -65,30 +110,36 @@ export const QuestionStudio: React.FC = () => {
 
   const { verdict: advisoryVerdict, dismissHint } = useQddAdvisoryHint({
     stem: candidateStem,
-    blockId: 'cvs',
+    blockId: selectedBlockId,
     chapterId: selectedChapterId,
     enabled: true,
   });
 
-  const activeSubject = CVS_TAXONOMY.subjects.find((s) => s.id === selectedSubjectId);
-  const availableChapters = CVS_TAXONOMY.chapters.filter((c) => c.subjectId === selectedSubjectId);
-  const activeChapter = CVS_TAXONOMY.chapters.find((c) => c.id === selectedChapterId);
-  const chapterTopics = CVS_TAXONOMY.topics.filter((t) => t.chapterId === selectedChapterId);
+  const activeSubject = blockSubjects.find((s) => s.id === selectedSubjectId);
+  const availableChapters = blockChapters.filter((c) => c.subjectId === selectedSubjectId);
+  const activeChapter = blockChapters.find((c) => c.id === selectedChapterId);
+  const chapterTopics = blockTopics.filter((t) => t.chapterId === selectedChapterId);
 
   useEffect(() => {
     const userId = authState.user?.id || 'usr_local_author';
     loadMySubmissions(userId);
   }, [authState.user?.id, loadMySubmissions]);
+
   const generatePrompt = () => {
+    const blockName = activeBlockPack?.manifest.block.name.en || 'Cardiovascular System';
+    const blockCode = activeBlockPack?.manifest.block.code || 'Block 206';
+    const subName = activeSubject ? (typeof activeSubject.name === 'string' ? activeSubject.name : activeSubject.name.en) : selectedSubjectId;
+    const chapName = activeChapter ? (typeof activeChapter.name === 'string' ? activeChapter.name : activeChapter.name.en) : selectedChapterId;
+
     return `You are a Senior Medical Professor and USMLE Board Item Writer creating high-yield, strictly grounded Multiple Choice Questions for 2nd-year medical students.
 
 I have uploaded the authoritative faculty curriculum document for:
-- BLOCK: Cardiovascular System (Block 206)
-- SUBJECT: ${activeSubject?.name}
-- CHAPTER: ${activeChapter?.name} (ID: "${activeChapter?.id}")
+- BLOCK: ${blockName} (${blockCode})
+- SUBJECT: ${subName}
+- CHAPTER: ${chapName} (ID: "${activeChapter?.id || selectedChapterId}")
 
 AVAILABLE TOPIC IDS FOR THIS CHAPTER:
-${chapterTopics.map((t) => `- "${t.id}": ${t.name}`).join('\n')}
+${chapterTopics.map((t) => `- "${t.id}": ${typeof t.name === 'string' ? t.name : t.name.en}`).join('\n')}
 
 INSTRUCTIONS:
 1. Grounding Rule: Every single question must be 100% grounded in the uploaded materials. You MUST cite the verbatim evidence quote from the text or slides that proves the correct answer.
@@ -101,8 +152,8 @@ INSTRUCTIONS:
 JSON SCHEMA TO PRODUCE:
 [
   {
-    "id": "q-cvs-${selectedSubjectId.slice(0, 3)}-001",
-    "blockId": "cvs",
+    "id": "q-${selectedBlockId}-${selectedSubjectId.slice(0, 3)}-001",
+    "blockId": "${selectedBlockId}",
     "subjectId": "${selectedSubjectId}",
     "chapterId": "${selectedChapterId}",
     "topicId": "${chapterTopics[0]?.id || 'topic-id'}",
@@ -325,20 +376,37 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                Target Curriculum Block
+              </label>
+              <select
+                value={selectedBlockId}
+                onChange={(e) => handleBlockChange(e.target.value as BlockId)}
+                className="w-full text-xs font-semibold rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 backdrop-blur-md p-3 text-slate-800 dark:text-zinc-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+              >
+                {availableBlocks.map((b) => (
+                  <option key={b.blockId} value={b.blockId}>
+                    {b.manifest.block.name.en} ({b.manifest.block.code}) [{b.manifest.block.status.toUpperCase()}]
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
                 {t.studio.selectSubject}
               </label>
               <select
                 value={selectedSubjectId}
                 onChange={(e) => {
                   setSelectedSubjectId(e.target.value);
-                  const firstChap = CVS_TAXONOMY.chapters.find((c) => c.subjectId === e.target.value);
+                  const firstChap = blockChapters.find((c) => c.subjectId === e.target.value);
                   if (firstChap) setSelectedChapterId(firstChap.id);
                 }}
-                className="w-full text-xs font-semibold rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 backdrop-blur-md p-3 text-slate-800 dark:text-zinc-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                className="w-full text-xs font-semibold rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 backdrop-blur-md p-3 text-slate-800 dark:text-zinc-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 cursor-pointer"
               >
-                {CVS_TAXONOMY.subjects.map((sub) => (
+                {blockSubjects.map((sub) => (
                   <option key={sub.id} value={sub.id}>
-                    {sub.name}
+                    {typeof sub.name === 'string' ? sub.name : sub.name.en}
                   </option>
                 ))}
               </select>
@@ -351,11 +419,11 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
               <select
                 value={selectedChapterId}
                 onChange={(e) => setSelectedChapterId(e.target.value)}
-                className="w-full text-xs font-semibold rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 backdrop-blur-md p-3 text-slate-800 dark:text-zinc-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                className="w-full text-xs font-semibold rounded-2xl border border-slate-200/80 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 backdrop-blur-md p-3 text-slate-800 dark:text-zinc-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 cursor-pointer"
               >
                 {availableChapters.map((chap) => (
                   <option key={chap.id} value={chap.id}>
-                    {chap.name}
+                    {typeof chap.name === 'string' ? chap.name : chap.name.en}
                   </option>
                 ))}
               </select>
@@ -366,10 +434,10 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
                 Target Topics in this Chapter ({chapterTopics.length})
               </label>
               <div className="max-h-36 overflow-y-auto space-y-1.5 p-3 rounded-2xl bg-slate-50/50 dark:bg-zinc-950/30 border border-slate-100 dark:border-zinc-800">
-                {chapterTopics.map((t) => (
-                  <div key={t.id} className="text-xs flex items-center space-x-2 text-slate-600 dark:text-zinc-400">
+                {chapterTopics.map((top) => (
+                  <div key={top.id} className="text-xs flex items-center space-x-2 text-slate-600 dark:text-zinc-400">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                    <span>{t.name}</span>
+                    <span>{typeof top.name === 'string' ? top.name : top.name.en}</span>
                   </div>
                 ))}
               </div>
@@ -508,7 +576,7 @@ Please generate 10-20 high-yield, challenging, board-style MCQs covering all the
           onClose={() => setInspectingVerdict(null)}
           subjectQuestion={{
             id: 'draft-q',
-            blockId: 'cvs',
+            blockId: selectedBlockId,
             subjectId: selectedSubjectId,
             chapterId: selectedChapterId,
             topicId: `${selectedChapterId}/draft`,
