@@ -15,14 +15,32 @@ import {
   Clock,
   TrendingUp,
   Flame,
-  CheckCircle2
+  CheckCircle2,
+  ChevronDown,
+  Bookmark
 } from 'lucide-react';
 import { ResetBankConfirmationModal } from '../questionBank/ResetBankConfirmationModal.tsx';
+import { useActiveBlock, useActiveTaxonomy, useBlockContextStore } from '../../../application/stores/useBlockContextStore.ts';
+import { BlockSwitcherSheet } from '../../app/navigation/BlockSwitcherSheet.tsx';
+import {
+  loadSessionMemento,
+  clearSessionMemento,
+  type SavedSessionMemento,
+} from '../../../application/curriculum/SessionLeaveGuard.ts';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { questions } = useQuestionStore();
-  const { t, isRtl } = useLocaleStore();
+  const { t, isRtl, locale } = useLocaleStore();
+  const { block, visibleBlocks } = useActiveBlock();
+  const { activeBlockId } = useBlockContextStore();
+  const taxonomy = useActiveTaxonomy();
+  const [showMobileBlockSheet, setShowMobileBlockSheet] = useState(false);
+  const [savedSession, setSavedSession] = useState<SavedSessionMemento | null>(() => loadSessionMemento(activeBlockId));
+
+  useEffect(() => {
+    setSavedSession(loadSessionMemento(activeBlockId));
+  }, [activeBlockId]);
   const stats = useStatsStore();
   const currentStats = typeof window === 'undefined' ? useStatsStore.getState() : stats;
   const { 
@@ -88,6 +106,52 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] py-4 sm:py-8 px-2.5 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 animate-apple-entrance">
+      {/* Resume In-Progress Session Card (User Story 4) */}
+      {savedSession && (
+        <div className="p-4 sm:p-5 rounded-3xl bg-blue-500/10 dark:bg-blue-950/40 border border-blue-400/30 dark:border-blue-700/40 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-apple-entrance">
+          <div className="flex items-center space-x-3.5 rtl:space-x-reverse">
+            <div className="p-3 bg-blue-600 text-white rounded-2xl flex-shrink-0 shadow-md shadow-blue-500/20">
+              <Bookmark className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-600 text-white">
+                  In-Progress {savedSession.mode.toUpperCase()}
+                </span>
+                <span className="text-xs text-slate-400 dark:text-zinc-500 font-mono">
+                  {Object.keys(savedSession.answers).length} / {savedSession.questionIds.length} Answered
+                </span>
+              </div>
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-zinc-100 mt-0.5">
+                Resume your paused {savedSession.mode} session
+              </h3>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <button
+              onClick={() => {
+                clearSessionMemento(activeBlockId);
+                setSavedSession(null);
+              }}
+              className="px-3.5 py-2 text-xs font-semibold text-slate-500 dark:text-zinc-400 hover:text-rose-600 rounded-xl transition-colors cursor-pointer"
+            >
+              Discard
+            </button>
+            <button
+              onClick={() => {
+                navigate(`/session/${savedSession.sessionId}`, {
+                  state: { savedSession },
+                });
+              }}
+              className="py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer apple-tap"
+            >
+              <span>Resume Session</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Banner: Rich Glassmorphic Hub Card with Vivid Chromatic Gradients */}
       <div className="p-4 sm:p-6 md:p-8 rounded-3xl glass-surface space-y-5 sm:space-y-6 relative overflow-hidden">
         {/* Subtle Ambient Color Splash */}
@@ -95,12 +159,12 @@ export const Dashboard: React.FC = () => {
 
         <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 sm:gap-5">
           <div className="space-y-1.5 min-w-0">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 rtl:space-x-reverse">
               <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-500/15 dark:bg-blue-400/15 px-2.5 py-0.5 rounded-full border border-blue-400/30 backdrop-blur-md">
-                {t.dashboard.badgeExamPrep}
+                {block?.code || t.dashboard.badgeExamPrep}
               </span>
               <span className="text-xs text-slate-300 dark:text-zinc-600">•</span>
-              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center space-x-1.5">
+              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center space-x-1.5 rtl:space-x-reverse">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -108,11 +172,21 @@ export const Dashboard: React.FC = () => {
                 <span className="hidden xs:inline sm:inline">{t.dashboard.engineBadge}</span>
               </span>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-400 dark:via-indigo-300 dark:to-purple-300 bg-clip-text text-transparent">
-              {t.dashboard.title}
+            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-400 dark:via-indigo-300 dark:to-purple-300 bg-clip-text text-transparent flex items-center gap-2">
+              <span>{block ? (locale === 'ar' ? block.name.ar : block.name.en) : t.dashboard.title.replace('{blockName}', taxonomy.block.name)}</span>
+              {visibleBlocks.length >= 2 && (
+                <button
+                  type="button"
+                  onClick={() => setShowMobileBlockSheet(true)}
+                  aria-label="Switch Curriculum Block"
+                  className="inline-flex md:hidden items-center justify-center p-1 rounded-xl text-slate-500 hover:text-slate-700 dark:hover:text-zinc-300 cursor-pointer apple-tap"
+                >
+                  <ChevronDown className="w-5 h-5" />
+                </button>
+              )}
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl leading-relaxed">
-              {t.dashboard.subtitle}
+              {block ? (locale === 'ar' ? block.description.ar : block.description.en) : t.dashboard.subtitle}
             </p>
           </div>
 
@@ -569,79 +643,74 @@ export const Dashboard: React.FC = () => {
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {(
-            [
+          {taxonomy.subjects.map((subj, idx) => {
+            const colorThemes = [
               {
-                id: 'anatomy' as const,
-                title: t.dashboard.subjects.anatomy,
-                chaptersLabel: '3 Chapters',
-                desc: 'Heart chambers, valves, coronaries, pericardium, cardiac looping, atrial & ventricular septation.',
                 dotClass: 'bg-blue-500 shadow-blue-500/50',
                 borderClass: 'border-blue-400/25 dark:border-blue-700/30',
                 badgeClass: 'text-blue-600 dark:text-blue-400 bg-blue-500/10',
                 btnClass: 'text-blue-600 dark:text-blue-400',
               },
               {
-                id: 'histology' as const,
-                title: t.dashboard.subjects.histology,
-                chaptersLabel: '2 Chapters',
-                desc: 'Heart wall layers, intercalated discs, Purkinje fibers, elastic/muscular arteries, and capillary beds.',
                 dotClass: 'bg-purple-500 shadow-purple-500/50',
                 borderClass: 'border-purple-400/25 dark:border-purple-700/30',
                 badgeClass: 'text-purple-600 dark:text-purple-400 bg-purple-500/10',
                 btnClass: 'text-purple-600 dark:text-purple-400',
               },
               {
-                id: 'microbiology' as const,
-                title: t.dashboard.subjects.microbiology,
-                chaptersLabel: '3 Chapters',
-                desc: 'Rheumatic fever (JONES criteria & M protein mimicry), infective endocarditis, and viral myocarditis.',
                 dotClass: 'bg-emerald-500 shadow-emerald-500/50',
                 borderClass: 'border-emerald-400/25 dark:border-emerald-700/30',
                 badgeClass: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10',
                 btnClass: 'text-emerald-600 dark:text-emerald-400',
               },
               {
-                id: 'physiology' as const,
-                title: t.dashboard.subjects.physiology,
-                chaptersLabel: '3 Chapters',
-                desc: 'Cardiac electrophysiology, AP phases (0–4), cardiac cycle phases, heart sounds, and hemodynamics / BP regulation.',
                 dotClass: 'bg-amber-500 shadow-amber-500/50',
                 borderClass: 'border-amber-400/25 dark:border-amber-700/30',
                 badgeClass: 'text-amber-600 dark:text-amber-400 bg-amber-500/10',
                 btnClass: 'text-amber-600 dark:text-amber-400',
               },
-            ]
-          ).map((subj) => {
+              {
+                dotClass: 'bg-rose-500 shadow-rose-500/50',
+                borderClass: 'border-rose-400/25 dark:border-rose-700/30',
+                badgeClass: 'text-rose-600 dark:text-rose-400 bg-rose-500/10',
+                btnClass: 'text-rose-600 dark:text-rose-400',
+              },
+            ];
+            const theme = colorThemes[idx % colorThemes.length];
             const stat = subjectReadiness[subj.id];
+            const subjQuestions = questions.filter((q) => q.subjectId === subj.id);
             const totalQs =
-              stat?.totalQuestions ||
-              questions.filter((q) => q.subjectId === subj.id).length;
+              stat?.totalQuestions || subjQuestions.length;
             const correctPct =
               totalQs > 0 ? Math.round(((stat?.correctCount ?? 0) / totalQs) * 100) : 0;
             const mistakePct =
               totalQs > 0 ? Math.round(((stat?.incorrectCount ?? 0) / totalQs) * 100) : 0;
+            const chapters = taxonomy.chapters.filter((c) => c.subjectId === subj.id);
+            const chaptersLabel = `${chapters.length} ${locale === 'ar' ? 'فصول' : 'Chapters'}`;
+            const desc = chapters.length > 0
+              ? chapters.map((c) => c.name).join(', ')
+              : subj.name;
 
             return (
               <div
                 key={subj.id}
-                className={`p-6 rounded-3xl glass-card-interactive space-y-3 ${subj.borderClass}`}
+                className={`p-6 rounded-3xl glass-card-interactive space-y-3 ${theme.borderClass}`}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className={`w-2.5 h-2.5 rounded-full shadow-sm ${subj.dotClass}`} />
+                  <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                    <span className={`w-2.5 h-2.5 rounded-full shadow-sm ${theme.dotClass}`} />
                     <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-sm">
-                      {subj.title}
+                      {subj.name}
                     </h3>
                   </div>
-                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${subj.badgeClass}`}>
+                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${theme.badgeClass}`}>
                     {stat && stat.answeredCount > 0
                       ? `${stat.accuracy}% Acc • ${stat.coveragePercent}% Seen`
-                      : subj.chaptersLabel}
+                      : chaptersLabel}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-                  {subj.desc}
+                <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed line-clamp-2">
+                  {desc}
                 </p>
 
                 {/* Live Multi-Segment Mastery Bar (Correct / Mistake / Unseen) */}
@@ -674,7 +743,7 @@ export const Dashboard: React.FC = () => {
                   </span>
                   <button
                     onClick={() => navigate(`/test?subject=${subj.id}`)}
-                    className={`${subj.btnClass} font-bold hover:underline cursor-pointer flex items-center space-x-1`}
+                    className={`${theme.btnClass} font-bold hover:underline cursor-pointer flex items-center space-x-1`}
                   >
                     <span>
                       {stat && stat.answeredCount > 0
@@ -725,6 +794,12 @@ export const Dashboard: React.FC = () => {
       <ResetBankConfirmationModal
         isOpen={showResetBankModal}
         onClose={() => setShowResetBankModal(false)}
+      />
+
+      {/* Mobile Bottom Sheet Switcher (opened from Dashboard title chip) */}
+      <BlockSwitcherSheet
+        isOpen={showMobileBlockSheet}
+        onClose={() => setShowMobileBlockSheet(false)}
       />
     </div>
   );
