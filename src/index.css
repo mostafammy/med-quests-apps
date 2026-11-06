@@ -8,10 +8,71 @@
     --font-heading: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-arabic: 'IBM Plex Sans Arabic', 'SF Arabic', -apple-system, 'Geeza Pro', 'Cairo', 'Segoe UI', sans-serif;
+    --block-accent: #e11d48;
+    --block-accent-soft: rgba(225, 29, 72, 0.12);
+    --block-ring: rgba(225, 29, 72, 0.35);
   }
 
   :root.dark {
     color-scheme: dark;
+    --block-accent: #fb7185;
+    --block-accent-soft: rgba(251, 113, 133, 0.16);
+    --block-ring: rgba(251, 113, 133, 0.4);
+  }
+
+  :root[data-block-accent="rose"] {
+    --block-accent: #e11d48;
+    --block-accent-soft: rgba(225, 29, 72, 0.12);
+    --block-ring: rgba(225, 29, 72, 0.35);
+  }
+  :root.dark[data-block-accent="rose"] {
+    --block-accent: #fb7185;
+    --block-accent-soft: rgba(251, 113, 133, 0.16);
+    --block-ring: rgba(251, 113, 133, 0.4);
+  }
+
+  :root[data-block-accent="violet"] {
+    --block-accent: #7c3aed;
+    --block-accent-soft: rgba(124, 58, 237, 0.12);
+    --block-ring: rgba(124, 58, 237, 0.35);
+  }
+  :root.dark[data-block-accent="violet"] {
+    --block-accent: #a78bfa;
+    --block-accent-soft: rgba(167, 139, 250, 0.16);
+    --block-ring: rgba(167, 139, 250, 0.4);
+  }
+
+  :root[data-block-accent="sky"] {
+    --block-accent: #0284c7;
+    --block-accent-soft: rgba(2, 132, 199, 0.12);
+    --block-ring: rgba(2, 132, 199, 0.35);
+  }
+  :root.dark[data-block-accent="sky"] {
+    --block-accent: #38bdf8;
+    --block-accent-soft: rgba(56, 189, 248, 0.16);
+    --block-ring: rgba(56, 189, 248, 0.4);
+  }
+
+  :root[data-block-accent="amber"] {
+    --block-accent: #d97706;
+    --block-accent-soft: rgba(217, 119, 6, 0.14);
+    --block-ring: rgba(217, 119, 6, 0.35);
+  }
+  :root.dark[data-block-accent="amber"] {
+    --block-accent: #fbbf24;
+    --block-accent-soft: rgba(251, 191, 36, 0.16);
+    --block-ring: rgba(251, 191, 36, 0.4);
+  }
+
+  :root[data-block-accent="emerald"] {
+    --block-accent: #059669;
+    --block-accent-soft: rgba(5, 150, 105, 0.12);
+    --block-ring: rgba(5, 150, 105, 0.35);
+  }
+  :root.dark[data-block-accent="emerald"] {
+    --block-accent: #34d399;
+    --block-accent-soft: rgba(52, 211, 153, 0.16);
+    --block-ring: rgba(52, 211, 153, 0.4);
   }
 
   :root[dir="rtl"] {
