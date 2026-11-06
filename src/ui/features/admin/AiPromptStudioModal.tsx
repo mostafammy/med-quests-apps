@@ -14,18 +14,22 @@ import {
   type AiPromptMode,
   GOLD_STANDARD_EXAMPLE_QUESTION,
 } from '../../../domain/questionBank/questionAiPromptBuilder.ts';
-import { CVS_TAXONOMY } from '../../../domain/taxonomy/cvsTaxonomy.ts';
+import type { BlockId } from '../../../domain/curriculum/ids.ts';
+import { LEGACY_DEFAULT_BLOCK_ID } from '../../../domain/curriculum/ids.ts';
+import { compositionRoot } from '../../../application/composition/clientCompositionRoot.ts';
 
 interface AiPromptStudioModalProps {
   isOpen: boolean;
   onClose: () => void;
   onInsertExample?: (exampleJson: string) => void;
+  blockId?: BlockId;
 }
 
 export const AiPromptStudioModal: React.FC<AiPromptStudioModalProps> = ({
   isOpen,
   onClose,
   onInsertExample,
+  blockId = LEGACY_DEFAULT_BLOCK_ID,
 }) => {
   const [mode, setMode] = useState<AiPromptMode>('format_existing');
   const [subjectId, setSubjectId] = useState<string>('all');
@@ -35,36 +39,73 @@ export const AiPromptStudioModal: React.FC<AiPromptStudioModalProps> = ({
   const [customFocus, setCustomFocus] = useState<string>('');
   const [copiedType, setCopiedType] = useState<'prompt' | 'json' | null>(null);
 
+  const currentBlockPack = useMemo(() => {
+    return compositionRoot.catalog.get(blockId);
+  }, [blockId]);
+
+  const blockSubjects = useMemo(() => {
+    return compositionRoot.catalog.subjects(blockId);
+  }, [blockId]);
+
+  const blockChapters = useMemo(() => {
+    return compositionRoot.catalog.chapters(blockId);
+  }, [blockId]);
+
   // Filter chapters based on selected subject
   const availableChapters = useMemo(() => {
     if (subjectId === 'all') {
-      return CVS_TAXONOMY.chapters;
+      return blockChapters;
     }
-    return CVS_TAXONOMY.chapters.filter((c) => c.subjectId === subjectId);
-  }, [subjectId]);
+    return blockChapters.filter((c) => c.subjectId === subjectId);
+  }, [subjectId, blockChapters]);
 
   // Reset chapterId when subject changes if current chapter doesn't belong to subject
   const handleSubjectChange = (newSubjectId: string) => {
     setSubjectId(newSubjectId);
     if (newSubjectId !== 'all') {
-      const match = CVS_TAXONOMY.chapters.find((c) => c.subjectId === newSubjectId);
+      const match = blockChapters.find((c) => c.subjectId === newSubjectId);
       setChapterId(match ? match.id : 'all');
     } else {
       setChapterId('all');
     }
   };
 
+  const selectedSubjectObj = useMemo(
+    () => blockSubjects.find((s) => s.id === subjectId),
+    [blockSubjects, subjectId]
+  );
+  const selectedChapterObj = useMemo(
+    () => blockChapters.find((c) => c.id === chapterId),
+    [blockChapters, chapterId]
+  );
+
   // Build the live prompt
   const generatedPrompt = useMemo(() => {
     return QuestionAiPromptBuilder.buildPrompt({
       mode,
+      blockId,
+      blockName: currentBlockPack?.manifest.block.name.en || 'Cardiovascular System',
+      blockCode: currentBlockPack?.manifest.block.code || 'Block 206',
       subjectId,
+      subjectName: selectedSubjectObj ? `${selectedSubjectObj.name.en} (${selectedSubjectObj.id})` : undefined,
       chapterId,
+      chapterName: selectedChapterObj ? `${selectedChapterObj.name.en} (${selectedChapterObj.id})` : undefined,
       difficulty,
       questionCount,
       customFocus,
     });
-  }, [mode, subjectId, chapterId, difficulty, questionCount, customFocus]);
+  }, [
+    mode,
+    blockId,
+    currentBlockPack,
+    subjectId,
+    selectedSubjectObj,
+    chapterId,
+    selectedChapterObj,
+    difficulty,
+    questionCount,
+    customFocus,
+  ]);
 
   const exampleJson = useMemo(() => {
     return JSON.stringify([GOLD_STANDARD_EXAMPLE_QUESTION], null, 2);
@@ -180,10 +221,10 @@ export const AiPromptStudioModal: React.FC<AiPromptStudioModalProps> = ({
                     onChange={(e) => handleSubjectChange(e.target.value)}
                     className="w-full py-2 px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
                   >
-                    <option value="all">All CVS Subjects</option>
-                    {CVS_TAXONOMY.subjects.map((s) => (
+                    <option value="all">All {currentBlockPack?.manifest.block.shortName || 'Curriculum'} Subjects</option>
+                    {blockSubjects.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name}
+                        {s.name.en}
                       </option>
                     ))}
                   </select>
@@ -202,7 +243,7 @@ export const AiPromptStudioModal: React.FC<AiPromptStudioModalProps> = ({
                     <option value="all">All Chapters</option>
                     {availableChapters.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name}
+                        {c.name.en}
                       </option>
                     ))}
                   </select>
