@@ -15,8 +15,26 @@ describe('Stats Store & Subject Cards Live Calibration Test', () => {
   beforeEach(() => {
     mockAttempts = [];
     vi.spyOn(db.attempts, 'toArray').mockImplementation((async () => mockAttempts) as any);
+    vi.spyOn(db.attempts, 'where').mockImplementation(((field: string) => ({
+      equals: (val: any) => ({
+        toArray: async () => mockAttempts.filter((a) => (a as any)[field] === val),
+        count: async () => mockAttempts.filter((a) => (a as any)[field] === val).length,
+      }),
+    })) as any);
     vi.spyOn(db.reviewCards, 'toArray').mockImplementation((async () => []) as any);
+    vi.spyOn(db.reviewCards, 'where').mockImplementation((() => ({
+      equals: () => ({
+        toArray: async () => [],
+        count: async () => 0,
+      }),
+    })) as any);
     vi.spyOn(db.srsCards, 'toArray').mockImplementation((async () => []) as any);
+    vi.spyOn(db.srsCards, 'where').mockImplementation((() => ({
+      equals: () => ({
+        toArray: async () => [],
+        count: async () => 0,
+      }),
+    })) as any);
     vi.spyOn(db.aiModelMetrics, 'toArray').mockImplementation((async () => []) as any);
 
     useQuestionStore.setState({
