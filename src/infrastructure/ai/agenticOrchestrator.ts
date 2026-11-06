@@ -18,6 +18,7 @@ import {
   agentToolRegistry,
   type AgentToolExecutionEnvelope,
 } from '../../domain/ai/tools/toolRegistry.ts';
+import type { BlockAiProfile } from '../../domain/curriculum/BlockAiProfileRegistry.ts';
 import {
   resolveAiProvider,
   getAvailableFallbackProvider,
@@ -33,6 +34,7 @@ export interface OrchestratorRequest {
   readonly historyTurns: readonly { readonly role: 'user' | 'assistant'; readonly text: string }[];
   readonly settings: AiSettings;
   readonly signal: AbortSignal;
+  readonly profile?: BlockAiProfile;
 }
 
 export type OrchestratorEvent =
@@ -77,11 +79,11 @@ export class AgenticOrchestrator {
     );
 
     const systemPrompt = new SystemPromptBuilder()
-      .withRolePersona()
+      .withRolePersona(request.profile)
       .withChatLanguageDirective(langContext)
       .withSafeContext(safeContext, activeQuestion)
       .withTelemetrySnapshot(telemetrySnapshot, timeSpentSeconds)
-      .withToolOrchestrationRules()
+      .withToolOrchestrationRules(request.profile)
       .build();
 
     // 3. Assemble Conversation History
@@ -94,7 +96,7 @@ export class AgenticOrchestrator {
       { role: 'user', content: userMessage },
     ];
 
-    const toolDeclarations = agentToolRegistry.getToolDeclarations(safeContext);
+    const toolDeclarations = agentToolRegistry.getToolDeclarations(safeContext, request.profile);
     const executionContext = {
       activeQuestion,
       safeContext,
@@ -204,7 +206,8 @@ export class AgenticOrchestrator {
           tc.callId,
           tc.name,
           tc.argsJson,
-          executionContext
+          executionContext,
+          request.profile
         );
 
         if (isSilent) {
