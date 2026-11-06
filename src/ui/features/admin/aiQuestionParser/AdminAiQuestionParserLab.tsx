@@ -39,6 +39,8 @@ import { useQuestionStore } from '../../../../application/stores/useQuestionStor
 import { useBankGovernanceStore } from '../../../../application/stores/useBankGovernanceStore.ts';
 import { edgeQuestionBankGateway } from '../../../../infrastructure/questionBank/edgeQuestionBankGateway.ts';
 import defaultCvsBank from '../../../../../content/cvs/dist/bank.v1.json';
+import { compositionRoot } from '../../../../application/composition/clientCompositionRoot.ts';
+import type { BlockId } from '../../../../domain/curriculum/ids.ts';
 import { curriculumTaxonomyRegistry } from '../../../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
 import { AppleIntelligenceAgentOrchestrator } from './AppleIntelligenceAgentOrchestrator.tsx';
 import { StagingMasterRail } from './StagingMasterRail.tsx';
@@ -166,6 +168,8 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     selectedProvider,
     selectedModelId,
     setSelectedModel,
+    targetBlockId,
+    setTargetBlockId,
     targetSubjectId,
     targetChapterId,
     setTargetTaxonomy,
@@ -463,10 +467,46 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     MODEL_OPTIONS.find((m) => m.providerId === selectedProvider && m.modelId === selectedModelId) ||
     MODEL_OPTIONS[0];
 
-  const currentSubjects = curriculumTaxonomyRegistry.getSubjects();
-  const currentChapters = curriculumTaxonomyRegistry.getChapters(
-    targetSubjectId === 'auto' || targetSubjectId === 'all' ? undefined : targetSubjectId
-  );
+  const availableBlocks = React.useMemo(() => {
+    return compositionRoot.catalog.list('faculty-reviewer');
+  }, []);
+
+  const currentBlockPack = React.useMemo(() => {
+    return compositionRoot.catalog.get(targetBlockId);
+  }, [targetBlockId]);
+
+  const currentSubjects = React.useMemo(() => {
+    if (currentBlockPack) {
+      return currentBlockPack.manifest.subjects.map((s) => ({
+        id: s.id,
+        name: typeof s.name === 'string' ? s.name : s.name.en,
+      }));
+    }
+    return curriculumTaxonomyRegistry.getSubjects().map((s) => ({
+      id: s.id,
+      name: typeof s.name === 'string' ? s.name : (s.name as any)?.en || s.id,
+    }));
+  }, [currentBlockPack]);
+
+  const currentChapters = React.useMemo(() => {
+    if (currentBlockPack) {
+      const chaps = currentBlockPack.manifest.chapters;
+      const filtered =
+        targetSubjectId === 'auto' || targetSubjectId === 'all'
+          ? chaps
+          : chaps.filter((c) => c.subjectId === targetSubjectId);
+      return filtered.map((c) => ({
+        id: c.id,
+        name: typeof c.name === 'string' ? c.name : c.name.en,
+      }));
+    }
+    return curriculumTaxonomyRegistry
+      .getChapters(targetSubjectId === 'auto' || targetSubjectId === 'all' ? undefined : targetSubjectId)
+      .map((c) => ({
+        id: c.id,
+        name: typeof c.name === 'string' ? c.name : (c.name as any)?.en || c.id,
+      }));
+  }, [currentBlockPack, targetSubjectId]);
 
   const handleCopySinglePrompt = async (index: number, tempId: string) => {
     const prompt = getSingleQuestionPrompt(index);
@@ -610,6 +650,25 @@ export const AdminAiQuestionParserLab: React.FC = () => {
               </div>
             </div>
 
+            {/* Target Curriculum Block */}
+            <div className="space-y-1 pt-1">
+              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                Target Curriculum Block
+              </label>
+              <select
+                value={targetBlockId}
+                onChange={(e) => setTargetBlockId(e.target.value as BlockId)}
+                disabled={isParsing}
+                className="w-full text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 font-medium focus:ring-2 focus:ring-purple-500 transition-all cursor-pointer"
+              >
+                {availableBlocks.map((b) => (
+                  <option key={b.blockId} value={b.blockId}>
+                    {b.manifest.block.name.en} ({b.manifest.block.code}) [{b.manifest.block.status.toUpperCase()}]
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {isAutoCurriculumMode ? (
               <div className="p-3 rounded-xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-pink-500/10 border border-purple-500/20 flex items-start gap-3">
                 <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
@@ -652,7 +711,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                     value={targetSubjectId}
                     onChange={(e) => setTargetTaxonomy(e.target.value, 'all')}
                     disabled={isParsing}
-                    className="w-full text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 font-medium focus:ring-2 focus:ring-purple-500 transition-all"
+                    className="w-full text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 font-medium focus:ring-2 focus:ring-purple-500 transition-all cursor-pointer"
                   >
                     {currentSubjects.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -670,7 +729,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                     value={targetChapterId}
                     onChange={(e) => setTargetTaxonomy(targetSubjectId, e.target.value)}
                     disabled={isParsing}
-                    className="w-full text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 font-medium focus:ring-2 focus:ring-purple-500 transition-all"
+                    className="w-full text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 font-medium focus:ring-2 focus:ring-purple-500 transition-all cursor-pointer"
                   >
                     <option value="all">All Chapters in {targetSubjectId}</option>
                     {currentChapters.map((c) => (
@@ -969,7 +1028,7 @@ export const AdminAiQuestionParserLab: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-600 dark:text-zinc-400 flex-wrap">
-                    <span>Target Block: <strong className="text-zinc-900 dark:text-zinc-100 font-semibold">{effectiveQuestions[0]?.taxonomyClassification?.blockName || 'Cardiovascular System (CVS) - Block 206'}</strong></span>
+                    <span>Target Block: <strong className="text-zinc-900 dark:text-zinc-100 font-semibold">{effectiveQuestions[0]?.taxonomyClassification?.blockName || (currentBlockPack ? `${currentBlockPack.manifest.block.name.en} (${currentBlockPack.manifest.block.shortName}) - ${currentBlockPack.manifest.block.code}` : 'Cardiovascular System (CVS) - Block 206')}</strong></span>
                     <span>•</span>
                     <span>{effectiveQuestions.length} Question(s) Grounded to Active Syllabus</span>
                   </div>
@@ -1228,7 +1287,8 @@ export const AdminAiQuestionParserLab: React.FC = () => {
         const storeQuestions = useQuestionStore.getState().questions;
         const candidateId = inspectingQuestionItem.qddVerdict?.candidates[0]?.matchedQuestionId;
         const govCatalog = useBankGovernanceStore.getState().catalogQuestions || [];
-        const localCanonical = edgeQuestionBankGateway.getLocalCanonicalBank('cvs') || [];
+        const activeBlock = (inspectingQuestionItem.question.blockId || targetBlockId || 'cvs') as BlockId;
+        const localCanonical = edgeQuestionBankGateway.getLocalCanonicalBank(activeBlock) || [];
         const matched =
           storeQuestions.find((q) => q.id === candidateId) ||
           parsedQuestions.find((p) => p.question.id === candidateId)?.question ||
