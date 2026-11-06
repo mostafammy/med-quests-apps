@@ -321,4 +321,20 @@ Answer: D`;
     expect(itemSeparate.qddVerdict?.relation).toBe('EXACT');
     expect(itemSeparate.qddVerdict?.relation).not.toBe('CONFLICT');
   });
+
+  it('automatically detects CNS block and updates store targetBlockId when pasting CNS questions', async () => {
+    const { useAdminAiQuestionParserStore } = await import('../../../application/stores/useAdminAiQuestionParserStore.ts');
+    useAdminAiQuestionParserStore.setState({ targetBlockId: 'cvs' as any, rawInputText: '' });
+    expect(useAdminAiQuestionParserStore.getState().targetBlockId).toBe('cvs');
+
+    useAdminAiQuestionParserStore.getState().setRawInputText(`[
+      {
+        "id": "q-cns-ana-001",
+        "blockId": "cns-neuroscience",
+        "stem": "A histology researcher is examining parenchymal cells..."
+      }
+    ]`);
+
+    expect(useAdminAiQuestionParserStore.getState().targetBlockId).toBe('cns');
+  });
 });
