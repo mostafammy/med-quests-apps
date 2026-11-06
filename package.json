@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test": "vitest run",
+    "blocks:validate": "node --experimental-strip-types scripts/blocks/validate-blocks.ts",
+    "blocks:ratchet": "node --experimental-strip-types scripts/blocks/ratchet-cvs-literals.ts",
     "qdd:golden:gen": "node --experimental-strip-types scripts/qdd/generate-synthetic-golden.ts",
     "qdd:golden:export": "node --experimental-strip-types scripts/qdd/golden-export.ts",
     "qdd:eval": "node --experimental-strip-types scripts/qdd/eval.ts",
