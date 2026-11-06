@@ -91,7 +91,7 @@ export const arDictionary: TranslationDictionary = {
   dashboard: {
     badgeExamPrep: 'التحضير للاختبار الطبي',
     engineBadge: 'محرك IndexedDB فوري',
-    title: 'إتقان جهاز الدوران (CVS)',
+    title: 'إتقان {blockName}',
     subtitle: 'معايرة فورية للأداء عبر وثائق ومحاضرات التشريح وعلم الأنسجة وعلم الأحياء الدقيقة.',
     resetBtn: 'إعادة تعيين',
     mockExamBtn: 'اختبار تجريبي',
@@ -132,7 +132,7 @@ export const arDictionary: TranslationDictionary = {
     },
   },
   test: {
-    hubTitle: 'مركز اختبارات القلب والأوعية',
+    hubTitle: 'مركز اختبارات {blockName}',
     hubSubtitle: 'حدد وضع الاختبار المفضل والمجال الأكاديمي ومرشحات الأسئلة.',
     practiceMode: 'تدريب تفاعلي اعتيادي',
     practiceModeDesc: 'تقييم فوري مع تعليل سريري سقراطي كامل ومراجع الكلية المعتمدة.',
@@ -145,7 +145,7 @@ export const arDictionary: TranslationDictionary = {
     scopeSubtitle: 'تصفية الأسئلة حسب التخصص الطبي أو الفصل المحدد',
     filterSubject: 'تصفية حسب المادة',
     filterChapter: 'تصفية حسب الفصل / الموضوع',
-    allSubjects: 'جميع المواد (جهاز الدوران)',
+    allSubjects: 'جميع المواد ({blockName})',
     allChapters: 'جميع الفصول والمواضيع',
     questionCount: 'عدد الأسئلة',
     highYieldOnly: 'الأسئلة عالية الأهمية فقط',
@@ -191,7 +191,7 @@ export const arDictionary: TranslationDictionary = {
     },
     mockSetup: {
       title: 'الامتحان التجريبي الشامل',
-      subtitle: 'محاكاة اختبار الكلية الحقيقي لموديل CVS Block 206 بشروط معيارية.',
+      subtitle: 'محاكاة اختبار {blockName} ({blockCode}) الجامعي الفعلي بشروط معيارية.',
       length: 'عدد الأسئلة',
       lengthSub: 'عينة طبقية متوازنة',
       duration: 'المدة الزمنية',
