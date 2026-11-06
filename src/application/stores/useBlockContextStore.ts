@@ -16,7 +16,24 @@ import { compositionRoot } from '../composition/clientCompositionRoot.ts';
 import type { BlockPackDescriptor } from '../../domain/curriculum/BootBlockResolver.ts';
 import { LegacyTaxonomyAdapter } from '../../domain/curriculum/LegacyTaxonomyAdapter.ts';
 import type { Taxonomy } from '../../domain/model/types.ts';
+import type { ViewerRole } from '../../domain/curriculum/BlockVisibilityPolicy.ts';
+import { useAuthStore } from './useAuthStore.ts';
 import { useLocaleStore } from './useLocaleStore.ts';
+
+function getViewerRole(): ViewerRole {
+  try {
+    const authState = useAuthStore.getState()?.authState;
+    if (authState?.status === 'authenticated-active') {
+      const role = authState.user.role;
+      if (role === 'admin' || role === 'faculty-reviewer' || role === 'student-pro' || role === 'student-free') {
+        return role;
+      }
+    }
+  } catch {
+    // SSR or uninitialized store
+  }
+  return 'student-free';
+}
 
 export type BlockContextStatus =
   | 'booting'
@@ -44,17 +61,18 @@ export const useBlockContextStoreBase = create<BlockContextState>((set, get) => 
   epoch: 0,
   lastError: null,
   visibleBlocks: (typeof compositionRoot !== 'undefined' && compositionRoot?.catalog)
-    ? compositionRoot.catalog.list('student-free')
+    ? compositionRoot.catalog.list(getViewerRole())
     : [],
 
   init: async (deepLink: string | null = null) => {
     const catalog = compositionRoot.catalog;
     const initialBlockId = compositionRoot.resolveInitialBlock(deepLink);
+    const role = getViewerRole();
 
     set({
       activeBlockId: initialBlockId,
       status: 'ready',
-      visibleBlocks: catalog.list('student-free'),
+      visibleBlocks: catalog.list(role),
     });
 
     // Subscribe to cross-tab updates
@@ -63,6 +81,20 @@ export const useBlockContextStoreBase = create<BlockContextState>((set, get) => 
         get().switchBlock(newBlockId, 'cross-tab');
       }
     });
+
+    // Subscribe to auth role changes to update visible blocks dynamically
+    if (typeof window !== 'undefined') {
+      useAuthStore.subscribe((authState) => {
+        const nextRole = authState.authState.status === 'authenticated-active'
+          ? (authState.authState.user.role as ViewerRole)
+          : 'student-free';
+        const updated = catalog.list(nextRole);
+        const current = get().visibleBlocks;
+        if (updated.length !== current.length || updated.some((b, i) => b.blockId !== current[i]?.blockId)) {
+          set({ visibleBlocks: updated });
+        }
+      });
+    }
 
     // Execute initial hydration for the resolved block
     await get().switchBlock(initialBlockId, 'boot');
@@ -121,7 +153,7 @@ export function useActiveBlock() {
     : useBlockContextStore((s) => s.visibleBlocks);
   const visibleBlocks = (rawVisible && rawVisible.length > 0)
     ? rawVisible
-    : (typeof compositionRoot !== 'undefined' && compositionRoot?.catalog ? compositionRoot.catalog.list('student-free') : []);
+    : (typeof compositionRoot !== 'undefined' && compositionRoot?.catalog ? compositionRoot.catalog.list(getViewerRole()) : []);
   const switchBlock = useBlockContextStoreBase.getState().switchBlock;
 
   const pack = (typeof compositionRoot !== 'undefined' && compositionRoot?.catalog)
