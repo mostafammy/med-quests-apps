@@ -29,23 +29,24 @@ import { createCloudProvider, getAvailableFallbackProvider } from '../../../infr
 import type { LlmMessage } from '../../../infrastructure/ai/providers/openAiCompatibleProvider.ts';
 import { createClientQddEngine, loadAllClientBankQuestions } from '../duplication/clientCompositionRoot.ts';
 import type { DuplicationVerdict } from '../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
+import { LEGACY_DEFAULT_BLOCK_ID } from '../../curriculum/ids.ts';
 import defaultCvsBank from '../../../../content/cvs/dist/bank.v1.json';
 import cvsManifest from '../../../../content/cvs/manifest.json';
 import cnsManifest from '../../../../content/cns/manifest.json';
 
 const KNOWN_MANIFESTS: Record<string, any> = {
-  cvs: cvsManifest,
+  [LEGACY_DEFAULT_BLOCK_ID]: cvsManifest,
   cns: cnsManifest,
 };
 
-export function normalizeBlockId(rawBlockId: string | undefined | null, fallbackBlockId: string = 'cvs'): string {
+export function normalizeBlockId(rawBlockId: string | undefined | null, fallbackBlockId: string = LEGACY_DEFAULT_BLOCK_ID): string {
   if (!rawBlockId || typeof rawBlockId !== 'string') return fallbackBlockId;
   const clean = rawBlockId.toLowerCase().trim();
   if (clean === 'cns' || clean.startsWith('cns-') || clean.includes('neuroscience') || clean.includes('cns')) {
     return 'cns';
   }
-  if (clean === 'cvs' || clean.startsWith('cvs-') || clean.includes('cardiovascular') || clean.includes('cvs')) {
-    return 'cvs';
+  if (clean === LEGACY_DEFAULT_BLOCK_ID || clean.startsWith('cvs-') || clean.includes('cardiovascular') || clean.includes('cvs')) {
+    return LEGACY_DEFAULT_BLOCK_ID;
   }
   if (KNOWN_MANIFESTS[clean]) return clean;
   return clean;
@@ -236,7 +237,7 @@ export class QuestionParsingAgent {
     const qddEngine = await createClientQddEngine(bankQuestions);
     // Always send schema-valid probes with IDs guaranteed not to collide with existing bank IDs
     // (preventing S1/S2 self-comparison skips when an LLM reuses a placeholder ID).
-    const targetBlockId = (request.targetBlockId || 'cvs') as string;
+    const targetBlockId = (request.targetBlockId || LEGACY_DEFAULT_BLOCK_ID) as string;
     const questionsPayload = parsedResult.items.map((item, idx) => {
       const validQ = QuestionSchema.safeParse(item.question).success
         ? item.question
@@ -646,7 +647,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
         const q = item.question;
         // Always assign a fresh unique question ID (never reuse LLM placeholder IDs like q-parsed-1701987600000-1)
         q.id = `q-parsed-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}-${i + 1}`;
-        q.blockId = request.targetBlockId || 'cvs';
+        q.blockId = request.targetBlockId || LEGACY_DEFAULT_BLOCK_ID;
         if (!q.type) q.type = 'single-best-answer';
         if (!q.status) q.status = 'active';
         if (!q.bankVersion) q.bankVersion = 1;
@@ -881,7 +882,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
 
     const questionDraft: Question = {
       id: `q-parsed-${Date.now().toString(36)}-${index}`,
-      blockId: request.targetBlockId || 'cvs',
+      blockId: request.targetBlockId || LEGACY_DEFAULT_BLOCK_ID,
       subjectId,
       chapterId,
       topicId: matchedBankQuestion?.topicId || `${chapterId}/clinical-review`,
@@ -1273,7 +1274,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
    * Coerces a loosely-shaped question into a QuestionSchema-valid object
    * without altering stem, choice text, or the keyed answer.
    */
-  public repairQuestionToSchema(raw: any, fallbackBlockId: string = 'cvs'): Question {
+  public repairQuestionToSchema(raw: any, fallbackBlockId: string = LEGACY_DEFAULT_BLOCK_ID): Question {
     const q = raw && typeof raw === 'object' ? raw : {};
     const ids: ChoiceId[] = ['a', 'b', 'c', 'd'];
     const rawChoices: any[] = Array.isArray(q.choices) ? q.choices : [];
@@ -1357,7 +1358,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     } as Question;
   }
 
-  private extractConceptTitle(stem: string, subjectId: string, blockId: string = 'cvs'): string {
+  private extractConceptTitle(stem: string, subjectId: string, blockId: string = LEGACY_DEFAULT_BLOCK_ID): string {
     const words = stem.split(/\s+/).slice(0, 6).join(' ');
     const sanitized = words.replace(/[^a-zA-Z0-9\s]/g, '').trim();
     if (sanitized.length > 8) {
@@ -1366,7 +1367,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     return `${normalizeBlockId(blockId).toUpperCase()} ${subjectId.toUpperCase()} Clinical Assessment`;
   }
 
-  private synthesizeEvidence(subjectId: string, concept: string, blockId: string = 'cvs') {
+  private synthesizeEvidence(subjectId: string, concept: string, blockId: string = LEGACY_DEFAULT_BLOCK_ID) {
     const normBlock = normalizeBlockId(blockId);
     if (normBlock === 'cns') {
       const cnsSources: Record<string, { name: string; loc: string }> = {
@@ -1613,7 +1614,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
     const firstBlockId =
       rawJsonItems.find((it) => it && (it.blockId || it.question?.blockId))?.blockId ||
       rawJsonItems.find((it) => it && it.question?.blockId)?.question?.blockId;
-    const targetBlockId = normalizeBlockId(firstBlockId || request.targetBlockId || 'cvs');
+    const targetBlockId = normalizeBlockId(firstBlockId || request.targetBlockId || LEGACY_DEFAULT_BLOCK_ID);
 
     // STEP 1: Text Segmentation & Tokenization
     telemetry = this.updateTelemetryStep(telemetry, 'segmentation', 'completed', {
