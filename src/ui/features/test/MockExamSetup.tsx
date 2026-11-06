@@ -1,20 +1,30 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldAlert, Award, Play } from 'lucide-react';
+import { ShieldAlert, Award, Play, AlertCircle } from 'lucide-react';
 import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
+import { useBlockContextStore, useActiveTaxonomy } from '../../../application/stores/useBlockContextStore.ts';
+import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 
 export const MockExamSetup: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useLocaleStore();
+  const { activeBlockId } = useBlockContextStore();
+  const taxonomy = useActiveTaxonomy();
+  const { questions } = useQuestionStore();
+
+  const targetCount = Math.min(50, questions.length);
+  const isAvailable = questions.length > 0;
 
   const handleStartMock = () => {
+    if (!isAvailable) return;
     navigate('/session/mock-exam', {
       state: {
         mode: 'mock',
         subjectId: 'all',
         chapterId: 'all',
-        questionCount: 50,
+        questionCount: targetCount,
         timeLimitMinutes: 120, // 2 hours
+        blockId: activeBlockId,
       },
     });
   };
@@ -27,7 +37,7 @@ export const MockExamSetup: React.FC = () => {
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-zinc-100 tracking-tight">{t.test.mockSetup.title}</h1>
         <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
-          {t.test.mockSetup.subtitle}
+          {taxonomy.block.name} • {t.test.mockSetup.subtitle.replace('{blockName}', taxonomy.block.name).replace('{blockCode}', taxonomy.block.code || '')}
         </p>
       </div>
 
@@ -36,7 +46,9 @@ export const MockExamSetup: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-center">
           <div className="p-3.5 sm:p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-100 dark:border-zinc-800">
             <div className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 uppercase font-semibold">{t.test.mockSetup.length}</div>
-            <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-1">50 {t.common.questions}</div>
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-1">
+              {isAvailable ? `${targetCount} ${t.common.questions}` : `0 ${t.common.questions}`}
+            </div>
             <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">{t.test.mockSetup.lengthSub}</div>
           </div>
 
@@ -52,6 +64,35 @@ export const MockExamSetup: React.FC = () => {
             <div className="text-[10px] sm:text-[11px] text-indigo-700 dark:text-indigo-300 mt-0.5">{t.test.mockSetup.modeSub}</div>
           </div>
         </div>
+
+        {/* Blueprint Distribution */}
+        <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-2xl border border-slate-200/80 dark:border-zinc-800 space-y-2">
+          <div className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
+            Curriculum Blueprint Distribution ({taxonomy.subjects.length} Subjects)
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {taxonomy.subjects.map((sub) => {
+              const count = questions.filter((q) => q.subjectId === sub.id).length;
+              return (
+                <span
+                  key={sub.id}
+                  className="text-xs px-2.5 py-1 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-semibold"
+                >
+                  {sub.name.replace(/^(CVS|CNS)\s+/, '')} ({count})
+                </span>
+              );
+            })}
+          </div>
+        </div>
+
+        {!isAvailable && (
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-400/30 text-amber-800 dark:text-amber-200 text-xs flex items-center space-x-2.5">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-500" />
+            <span>
+              This curriculum block is currently in beta. No questions have been published yet for full-length mock exams.
+            </span>
+          </div>
+        )}
 
         {/* Examination Rules Banner */}
         <div className="p-4 bg-slate-900 dark:bg-zinc-950 text-slate-200 dark:text-zinc-300 rounded-2xl text-xs space-y-2 border border-slate-800 dark:border-zinc-800">
@@ -69,10 +110,11 @@ export const MockExamSetup: React.FC = () => {
 
         <button
           onClick={handleStartMock}
-          className="w-full py-3.5 px-6 bg-slate-900 dark:bg-zinc-800 hover:bg-slate-800 dark:hover:bg-zinc-700 text-white rounded-2xl text-base font-bold flex items-center justify-center space-x-2 shadow-md transition-all cursor-pointer border border-transparent dark:border-zinc-700 apple-tap"
+          disabled={!isAvailable}
+          className="w-full py-3.5 px-6 bg-slate-900 dark:bg-zinc-800 hover:bg-slate-800 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl text-base font-bold flex items-center justify-center space-x-2 shadow-md transition-all cursor-pointer border border-transparent dark:border-zinc-700 apple-tap"
         >
           <Play className="w-5 h-5 fill-current text-emerald-400" />
-          <span>{t.test.mockSetup.startBtn}</span>
+          <span>{isAvailable ? t.test.mockSetup.startBtn : 'No Questions Published Yet'}</span>
         </button>
       </div>
     </div>
