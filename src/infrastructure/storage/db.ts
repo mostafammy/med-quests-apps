@@ -33,6 +33,7 @@ export interface AiThreadRecord {
 
 export interface SrsFlashcardRecord {
   id: string;
+  blockId?: string;
   questionId: string | null;
   highYieldTopicId: string;
   frontPrompt: string;
@@ -96,6 +97,29 @@ export interface QuestionFingerprintRecord {
   updatedAt: string;
 }
 
+export async function upgradeV8ToV9(tx: any): Promise<void> {
+  const questionsTable = tx.table('questions');
+  const srsTable = tx.table('srsCards');
+
+  const questionBlockMap = new Map<string, string>();
+  await questionsTable.each((q: any) => {
+    questionBlockMap.set(q.id, q.blockId || 'cvs');
+  });
+
+  await srsTable.toCollection().modify((card: any) => {
+    if (!card.blockId) {
+      const inferredFromQuestion = card.questionId ? questionBlockMap.get(card.questionId) : undefined;
+      const topicParts = card.highYieldTopicId?.split('-');
+      const inferredFromTopic =
+        topicParts && topicParts.length > 1 && (topicParts[0] === 'cvs' || topicParts[0] === 'cns')
+          ? topicParts[0]
+          : undefined;
+
+      card.blockId = inferredFromQuestion || inferredFromTopic || 'cvs';
+    }
+  });
+}
+
 class MedQuestsDB extends Dexie {
   questions!: EntityTable<Question, 'id'>;
   attempts!: EntityTable<Attempt, 'id'>;
@@ -152,6 +176,25 @@ class MedQuestsDB extends Dexie {
     this.version(8).stores({
       questionFingerprints: 'questionId, blockId, chapterId, stemHash, itemHash, answerKeyHash, contentVersion',
     });
+
+    this.version(9)
+      .stores({
+        questions:
+          'id, blockId, [blockId+subjectId], [blockId+chapterId], [blockId+highYield], subjectId, chapterId, topicId, highYield, difficulty, provenanceScope, editorialStatus',
+        attempts:
+          'id, questionId, blockId, [blockId+answeredAt], [blockId+questionId], sessionId, mode, isCorrect, confidence, answeredAt',
+        reviewCards:
+          'questionId, blockId, [blockId+dueAt], dueAt, repetitions, lapses',
+        bookmarks:
+          'questionId, blockId, [blockId+bookmarkedAt], bookmarkedAt',
+        notes:
+          'questionId, blockId, [blockId+updatedAt], updatedAt',
+        aiThreads:
+          'threadId, questionId, blockId, [blockId+updatedAt], updatedAt',
+        srsCards:
+          'id, blockId, [blockId+nextReviewAt], questionId, highYieldTopicId, nextReviewAt, createdAt',
+      })
+      .upgrade(upgradeV8ToV9);
   }
 }
 
