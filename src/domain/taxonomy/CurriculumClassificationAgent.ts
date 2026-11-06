@@ -39,14 +39,29 @@ export interface TaxonomyClassificationResult {
   };
 }
 
+export interface BlockDescriptorContext {
+  id: string;
+  name: string;
+  code?: string;
+  shortName?: string;
+}
+
 export class CurriculumClassificationAgent {
   constructor(
     private readonly taxonomyRegistry: ICurriculumTaxonomyRegistry = CurriculumTaxonomyRegistry.getInstance()
   ) {}
 
   private createResult(
-    params: Omit<TaxonomyClassificationResult, 'blockId' | 'blockName'>
+    params: Omit<TaxonomyClassificationResult, 'blockId' | 'blockName'>,
+    customBlock?: BlockDescriptorContext
   ): TaxonomyClassificationResult {
+    if (customBlock) {
+      return {
+        blockId: customBlock.id,
+        blockName: `${customBlock.name} (${customBlock.shortName || customBlock.id.toUpperCase()}) - ${customBlock.code || 'Curriculum Block'}`,
+        ...params,
+      };
+    }
     const block = this.taxonomyRegistry.getTaxonomy().block;
     return {
       blockId: block?.id || 'cvs',
@@ -64,18 +79,24 @@ export class CurriculumClassificationAgent {
   public classify(
     stem: string,
     choicesText = '',
-    explanationText = ''
+    explanationText = '',
+    targetDescriptor?: BlockDescriptorContext
   ): TaxonomyClassificationResult {
     const combined = `${stem} ${choicesText} ${explanationText}`.toLowerCase();
 
     // 1. GAP ANALYSIS: Check if content belongs to an unmapped specialty (e.g. Pharmacology or Pathology)
     const gapAssessment = this.detectCurriculumGaps(combined);
-    if (gapAssessment) {
-      return gapAssessment;
+    const result = gapAssessment || this.matchAgainstRegisteredTaxonomy(combined);
+
+    if (targetDescriptor) {
+      return {
+        ...result,
+        blockId: targetDescriptor.id,
+        blockName: `${targetDescriptor.name} (${targetDescriptor.shortName || targetDescriptor.id.toUpperCase()}) - ${targetDescriptor.code || 'Curriculum Block'}`,
+      };
     }
 
-    // 2. CANONICAL CLASSIFICATION: Match against active registered taxonomy
-    return this.matchAgainstRegisteredTaxonomy(combined);
+    return result;
   }
 
   /**
