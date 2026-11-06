@@ -91,7 +91,7 @@ export const enDictionary: TranslationDictionary = {
   dashboard: {
     badgeExamPrep: 'Exam Preparation',
     engineBadge: 'IndexedDB Engine',
-    title: 'CVS Block Mastery',
+    title: '{blockName} Mastery',
     subtitle: 'Real-time calibration across Anatomy, Histology, and Microbiology faculty documents.',
     resetBtn: 'Reset',
     mockExamBtn: 'Mock Exam',
@@ -132,7 +132,7 @@ export const enDictionary: TranslationDictionary = {
     },
   },
   test: {
-    hubTitle: 'Cardiovascular Test Hub',
+    hubTitle: '{blockName} Test Hub',
     hubSubtitle: 'Select a customized testing mode, subject domain, and question filters.',
     practiceMode: 'Standard Practice',
     practiceModeDesc: 'Instant feedback with full Socratic AI reasoning and curriculum citations.',
@@ -145,7 +145,7 @@ export const enDictionary: TranslationDictionary = {
     scopeSubtitle: 'Filter questions by medical discipline or specific chapter',
     filterSubject: 'Subject Filter',
     filterChapter: 'Chapter / Topic Filter',
-    allSubjects: 'All Subjects (Cardiovascular)',
+    allSubjects: 'All Subjects ({blockName})',
     allChapters: 'All Chapters',
     questionCount: 'Question Count',
     highYieldOnly: 'High-Yield Questions Only',
@@ -191,7 +191,7 @@ export const enDictionary: TranslationDictionary = {
     },
     mockSetup: {
       title: 'Full Mock Examination',
-      subtitle: 'Simulate the actual university CVS Block 206 Exam with standardized conditions.',
+      subtitle: 'Simulate the actual university {blockName} ({blockCode}) Exam with standardized conditions.',
       length: 'Length',
       lengthSub: 'Stratified Sampling',
       duration: 'Duration',
