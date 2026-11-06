@@ -9,6 +9,7 @@ import { SessionPlayer } from './ui/features/test/SessionPlayer.tsx';
 import { ReviewHub } from './ui/features/review/ReviewHub.tsx';
 import { CurriculumLibrary } from './ui/features/curriculum/CurriculumLibrary.tsx';
 import { useQuestionStore } from './application/stores/useQuestionStore.ts';
+import { useBlockContextStore } from './application/stores/useBlockContextStore.ts';
 import { useThemeStore } from './application/stores/useThemeStore.ts';
 import { useAuthStore } from './application/stores/useAuthStore.ts';
 import { useLocaleStore } from './application/stores/useLocaleStore.ts';
@@ -45,7 +46,6 @@ const suspense = (node: React.ReactNode) => (
 );
 
 export const App: React.FC = () => {
-  const { loadQuestions } = useQuestionStore();
   const { initTheme } = useThemeStore();
   const { init: initAuth } = useAuthStore();
 
@@ -54,23 +54,44 @@ export const App: React.FC = () => {
     const cleanupTheme = initTheme();
     // Synchronize hardware capability detector and background edge revalidation
     const cleanupAuth = initAuth();
-    // Initialise and load stored questions for active block (CVS)
-    loadQuestions('cvs');
 
-    // Emit zero-overhead boot hydration telemetry
-    const hydrationMs = Math.round(performance.now());
-    analytics.capture('app:boot_hydrated', {
-      boot_hydration_ms: hydrationMs,
-      indexeddb_questions_loaded: 212,
-      cold_start: true,
-      referrer_source: typeof document !== 'undefined' ? document.referrer || 'direct' : 'direct',
-    });
+    // 1. Resolve deep link ?block= from URL and strip cleanly with history.replaceState
+    let deepLinkBlock: string | null = null;
+    if (typeof window !== 'undefined' && window.location.search) {
+      const params = new URLSearchParams(window.location.search);
+      deepLinkBlock = params.get('block');
+      if (deepLinkBlock) {
+        params.delete('block');
+        const remainingQuery = params.toString();
+        const newUrl =
+          window.location.pathname +
+          (remainingQuery ? `?${remainingQuery}` : '') +
+          window.location.hash;
+        window.history.replaceState(null, '', newUrl);
+      }
+    }
+
+    // 2. Initialize block context store (which runs BootBlockResolver & 2-phase hydration)
+    useBlockContextStore
+      .getState()
+      .init(deepLinkBlock)
+      .then(() => {
+        const qCount = useQuestionStore.getState().questions.length;
+        const hydrationMs = Math.round(performance.now());
+        analytics.capture('app:boot_hydrated', {
+          boot_hydration_ms: hydrationMs,
+          indexeddb_questions_loaded: qCount,
+          cold_start: true,
+          referrer_source:
+            typeof document !== 'undefined' ? document.referrer || 'direct' : 'direct',
+        });
+      });
 
     return () => {
       cleanupTheme?.();
       cleanupAuth?.();
     };
-  }, [loadQuestions, initTheme, initAuth]);
+  }, [initTheme, initAuth]);
 
   return (
     <BrowserRouter>
