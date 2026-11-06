@@ -13,8 +13,13 @@ export type AiPromptMode = 'format_existing' | 'generate_new' | 'schema_only';
 
 export interface AiPromptOptions {
   mode: AiPromptMode;
+  blockId?: string;
+  blockName?: string;
+  blockCode?: string;
   subjectId?: string;
+  subjectName?: string;
   chapterId?: string;
+  chapterName?: string;
   topicId?: string;
   difficulty?: 1 | 2 | 3;
   questionCount?: number;
@@ -86,6 +91,9 @@ export class QuestionAiPromptBuilder {
   public static buildPrompt(options: AiPromptOptions): string {
     const {
       mode,
+      blockId = 'cvs',
+      blockName = 'Cardiovascular System',
+      blockCode = 'Block 206',
       subjectId = 'all',
       chapterId = 'all',
       difficulty = 2,
@@ -93,11 +101,17 @@ export class QuestionAiPromptBuilder {
       customFocus = '',
     } = options;
 
-    const subjectObj = CVS_TAXONOMY.subjects.find((s) => s.id === subjectId);
-    const subjectName = subjectObj ? `${subjectObj.name} (${subjectObj.id})` : 'Integrated Cardiovascular (CVS)';
+    let subjectName = options.subjectName;
+    if (!subjectName) {
+      const subjectObj = CVS_TAXONOMY.subjects.find((s) => s.id === subjectId);
+      subjectName = subjectObj ? `${subjectObj.name} (${subjectObj.id})` : `Integrated ${blockName} (${blockId.toUpperCase()})`;
+    }
 
-    const chapterObj = CVS_TAXONOMY.chapters.find((c) => c.id === chapterId);
-    const chapterName = chapterObj ? `${chapterObj.name} (${chapterObj.id})` : 'All Curriculum Chapters';
+    let chapterName = options.chapterName;
+    if (!chapterName) {
+      const chapterObj = CVS_TAXONOMY.chapters.find((c) => c.id === chapterId);
+      chapterName = chapterObj ? `${chapterObj.name} (${chapterObj.id})` : 'All Curriculum Chapters';
+    }
 
     const exampleJsonString = JSON.stringify([GOLD_STANDARD_EXAMPLE_QUESTION], null, 2);
 
@@ -106,13 +120,13 @@ export class QuestionAiPromptBuilder {
     }
 
     if (mode === 'format_existing') {
-      return `You are an expert Medical Assessment Psychometrician and JSON formatting engine for the MedQuests Cardiovascular (CVS) Medical Question Bank.
+      return `You are an expert Medical Assessment Psychometrician and JSON formatting engine for the MedQuests ${blockName} (${blockId.toUpperCase()}) Medical Question Bank.
 
 Your objective is to reformat, refine, and structure raw medical multiple-choice questions or lecture notes into the strictly typed, high-yield JSON format required by our medical education platform.
 
 ----------------------------------------------------------------------
 TARGET CURRICULUM CONTEXT:
-- Block: Cardiovascular System (cvs)
+- Block: ${blockName} (${blockId} - ${blockCode})
 - Subject: ${subjectName}
 - Chapter: ${chapterName}
 - Target Difficulty: Level ${difficulty} (${difficulty === 1 ? 'Foundational Knowledge / Recall' : difficulty === 2 ? 'Clinical Vignette / Application' : 'Complex Multi-step Reasoning'})
@@ -181,13 +195,13 @@ Below are my raw questions / lecture notes. Reformat all of them into a single v
     }
 
     // Default: 'generate_new'
-    return `You are a Board-Certified Medical Question Author and Psychometrician specializing in USMLE Step 1, Saudi Medical Licensure Examination (SMLE), and MBBS cardiovascular assessment.
+    return `You are a Board-Certified Medical Question Author and Psychometrician specializing in USMLE Step 1, Saudi Medical Licensure Examination (SMLE), and MBBS ${blockName} assessment.
 
 Your task is to author ${questionCount} original, high-yield, board-caliber Single Best Answer (SBA) clinical vignette question(s) strictly formatted as a valid JSON array for MedQuests.
 
 ----------------------------------------------------------------------
 CURRICULUM SPECIFICATION:
-- System: Cardiovascular System (cvs)
+- System: ${blockName} (${blockId} - ${blockCode})
 - Subject: ${subjectName}
 - Chapter: ${chapterName}
 - Target Difficulty: Level ${difficulty} (${difficulty === 1 ? 'Foundational Recall' : difficulty === 2 ? 'Clinical Application / Diagnosis' : 'Complex Multi-step Pathophysiology'})
