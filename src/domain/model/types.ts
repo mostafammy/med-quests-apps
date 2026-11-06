@@ -83,7 +83,7 @@ export type Evidence = z.infer<typeof EvidenceSchema>;
 
 export const QuestionSchema = z.object({
   id: z.string(),
-  blockId: z.string().default('cvs'),
+  blockId: z.string().min(2, 'blockId must be a valid identifier (min 2 characters)'),
   subjectId: z.string(),
   chapterId: z.string(),
   topicId: z.string(),
