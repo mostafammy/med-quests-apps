@@ -650,7 +650,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
     const subjObj = subjects.find((s) => s.id === subjectId);
     const chapObj = chapters.find((c) => c.id === chapterId);
 
-    const targetBlockId = get().targetBlockId || ('cvs' as BlockId);
+    const targetBlockId = get().targetBlockId || LEGACY_DEFAULT_BLOCK_ID;
     const pack = compositionRoot.catalog.get(targetBlockId);
     const blockName = pack
       ? `${pack.manifest.block.name.en} (${pack.manifest.block.shortName}) - ${pack.manifest.block.code}`
@@ -830,7 +830,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
         } catch {
           // Ignore IndexedDB write error in non-browser environment
         }
-        const commitBlockId = (itemsToCommit[0]?.question?.blockId || get().targetBlockId || 'cvs') as BlockId;
+        const commitBlockId = (itemsToCommit[0]?.question?.blockId || get().targetBlockId || LEGACY_DEFAULT_BLOCK_ID) as BlockId;
         await useQuestionStore.getState().loadQuestions(commitBlockId);
 
         // Clear committed items from list
