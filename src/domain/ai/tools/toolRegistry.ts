@@ -24,6 +24,8 @@ import {
   FormulateMnemonicTool,
   PrescribeMicroCurriculumTool,
 } from './memoryRemediationTools.ts';
+import type { BlockAiProfile } from '../../curriculum/BlockAiProfileRegistry.ts';
+import { defaultBlockAiProfileRegistry } from '../../curriculum/BlockAiProfileRegistry.ts';
 
 export interface ToolDefinition {
   type: 'function';
@@ -74,11 +76,14 @@ export class AgentToolRegistry {
 
   /**
    * Compiles JSON Schema tool declarations for the LLM API.
-   * Supplies clinical and telemetry tools for the model.
+   * Supplies clinical and telemetry tools for the model, filtered by active block AI profile.
    */
-  getToolDeclarations(_context?: SafeAiContext): ToolDefinition[] {
+  getToolDeclarations(_context?: SafeAiContext, profile?: BlockAiProfile): ToolDefinition[] {
     const declarations: ToolDefinition[] = [];
     for (const tool of this.tools.values()) {
+      if (profile && !defaultBlockAiProfileRegistry.isToolAllowed(profile, tool.name)) {
+        continue;
+      }
       declarations.push({
         type: 'function',
         function: {
@@ -95,7 +100,8 @@ export class AgentToolRegistry {
     callId: string,
     toolName: string,
     rawArgs: unknown,
-    ctx: ToolExecutionContext
+    ctx: ToolExecutionContext,
+    profile?: BlockAiProfile
   ): Promise<AgentToolExecutionEnvelope> {
     const tool = this.tools.get(toolName as AgentToolName);
     if (!tool) {
@@ -106,6 +112,18 @@ export class AgentToolRegistry {
         status: 'error',
         llmFeedbackJson: JSON.stringify({ error: `Tool '${toolName}' not found.` }),
         error: `Tool '${toolName}' is not recognized.`,
+      };
+    }
+
+    // Block profile toolset policy check
+    if (profile && !defaultBlockAiProfileRegistry.isToolAllowed(profile, tool.name)) {
+      return {
+        callId,
+        toolName: tool.name,
+        visibility: 'silent',
+        status: 'blocked',
+        llmFeedbackJson: JSON.stringify({ error: `Tool '${toolName}' is not available in the ${profile.personaLabel} profile.` }),
+        error: `Tool '${toolName}' is blocked for active profile '${profile.id}'.`,
       };
     }
 
