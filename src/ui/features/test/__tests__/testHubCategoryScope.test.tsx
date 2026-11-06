@@ -1,12 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { TestHub } from '../TestHub.tsx';
 import { QuickPractice } from '../QuickPractice.tsx';
 import { enDictionary } from '../../../../domain/i18n/dictionaries/en.ts';
 import { arDictionary } from '../../../../domain/i18n/dictionaries/ar.ts';
+import { useQuestionStore } from '../../../../application/stores/useQuestionStore.ts';
+import defaultCvsBank from '../../../../../content/cvs/dist/bank.v1.json';
+import type { Question } from '../../../../domain/model/types.ts';
 
 describe('TestHub & QuickPractice Category Scope Option', () => {
+  beforeEach(() => {
+    useQuestionStore.setState({
+      questions: defaultCvsBank as Question[],
+      activeBlockId: 'cvs',
+      isLoading: false,
+    });
+  });
   it('renders the "Test All Questions in Category" card in TestHub Section 2', () => {
     const html = renderToString(
       <MemoryRouter>
