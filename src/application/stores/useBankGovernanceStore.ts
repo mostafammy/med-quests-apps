@@ -11,8 +11,11 @@ import type {
 import { edgeQuestionBankGateway } from '../../infrastructure/questionBank/edgeQuestionBankGateway.ts';
 import { QuestionSpecificationBuilder } from '../../domain/questionBank/questionSpecifications.ts';
 import type { Question } from '../../domain/model/types.ts';
+import type { BlockId } from '../../domain/curriculum/ids.ts';
+import { LEGACY_DEFAULT_BLOCK_ID } from '../../domain/curriculum/ids.ts';
 
 interface BankGovernanceStoreState {
+  activeBlockId: BlockId;
   activeWorkspaceTab: 'review-queue' | 'canonical-curator';
   reviewQueue: QuestionReviewSubmission[];
   catalogQuestions: GovernedQuestion[];
@@ -26,8 +29,9 @@ interface BankGovernanceStoreState {
   error: string | null;
 
   // Actions
+  setActiveBlockId: (blockId: BlockId) => void;
   setWorkspaceTab: (tab: 'review-queue' | 'canonical-curator') => void;
-  loadGovernanceData: (blockId?: string) => Promise<void>;
+  loadGovernanceData: (blockId?: BlockId | string) => Promise<void>;
   setFilter: (patch: Partial<QuestionCuratorFilterCriteria>) => void;
   resetFilters: () => void;
   selectTicket: (ticketId: string | null) => void;
@@ -63,7 +67,7 @@ interface BankGovernanceStoreState {
 }
 
 const DEFAULT_FILTERS: QuestionCuratorFilterCriteria = {
-  blockId: 'cvs',
+  blockId: LEGACY_DEFAULT_BLOCK_ID,
   subjectId: 'all',
   chapterId: 'all',
   editorialStatus: 'all',
@@ -73,6 +77,7 @@ const DEFAULT_FILTERS: QuestionCuratorFilterCriteria = {
 };
 
 export const useBankGovernanceStore = create<BankGovernanceStoreState>((set, get) => ({
+  activeBlockId: LEGACY_DEFAULT_BLOCK_ID,
   activeWorkspaceTab: 'review-queue',
   reviewQueue: [],
   catalogQuestions: [],
@@ -85,14 +90,28 @@ export const useBankGovernanceStore = create<BankGovernanceStoreState>((set, get
   isActionInProgress: false,
   error: null,
 
+  setActiveBlockId: (blockId: BlockId) => {
+    set((state) => ({
+      activeBlockId: blockId,
+      filterCriteria: {
+        ...state.filterCriteria,
+        blockId,
+        subjectId: 'all',
+        chapterId: 'all',
+      },
+    }));
+    void get().loadGovernanceData(blockId);
+  },
+
   setWorkspaceTab: (tab) => set({ activeWorkspaceTab: tab }),
 
-  loadGovernanceData: async (blockId = 'cvs') => {
+  loadGovernanceData: async (blockId) => {
+    const targetBlock = (blockId || get().activeBlockId || LEGACY_DEFAULT_BLOCK_ID) as BlockId;
     set({ isLoading: true, error: null });
     try {
       const [queueRes, catalogRes] = await Promise.all([
-        edgeQuestionBankGateway.listReviewQueue(blockId),
-        edgeQuestionBankGateway.listGlobalBankCatalog(blockId),
+        edgeQuestionBankGateway.listReviewQueue(targetBlock),
+        edgeQuestionBankGateway.listGlobalBankCatalog(targetBlock),
       ]);
 
       const queue = queueRes.ok ? [...queueRes.value] : [];
@@ -130,7 +149,7 @@ export const useBankGovernanceStore = create<BankGovernanceStoreState>((set, get
     try {
       const res = await edgeQuestionBankGateway.submitReviewDecision(command);
       if (res.ok) {
-        await get().loadGovernanceData('cvs');
+        await get().loadGovernanceData(get().activeBlockId);
         set({ isActionInProgress: false });
         return true;
       } else {
@@ -153,7 +172,7 @@ export const useBankGovernanceStore = create<BankGovernanceStoreState>((set, get
         actorRole: actor.role,
       });
       if (res.ok) {
-        await get().loadGovernanceData('cvs');
+        await get().loadGovernanceData(get().activeBlockId);
         set({ isActionInProgress: false });
         return true;
       } else {
@@ -178,7 +197,7 @@ export const useBankGovernanceStore = create<BankGovernanceStoreState>((set, get
         actorRole: actor.role,
       });
       if (res.ok) {
-        await get().loadGovernanceData('cvs');
+        await get().loadGovernanceData(get().activeBlockId);
         set({ isActionInProgress: false });
         return true;
       } else {
@@ -203,7 +222,7 @@ export const useBankGovernanceStore = create<BankGovernanceStoreState>((set, get
         actorRole: actor.role,
       });
       if (res.ok) {
-        await get().loadGovernanceData('cvs');
+        await get().loadGovernanceData(get().activeBlockId);
         set({ isActionInProgress: false });
         return true;
       } else {
@@ -228,7 +247,7 @@ export const useBankGovernanceStore = create<BankGovernanceStoreState>((set, get
         permanent,
       });
       if (res.ok) {
-        await get().loadGovernanceData('cvs');
+        await get().loadGovernanceData(get().activeBlockId);
         set({ isActionInProgress: false });
         return true;
       } else {
