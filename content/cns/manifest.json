@@ -1,0 +1,699 @@
+{
+  "schemaVersion": 1,
+  "block": {
+    "id": "cns",
+    "code": "Block 207",
+    "name": {
+      "en": "Central Nervous System",
+      "ar": "الجهاز العصبي المركزي"
+    },
+    "shortName": "CNS",
+    "description": {
+      "en": "Integrated Central Nervous System Block: Neuroanatomy, Neurophysiology, Neurohistology, Neuropathology, Microbiology & Neuropharmacology",
+      "ar": "مجمع الجهاز العصبي المركزي: التشريح العصبي، الفسيولوجيا العصبية، الهستولوجيا، الباثولوجيا، الميكروبيولوجيا والفارماكولوجيا"
+    },
+    "status": "beta",
+    "catalogOrder": 2,
+    "presentation": {
+      "glyph": "brain",
+      "accent": "violet"
+    },
+    "aiProfileId": "cns-faculty-v1"
+  },
+  "subjects": [
+    {
+      "id": "anatomy",
+      "name": {
+        "en": "CNS Neuroanatomy & Embryology",
+        "ar": "تشريح وأجنة الجهاز العصبي المركزي"
+      },
+      "order": 1
+    },
+    {
+      "id": "physiology",
+      "name": {
+        "en": "CNS Neurophysiology",
+        "ar": "فسيولوجيا الجهاز العصبي"
+      },
+      "order": 2
+    },
+    {
+      "id": "histology",
+      "name": {
+        "en": "CNS Neurohistology",
+        "ar": "هستولوجيا الجهاز العصبي"
+      },
+      "order": 3
+    },
+    {
+      "id": "pathology-micro",
+      "name": {
+        "en": "CNS Pathology & Microbiology",
+        "ar": "باثولوجيا وميكروبيولوجيا الجهاز العصبي"
+      },
+      "order": 4
+    },
+    {
+      "id": "pharmacology",
+      "name": {
+        "en": "CNS Neuropharmacology",
+        "ar": "فارماكولوجيا الجهاز العصبي المركزي"
+      },
+      "order": 5
+    }
+  ],
+  "chapters": [
+    {
+      "id": "cns-ana-embryology-meninges-csf",
+      "subjectId": "anatomy",
+      "name": {
+        "en": "Neural Tube, Meninges & CSF Dynamics",
+        "ar": "الأنبوب العصبي، السحايا وديناميكا السائل النخاعي"
+      },
+      "order": 1,
+      "sourceIds": ["SRC-CNS-ANA-01"]
+    },
+    {
+      "id": "cns-ana-spinal-cord-tracts",
+      "subjectId": "anatomy",
+      "name": {
+        "en": "Spinal Cord Structure & Ascending/Descending Tracts",
+        "ar": "بنية النخاع الشوكي والسبل الصاعدة والنازلة"
+      },
+      "order": 2,
+      "sourceIds": ["SRC-CNS-ANA-01"]
+    },
+    {
+      "id": "cns-ana-brainstem-cranial-nerves",
+      "subjectId": "anatomy",
+      "name": {
+        "en": "Brainstem Levels & Cranial Nerve Nuclei",
+        "ar": "مستويات جذع الدماغ ونوى الأعصاب القحفية"
+      },
+      "order": 3,
+      "sourceIds": ["SRC-CNS-ANA-01"]
+    },
+    {
+      "id": "cns-ana-cerebellum-basal-ganglia",
+      "subjectId": "anatomy",
+      "name": {
+        "en": "Cerebellum, Basal Ganglia & Diencephalon",
+        "ar": "المخيخ، العقد القاعدية والدماغ البيني"
+      },
+      "order": 4,
+      "sourceIds": ["SRC-CNS-ANA-01"]
+    },
+    {
+      "id": "cns-ana-cerebral-cortex-vascular",
+      "subjectId": "anatomy",
+      "name": {
+        "en": "Cerebral Hemispheres, Cortical Areas & Circle of Willis",
+        "ar": "نصفا الكرة المخية، الباحات القشرية ودائرة ويليس"
+      },
+      "order": 5,
+      "sourceIds": ["SRC-CNS-ANA-01"]
+    },
+    {
+      "id": "cns-phy-excitable-synaptic",
+      "subjectId": "physiology",
+      "name": {
+        "en": "Membrane Potentials & Synaptic Transmission",
+        "ar": "جهد الغشاء، النقل المشبكي والنواقل العصبية"
+      },
+      "order": 1,
+      "sourceIds": ["SRC-CNS-PHY-01"]
+    },
+    {
+      "id": "cns-phy-somatosensory-pain",
+      "subjectId": "physiology",
+      "name": {
+        "en": "Somatosensory Pathways & Pain Modulation",
+        "ar": "السبل الحسية الجسدية وتعديل الألم"
+      },
+      "order": 2,
+      "sourceIds": ["SRC-CNS-PHY-01"]
+    },
+    {
+      "id": "cns-phy-motor-control-reflexes",
+      "subjectId": "physiology",
+      "name": {
+        "en": "Spinal Reflexes & Motor System Integration",
+        "ar": "المنعكسات الشوكية وتكامل التحكم الحركي"
+      },
+      "order": 3,
+      "sourceIds": ["SRC-CNS-PHY-01"]
+    },
+    {
+      "id": "cns-phy-special-senses",
+      "subjectId": "physiology",
+      "name": {
+        "en": "Visual, Auditory & Vestibular Pathways",
+        "ar": "السبل البصرية، السمعية والدهليزية"
+      },
+      "order": 4,
+      "sourceIds": ["SRC-CNS-PHY-01"]
+    },
+    {
+      "id": "cns-phy-higher-functions-eeg",
+      "subjectId": "physiology",
+      "name": {
+        "en": "Hypothalamus, Limbic System & Sleep Architecture",
+        "ar": "الوطاء، الجهاز الحوفي وبنية النوم وتخطيط الدماغ"
+      },
+      "order": 5,
+      "sourceIds": ["SRC-CNS-PHY-01"]
+    },
+    {
+      "id": "cns-his-neurons-neuroglia-bbb",
+      "subjectId": "histology",
+      "name": {
+        "en": "Neurons, Glial Cells & Blood-Brain Barrier",
+        "ar": "العصبونات، الخلايا الدبقية والحاجز الدموي الدماغي"
+      },
+      "order": 1,
+      "sourceIds": ["SRC-CNS-HIS-01"]
+    },
+    {
+      "id": "cns-his-cortex-cerebellum-cord",
+      "subjectId": "histology",
+      "name": {
+        "en": "Microscopic Architecture of Cortex, Cerebellum & Cord",
+        "ar": "البنية المجهرية للقشرة، المخيخ والنخاع الشوكي"
+      },
+      "order": 2,
+      "sourceIds": ["SRC-CNS-HIS-01"]
+    },
+    {
+      "id": "cns-pat-cerebrovascular-trauma",
+      "subjectId": "pathology-micro",
+      "name": {
+        "en": "Stroke, Aneurysms & CNS Trauma",
+        "ar": "السكتة الدماغية، أمهات الدم وإصابات الجهاز العصبي"
+      },
+      "order": 1,
+      "sourceIds": ["SRC-CNS-PAT-01"]
+    },
+    {
+      "id": "cns-mic-meningitis-encephalitis",
+      "subjectId": "pathology-micro",
+      "name": {
+        "en": "Infections: Meningitis, Encephalitis & Abscess",
+        "ar": "العدوى: التهاب السحايا، التهاب الدماغ وخراج الدماغ"
+      },
+      "order": 2,
+      "sourceIds": ["SRC-CNS-MIC-01"]
+    },
+    {
+      "id": "cns-pat-demyelinating-degenerative-tumors",
+      "subjectId": "pathology-micro",
+      "name": {
+        "en": "Demyelinating, Neurodegenerative Diseases & Neoplasms",
+        "ar": "الأمراض المزيلة للميالين، التنكس العصبي وأورام الجهاز العصبي"
+      },
+      "order": 3,
+      "sourceIds": ["SRC-CNS-PAT-01"]
+    },
+    {
+      "id": "cns-pha-neurotherapeutics",
+      "subjectId": "pharmacology",
+      "name": {
+        "en": "Antiepileptics, Anesthetics & Psychotropic Agents",
+        "ar": "مضادات الصرع، المخدرات والأدوية النفسية العصبية"
+      },
+      "order": 1,
+      "sourceIds": ["SRC-CNS-PHA-01"]
+    }
+  ],
+  "topics": [
+    {
+      "id": "cns-ana-embryology-meninges-csf/neural-tube-defects",
+      "chapterId": "cns-ana-embryology-meninges-csf",
+      "name": {
+        "en": "Neural Tube Formation & Dysraphic Anomalies (Spina Bifida, Anencephaly)",
+        "ar": "تشكل الأنبوب العصبي وتشوهات انغلاقه"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-ana-embryology-meninges-csf/meninges-and-dural-folds",
+      "chapterId": "cns-ana-embryology-meninges-csf",
+      "name": {
+        "en": "Dura, Arachnoid, Pia & Dural Reflections (Falx & Tentorium)",
+        "ar": "السحايا وانعكاسات الأم الجافية"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-ana-embryology-meninges-csf/ventricles-and-csf-dynamics",
+      "chapterId": "cns-ana-embryology-meninges-csf",
+      "name": {
+        "en": "Ventricular System, Choroid Plexus & CSF Hydrocephalus Dynamics",
+        "ar": "البطينات الدماغية، الضفيرة المشيمية واستسقاء الدماغ"
+      },
+      "order": 3
+    },
+    {
+      "id": "cns-ana-spinal-cord-tracts/spinal-cord-gray-matter",
+      "chapterId": "cns-ana-spinal-cord-tracts",
+      "name": {
+        "en": "Spinal Cord Segmental Organization & Rexed Laminae",
+        "ar": "التنظيم القطعي للنخاع الشوكي وصفائح ريكسد"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-ana-spinal-cord-tracts/ascending-sensory-tracts",
+      "chapterId": "cns-ana-spinal-cord-tracts",
+      "name": {
+        "en": "Dorsal Columns (Gracilis/Cuneatus) & Spinothalamic Tracts",
+        "ar": "العمود الخلفي والسبل الشوكية المهادية"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-ana-spinal-cord-tracts/descending-motor-tracts",
+      "chapterId": "cns-ana-spinal-cord-tracts",
+      "name": {
+        "en": "Lateral Corticospinal Tract, Rubrospinal & Reticulospinal Tracts",
+        "ar": "السبيل القشري الشوكي الجانبي والسبل المحركة"
+      },
+      "order": 3
+    },
+    {
+      "id": "cns-ana-spinal-cord-tracts/spinal-cord-lesions-brown-sequard",
+      "chapterId": "cns-ana-spinal-cord-tracts",
+      "name": {
+        "en": "Spinal Cord Syndromes (Brown-Séquard, Syringomyelia, Tabes Dorsalis)",
+        "ar": "متلازمات النخاع الشوكي وتكهف النخاع"
+      },
+      "order": 4
+    },
+    {
+      "id": "cns-ana-brainstem-cranial-nerves/medulla-oblongata-internal",
+      "chapterId": "cns-ana-brainstem-cranial-nerves",
+      "name": {
+        "en": "Medulla Oblongata: Pyramidal Decussation, Olives & CN IX-XII",
+        "ar": "البصلة السيسائية: التصالب الهرمي والأعصاب القحفية 9-12"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-ana-brainstem-cranial-nerves/pons-and-middle-cerebellar-peduncle",
+      "chapterId": "cns-ana-brainstem-cranial-nerves",
+      "name": {
+        "en": "Pons: Basilar Sulcus, Facial Colliculus & CN V-VIII",
+        "ar": "الجسر: الأكيمة الوجهية والأعصاب القحفية 5-8"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-ana-brainstem-cranial-nerves/midbrain-and-tectum",
+      "chapterId": "cns-ana-brainstem-cranial-nerves",
+      "name": {
+        "en": "Midbrain: Superior/Inferior Colliculi, Red Nucleus & CN III-IV",
+        "ar": "الدماغ المتوسط: الأكيمات، النواة الحمراء والعصبان 3-4"
+      },
+      "order": 3
+    },
+    {
+      "id": "cns-ana-brainstem-cranial-nerves/cranial-nerve-nuclei-functional-columns",
+      "chapterId": "cns-ana-brainstem-cranial-nerves",
+      "name": {
+        "en": "Cranial Nerve Functional Columns (GSE, GVE, SVA, GSA)",
+        "ar": "الأعمدة الوظيفية لنوى الأعصاب القحفية"
+      },
+      "order": 4
+    },
+    {
+      "id": "cns-ana-cerebellum-basal-ganglia/cerebellar-lobes-and-deep-nuclei",
+      "chapterId": "cns-ana-cerebellum-basal-ganglia",
+      "name": {
+        "en": "Cerebellar Hemispheres, Vermis & Deep Nuclei (Dentate, Emboliform, Globose, Fastigial)",
+        "ar": "المخيخ، الدودة والنوى العميقة"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-ana-cerebellum-basal-ganglia/basal-ganglia-striatum-pallidum",
+      "chapterId": "cns-ana-cerebellum-basal-ganglia",
+      "name": {
+        "en": "Caudate, Putamen, Globus Pallidus, Subthalamic Nucleus & Substantia Nigra",
+        "ar": "الجسم المخطط، الكرة الشاحبة، نواة تحت المهاد والمادة السوداء"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-ana-cerebellum-basal-ganglia/thalamic-nuclei-and-internal-capsule",
+      "chapterId": "cns-ana-cerebellum-basal-ganglia",
+      "name": {
+        "en": "Thalamic Relay Nuclei (VPL, VPM, LGN, MGN) & Internal Capsule Limbs",
+        "ar": "نوى المهاد والمحفظة الداخلية"
+      },
+      "order": 3
+    },
+    {
+      "id": "cns-ana-cerebral-cortex-vascular/cortical-lobes-and-brodmann-areas",
+      "chapterId": "cns-ana-cerebral-cortex-vascular",
+      "name": {
+        "en": "Primary Motor (BA4), Somatosensory (BA3,1,2), Broca (BA44,45) & Wernicke (BA22)",
+        "ar": "الفصوص المخية، باحات برودمان الحركية والحسية والكلامية"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-ana-cerebral-cortex-vascular/circle-of-willis-and-dural-venous-sinuses",
+      "chapterId": "cns-ana-cerebral-cortex-vascular",
+      "name": {
+        "en": "Circle of Willis (ACA, MCA, PCA), Basilar Artery & Dural Venous Drainage",
+        "ar": "دائرة ويليس والتصريف الوريدي الدماغي"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-phy-excitable-synaptic/resting-membrane-potential-and-action-potential",
+      "chapterId": "cns-phy-excitable-synaptic",
+      "name": {
+        "en": "Nernst Equation, Goldman Equation & Voltage-Gated Na+/K+ Dynamics",
+        "ar": "جهد الغشاء ومعادلة نيرنست وديناميكا قنوات الصوديوم والبوتاسيوم"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-phy-excitable-synaptic/synaptic-transmission-and-neurotransmitters",
+      "chapterId": "cns-phy-excitable-synaptic",
+      "name": {
+        "en": "EPSP, IPSP, Glutamate, GABA, Glycine & Monoamine Systems",
+        "ar": "الجهود المشبكية والنواقل العصبية (جلوتامات، غابا)"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-phy-somatosensory-pain/sensory-receptors-and-dorsal-column",
+      "chapterId": "cns-phy-somatosensory-pain",
+      "name": {
+        "en": "Mechanoreceptors (Meissner, Pacinian, Merkel) & Discriminative Touch",
+        "ar": "المستقبلات الميكانيكية واللمس التمييزي"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-phy-somatosensory-pain/anterolateral-system-and-pain-gate-control",
+      "chapterId": "cns-phy-somatosensory-pain",
+      "name": {
+        "en": "Nociceptors (A-delta/C fibers), Substance P, Gate Control Theory & Endorphins",
+        "ar": "مستقبلات الألم، نظرية بوابة الألم والإندورفينات"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-phy-motor-control-reflexes/muscle-spindles-and-stretch-reflex",
+      "chapterId": "cns-phy-motor-control-reflexes",
+      "name": {
+        "en": "Ia/II Afferents, Alpha-Gamma Coactivation & Golgi Tendon Reflex",
+        "ar": "المغازل العضلية، المنعكس الشدي وأعضاء غولجي الوترية"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-phy-motor-control-reflexes/corticospinal-and-extrapyramidal-systems",
+      "chapterId": "cns-phy-motor-control-reflexes",
+      "name": {
+        "en": "Upper vs. Lower Motor Neuron Signs & Decerebrate/Decorticate Posturing",
+        "ar": "علامات العصبون الحركي العلوي والسفلي ووضعيات الدماغ"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-phy-motor-control-reflexes/basal-ganglia-direct-indirect-pathways",
+      "chapterId": "cns-phy-motor-control-reflexes",
+      "name": {
+        "en": "D1 Direct Pathway, D2 Indirect Pathway & Movement Initiation Disorders",
+        "ar": "المسار المباشر وغير المباشر للعقد القاعدية واضطرابات الحركة"
+      },
+      "order": 3
+    },
+    {
+      "id": "cns-phy-special-senses/visual-pathways-and-visual-field-defects",
+      "chapterId": "cns-phy-special-senses",
+      "name": {
+        "en": "Phototransduction, Optic Chiasm Lesions & Homonymous Hemianopia",
+        "ar": "التحويل الضوئي وتناقص الساحة البصرية ونصف العمى"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-phy-special-senses/auditory-and-vestibular-systems",
+      "chapterId": "cns-phy-special-senses",
+      "name": {
+        "en": "Organ of Corti, Tonotopic Organization, Semicircular Canals & Nystagmus",
+        "ar": "عضو كورتي، القنوات الهلالية وتوازن الرأرأة"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-phy-higher-functions-eeg/hypothalamus-and-limbic-circuit",
+      "chapterId": "cns-phy-higher-functions-eeg",
+      "name": {
+        "en": "Hypothalamic Nuclei (Thermoregulation, Satiety, Circadian) & Papez Circuit",
+        "ar": "نوى الوطاء ودائرة بابيز الحوفية والذاكرة"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-phy-higher-functions-eeg/sleep-architecture-and-eeg-rhythms",
+      "chapterId": "cns-phy-higher-functions-eeg",
+      "name": {
+        "en": "NREM (N1, N2, N3/Delta), REM Waves & Alpha/Beta Wakefulness Rhythms",
+        "ar": "مراحل النوم وموجات تخطيط الدماغ الكهربائي"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-his-neurons-neuroglia-bbb/neuron-morphology-and-axonal-transport",
+      "chapterId": "cns-his-neurons-neuroglia-bbb",
+      "name": {
+        "en": "Nissl Bodies, Dendritic Spines, Axon Hillock & Retrograde/Anterograde Transport",
+        "ar": "أجسام نيسل، التل المحواري والنقل المحواري"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-his-neurons-neuroglia-bbb/neuroglia-astrocytes-oligodendrocytes-microglia",
+      "chapterId": "cns-his-neurons-neuroglia-bbb",
+      "name": {
+        "en": "Protoplasmic/Fibrous Astrocytes, Myelinating Oligodendrocytes & Microglia",
+        "ar": "الخلايا النجمية، قليلة التغصن والدبقية الصغيرة"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-his-neurons-neuroglia-bbb/blood-brain-barrier-ultrastructure",
+      "chapterId": "cns-his-neurons-neuroglia-bbb",
+      "name": {
+        "en": "Endothelial Tight Junctions (Claudin/Occludin) & Astrocyte End-Feet",
+        "ar": "المفارق المحكمة للبطانة وأقدام الخلايا النجمية"
+      },
+      "order": 3
+    },
+    {
+      "id": "cns-his-cortex-cerebellum-cord/cerebral-cortex-six-layers",
+      "chapterId": "cns-his-cortex-cerebellum-cord",
+      "name": {
+        "en": "Molecular, Granular, Pyramidal & Betz Cell Cytoarchitecture",
+        "ar": "الطبقات الست للقشرة المخية وخلايا بيتز"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-his-cortex-cerebellum-cord/cerebellar-cortex-three-layers",
+      "chapterId": "cns-his-cortex-cerebellum-cord",
+      "name": {
+        "en": "Molecular Layer, Purkinje Cell Layer & Granule Cell Layer (Mossy/Climbing Fibers)",
+        "ar": "طبقات المخيخ الثلاث وخلايا بوركنجي والألياف المتسلقة"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-pat-cerebrovascular-trauma/ischemic-stroke-and-infarct-evolution",
+      "chapterId": "cns-pat-cerebrovascular-trauma",
+      "name": {
+        "en": "Red Neurons (12-24h), Neutrophils, Macrophages/Foam Cells & Gliosis Cavitation",
+        "ar": "تطور الاحتشاء الدماغي، العصبونات الحمراء والتليف الدبقي"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-pat-cerebrovascular-trauma/intracranial-hemorrhage-and-aneurysms",
+      "chapterId": "cns-pat-cerebrovascular-trauma",
+      "name": {
+        "en": "Epidural (MMA), Subdural (Bridging Veins), SAH (Berry Aneurysm) & ICH",
+        "ar": "النزوف القحفية (فوق وتحت الجافية، تحت العنكبوتية وداخل المخ)"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-mic-meningitis-encephalitis/acute-pyogenic-and-aseptic-meningitis",
+      "chapterId": "cns-mic-meningitis-encephalitis",
+      "name": {
+        "en": "CSF Analysis (WBC, Protein, Glucose) for S. pneumoniae, N. meningitidis, HSV-1",
+        "ar": "تحليل السائل النخاعي لالتهاب السحايا الجرثومي والفيروسي"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-mic-meningitis-encephalitis/viral-encephalitis-and-brain-abscess",
+      "chapterId": "cns-mic-meningitis-encephalitis",
+      "name": {
+        "en": "HSV-1 Temporal Necrosis, Rabies Negri Bodies & Toxoplasma Ring-Enhancing Lesions",
+        "ar": "التهاب الدماغ الحلئي وخراج الدماغ والأجسام الاشتمالية"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-pat-demyelinating-degenerative-tumors/multiple-sclerosis-and-demyelination",
+      "chapterId": "cns-pat-demyelinating-degenerative-tumors",
+      "name": {
+        "en": "Perivenular Plaques, Oligoclonal Bands & Optic Neuritis",
+        "ar": "لويحات التصلب اللويحي المتعدد والأحزمة قليلة النمط"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-pat-demyelinating-degenerative-tumors/alzheimer-parkinson-neurodegeneration",
+      "chapterId": "cns-pat-demyelinating-degenerative-tumors",
+      "name": {
+        "en": "Amyloid-Beta Plaques, Tau Tangles, Alpha-Synuclein Lewy Bodies & Basal Forebrain",
+        "ar": "صفائح بيتا النشوانية وتشابكات تاو وأجسام ليوي في باركنسون"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-pat-demyelinating-degenerative-tumors/primary-and-metastatic-cns-neoplasms",
+      "chapterId": "cns-pat-demyelinating-degenerative-tumors",
+      "name": {
+        "en": "Glioblastoma (Pseudopalisading), Meningioma (Psammoma), Schwannoma & Medulloblastoma",
+        "ar": "أورام الدماغ الأولية (الورم الأرومي الدبقي، السحائي والشفاني)"
+      },
+      "order": 3
+    },
+    {
+      "id": "cns-pha-neurotherapeutics/antiepileptic-drug-mechanisms",
+      "chapterId": "cns-pha-neurotherapeutics",
+      "name": {
+        "en": "Na+ Channel Blockers (Phenytoin, Carbamazepine), Ethosuximide & Levetiracetam",
+        "ar": "آليات الأدوية المضادة للاختلاج والصرع"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-pha-neurotherapeutics/general-and-local-anesthetics",
+      "chapterId": "cns-pha-neurotherapeutics",
+      "name": {
+        "en": "MAC, Blood:Gas Partition Coefficient, Propofol, Ketamine & Amide/Ester Locals",
+        "ar": "المخدرات العامة والموضعية وآليات التأثير"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-pha-neurotherapeutics/sedative-hypnotics-and-antiparkinsonian-agents",
+      "chapterId": "cns-pha-neurotherapeutics",
+      "name": {
+        "en": "Benzodiazepines, Barbiturates, Levodopa/Carbidopa & COMT/MAO-B Inhibitors",
+        "ar": "المهدئات والمنومات وأدوية علاج مرض باركنسون"
+      },
+      "order": 3
+    }
+  ],
+  "sources": [
+    {
+      "id": "SRC-CNS-ANA-01",
+      "subjectId": "anatomy",
+      "title": {
+        "en": "CNS Neuroanatomy, Cranial Nerves & Tracts Atlas",
+        "ar": "أطلس التشريح العصبي، الأعصاب القحفية والسبل العصبية"
+      },
+      "fileName": "CNS Neuroanatomy and Tracts Handout.pdf",
+      "format": "PDF",
+      "extent": {
+        "unit": "pages",
+        "count": 52
+      },
+      "highlights": ["Brainstem Nuclei", "Spinal Cord Tracts", "Cranial Nerves", "Circle of Willis"]
+    },
+    {
+      "id": "SRC-CNS-PHY-01",
+      "subjectId": "physiology",
+      "title": {
+        "en": "Neurophysiology & Synaptic Transmission Guide",
+        "ar": "دليل الفسيولوجيا العصبية والنقل المشبكي"
+      },
+      "fileName": "CNS Neurophysiology Lecture Notes.pdf",
+      "format": "PDF",
+      "extent": {
+        "unit": "pages",
+        "count": 38
+      },
+      "highlights": ["Action Potentials", "Synapses", "Motor Systems", "Special Senses"]
+    },
+    {
+      "id": "SRC-CNS-HIS-01",
+      "subjectId": "histology",
+      "title": {
+        "en": "Microscopic Architecture of the Nervous System",
+        "ar": "البنية المجهرية للجهاز العصبي والخلايا الدبقية"
+      },
+      "fileName": "Neurohistology Slide Deck.pptx",
+      "format": "PPTX",
+      "extent": {
+        "unit": "slides",
+        "count": 28
+      },
+      "highlights": ["Neurons", "Neuroglia", "Blood-Brain Barrier", "Cortical Layers"]
+    },
+    {
+      "id": "SRC-CNS-PAT-01",
+      "subjectId": "pathology-micro",
+      "title": {
+        "en": "Neuropathology: Stroke, Degeneration & Neoplasms",
+        "ar": "الباثولوجيا العصبية: السكتة، التنكس وأورام الجهاز العصبي"
+      },
+      "fileName": "CNS Pathology Syllabus.pdf",
+      "format": "PDF",
+      "extent": {
+        "unit": "pages",
+        "count": 45
+      },
+      "highlights": ["Infarct Pathology", "Demyelination", "Lewy Bodies", "Gliomas"]
+    },
+    {
+      "id": "SRC-CNS-MIC-01",
+      "subjectId": "pathology-micro",
+      "title": {
+        "en": "CNS Infectious Syndromes & CSF Differential",
+        "ar": "متلازمات عدوى الجهاز العصبي وتشخيص السائل الدماغي"
+      },
+      "fileName": "CNS Microbiology and Meningitis Guide.pdf",
+      "format": "PDF",
+      "extent": {
+        "unit": "pages",
+        "count": 22
+      },
+      "highlights": ["Pyogenic Meningitis", "Viral Encephalitis", "CSF Profiles", "Brain Abscess"]
+    },
+    {
+      "id": "SRC-CNS-PHA-01",
+      "subjectId": "pharmacology",
+      "title": {
+        "en": "Neuropharmacology & Psychotropics Review",
+        "ar": "مراجعة الفارماكولوجيا العصبية والأدوية النفسية"
+      },
+      "fileName": "CNS Pharmacology Compendium.pdf",
+      "format": "PDF",
+      "extent": {
+        "unit": "pages",
+        "count": 34
+      },
+      "highlights": ["Antiepileptics", "Anesthetics", "GABA Agonists", "Levodopa"]
+    }
+  ]
+}
