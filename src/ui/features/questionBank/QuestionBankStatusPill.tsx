@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronDown, RotateCcw, RefreshCw, ShieldCheck, Database, Layers, X } from 'lucide-react';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
+import { useActiveBlock } from '../../../application/stores/useBlockContextStore.ts';
 import defaultCvsBank from '../../../../content/cvs/dist/bank.v1.json';
 import { ResetBankConfirmationModal } from './ResetBankConfirmationModal.tsx';
 
@@ -18,7 +19,8 @@ export const QuestionBankStatusPill: React.FC = () => {
     dismissedRemoteRevision,
     checkForGlobalUpdates,
   } = useQuestionStore();
-  const { t, isRtl } = useLocaleStore();
+  const { t, isRtl, locale } = useLocaleStore();
+  const { activeBlockId, block } = useActiveBlock();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
@@ -111,7 +113,7 @@ export const QuestionBankStatusPill: React.FC = () => {
   const handleSyncClick = async () => {
     try {
       setCheckMessage(null);
-      const preview = await checkForGlobalUpdates('cvs', { force: true });
+      const preview = await checkForGlobalUpdates(activeBlockId, { force: true });
       if (preview && (preview.hasChanges || preview.isOutOfDate)) {
         setIsOpen(false);
         navigate('/studio');
@@ -152,14 +154,14 @@ export const QuestionBankStatusPill: React.FC = () => {
           />
         </span>
 
-        {/* Ultra-wide desktop (2xl+): Full Block 206 label */}
+        {/* Ultra-wide desktop (2xl+): Full Block label */}
         <span className="hidden 2xl:inline">
-          {t.nav.activeBlockPrefix} · Block 206 · {questions.length} {t.bank.syncCenter.questionsShort}
+          {block?.shortName || t.nav.activeBlockPrefix} · {block?.code || 'Block 206'} · {questions.length} {t.bank.syncCenter.questionsShort}
         </span>
 
-        {/* Standard Laptop / MacBook Air (xl to 2xl): Compact CVS · 217 Qs */}
+        {/* Standard Laptop / MacBook Air (xl to 2xl): Compact label */}
         <span className="hidden xl:inline 2xl:hidden">
-          {t.nav.activeBlockPrefix} · {questions.length} {t.bank.syncCenter.questionsShort}
+          {block?.shortName || t.nav.activeBlockPrefix} · {questions.length} {t.bank.syncCenter.questionsShort}
         </span>
 
         {/* Compact Laptop, Tablet & Mobile (<xl): Number + Qs */}
