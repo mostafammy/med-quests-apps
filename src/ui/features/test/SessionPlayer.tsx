@@ -15,8 +15,18 @@ import { AiCopilotDrawer } from '../copilot/AiCopilotDrawer.tsx';
 import { ThemeToggle } from '../../app/ThemeToggle.tsx';
 import { LocaleToggle } from '../../app/LocaleToggle.tsx';
 import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
+import { useBlockContextStore } from '../../../application/stores/useBlockContextStore.ts';
+import { DexieBlockScopedAttemptRepository } from '../../../infrastructure/storage/DexieBlockScopedRepositories.ts';
+import type { BlockId } from '../../../domain/curriculum/ids.ts';
 import { SessionSeededSpatialPresentationStrategy } from '../../../domain/questionBank/spatialChoicePresenter.ts';
 import { analytics } from '../../../infrastructure/analytics/medQuestsAnalyticsFacade.ts';
+import { compositionRoot } from '../../../application/composition/clientCompositionRoot.ts';
+import {
+  saveSessionMemento,
+  clearSessionMemento,
+  useSessionLeaveDialogStore,
+  type SavedSessionMemento,
+} from '../../../application/curriculum/SessionLeaveGuard.ts';
 import type { VisualSlotIndex } from '../../../../specs/006-psychometric-choice-entropy-and-spatial-presentation/contracts/choice-entropy-ports.ts';
 import { 
   ArrowLeft, 
@@ -100,16 +110,19 @@ export const SessionPlayer: React.FC = () => {
       highYieldOnly?: boolean;
       questionFilter?: 'all' | 'unanswered' | 'incorrect';
       questionIds?: string[];
+      blockId?: string;
+      savedSession?: SavedSessionMemento;
     }) || { mode: 'practice', questionCount: 20 };
   }, [location.state]);
 
-  const mode = sessionConfig.mode || 'practice';
+  const mode = sessionConfig.savedSession?.mode || sessionConfig.mode || 'practice';
   const isExamMode = mode === 'mock' || mode === 'exam';
 
   // Synchronously compute initial question slice to prevent 1-frame empty flash on first paint
   const initialSessionQuestions = useMemo(() => {
-    if (sessionConfig.questionIds && sessionConfig.questionIds.length > 0) {
-      const idSet = new Set(sessionConfig.questionIds);
+    const targetQIds = sessionConfig.savedSession?.questionIds || sessionConfig.questionIds;
+    if (targetQIds && targetQIds.length > 0) {
+      const idSet = new Set(targetQIds);
       const ordered = allQuestions.filter((q) => idSet.has(q.id));
       const rawCount = sessionConfig.questionCount;
       const count =
@@ -147,23 +160,65 @@ export const SessionPlayer: React.FC = () => {
 
   // Filter questions according to session config
   const [sessionQuestions, setSessionQuestions] = useState<Question[]>(initialSessionQuestions);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, { choiceId: ChoiceId; isCorrect: boolean }>>({});
-  const [confidences, setConfidences] = useState<Record<string, Confidence>>({});
+  const [currentIndex, setCurrentIndex] = useState(() => sessionConfig.savedSession?.currentIndex ?? 0);
+  const [answers, setAnswers] = useState<Record<string, { choiceId: ChoiceId; isCorrect: boolean }>>(
+    () => (sessionConfig.savedSession?.answers as Record<string, { choiceId: ChoiceId; isCorrect: boolean }>) || {}
+  );
+  const [confidences, setConfidences] = useState<Record<string, Confidence>>(
+    () => (sessionConfig.savedSession?.confidences as Record<string, Confidence>) || {}
+  );
   const [questionTelemetryMap, setQuestionTelemetryMap] = useState<Record<string, QuestionAttemptTelemetry>>({});
-  const [flags, setFlags] = useState<Record<string, boolean>>({});
+  const [flags, setFlags] = useState<Record<string, boolean>>(() => sessionConfig.savedSession?.flags || {});
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
   const [showExplanation, setShowExplanation] = useState(true);
   const [showMatrixModal, setShowMatrixModal] = useState(false);
   const [showFinishModal, setShowFinishModal] = useState(false);
   const [sessionStartTime] = useState<number>(() => Date.now());
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(
-    (sessionConfig.timeLimitMinutes || 120) * 60
+    () => sessionConfig.savedSession?.timeLeftSeconds ?? ((sessionConfig.timeLimitMinutes || 120) * 60)
   );
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [activeSessionId] = useState<string>(
-    () => `sess-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    () => sessionConfig.savedSession?.sessionId || `sess-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
   );
+
+  // Register Mid-Session Leave Guard with compositionRoot (US4)
+  useEffect(() => {
+    if (isSubmitted || sessionQuestions.length === 0) {
+      return;
+    }
+
+    const unregister = compositionRoot.leaveGuard.registerGuard(async (from, to) => {
+      const answeredCount = Object.keys(answers).length;
+      const confirmed = await useSessionLeaveDialogStore.getState().prompt({
+        fromBlockId: from,
+        toBlockId: to,
+        answeredCount,
+        totalCount: sessionQuestions.length,
+      });
+
+      if (confirmed) {
+        saveSessionMemento({
+          blockId: from,
+          sessionId: activeSessionId,
+          mode,
+          currentIndex,
+          questionIds: sessionQuestions.map((q) => q.id),
+          answers,
+          confidences,
+          flags,
+          timeLeftSeconds,
+          savedAtIso: new Date().toISOString(),
+        });
+        return true;
+      }
+      return false;
+    });
+
+    return () => {
+      unregister();
+    };
+  }, [isSubmitted, sessionQuestions, answers, confidences, flags, currentIndex, timeLeftSeconds, activeSessionId, mode]);
 
   // Load persisted bookmarks on mount
   useEffect(() => {
@@ -221,7 +276,9 @@ export const SessionPlayer: React.FC = () => {
       // 3. Question Repetition & Coverage Scope Filter
       const qFilter = sessionConfig.questionFilter || 'all';
       if (qFilter !== 'all') {
-        const attempts = await db.attempts.toArray();
+        const targetBlockId = (sessionConfig.blockId || useBlockContextStore.getState().activeBlockId || 'cvs') as BlockId;
+        const attemptRepo = new DexieBlockScopedAttemptRepository(targetBlockId);
+        const attempts = (await attemptRepo.all()) as any[];
         const attemptsByQ = new Map<string, typeof attempts>();
         attempts.forEach((a) => {
           const list = attemptsByQ.get(a.questionId) || [];
@@ -435,10 +492,12 @@ export const SessionPlayer: React.FC = () => {
             choiceChangesCount: snap.choiceChangesCount,
             confidence: conf,
           };
+          const targetQ = sessionQuestions.find((sq) => sq.id === qId);
+          const blockId = (targetQ?.blockId || sessionConfig.blockId || useBlockContextStore.getState().activeBlockId || 'cvs') as BlockId;
           return {
             id: `att-${Date.now()}-${qId}`,
             questionId: qId,
-            blockId: 'cvs',
+            blockId,
             sessionId: activeSessionId,
             mode,
             selectedChoiceId: ans.choiceId,
@@ -474,6 +533,8 @@ export const SessionPlayer: React.FC = () => {
     } finally {
       setShowFinishModal(false);
       setIsSubmitted(true);
+      const targetBlockId = (sessionConfig.blockId || useBlockContextStore.getState().activeBlockId || 'cvs') as BlockId;
+      clearSessionMemento(targetBlockId);
     }
   }, [answers, confidences, isExamMode, mode, questionTelemetryMap, activeSessionId, sessionQuestions.length, sessionStartTime, timeLeftSeconds]);
 
@@ -582,7 +643,7 @@ export const SessionPlayer: React.FC = () => {
       });
 
       setShowExplanation(true);
-      const blockId = currentQ.blockId || 'cvs';
+      const blockId = (currentQ.blockId || sessionConfig.blockId || useBlockContextStore.getState().activeBlockId || 'cvs') as BlockId;
       void db.attempts
         .put({
           id: `att-${Date.now()}-${currentQ.id}`,
