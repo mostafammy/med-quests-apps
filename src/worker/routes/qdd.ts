@@ -9,6 +9,7 @@ import { createWorkerQddEngine, syncMissingD1Fingerprints } from '../qdd/composi
 import { D1AuditJobRepository } from '../../infrastructure/questionBank/duplication/d1/D1AuditJobRepository.ts';
 import { QddTelemetrySink } from '../../infrastructure/questionBank/duplication/telemetry/QddTelemetrySink.ts';
 import type { DuplicationVerdict } from '../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
+import { EdgeBlockGuard } from '../curriculum/EdgeBlockGuard.ts';
 
 const QddCheckRequestSchema = z.object({
   question: QuestionSchema,
@@ -74,8 +75,11 @@ export async function handleQddRoutes(
     }
   }
 
-  // 1. Single Question Check: POST /api/qdd/check
-  if (url.pathname === '/api/qdd/check' && request.method === 'POST') {
+  // 1. Single Question Check: POST /api/qdd/check or /api/v1/qdd/check
+  if (
+    (url.pathname === '/api/qdd/check' || url.pathname === '/api/v1/qdd/check') &&
+    request.method === 'POST'
+  ) {
     try {
       const body = await request.json();
       const parsed = QddCheckRequestSchema.safeParse(body);
@@ -89,9 +93,18 @@ export async function handleQddRoutes(
         );
       }
 
+      const scope = parsed.data.scope as any;
+      const targetBlock = url.searchParams.get('block') || scope?.blockId || parsed.data.question.blockId;
+      if (targetBlock || scope?.kind === 'block') {
+        const edgeBlockGuard = new EdgeBlockGuard(env.MED_QUESTS_DB);
+        const blockCheck = await edgeBlockGuard.requireKnownBlock(targetBlock || 'cvs');
+        if (!blockCheck.ok) {
+          return blockCheck.response;
+        }
+      }
+
       await syncMissingD1Fingerprints(env.MED_QUESTS_DB);
       const engine = createWorkerQddEngine(env.MED_QUESTS_DB);
-      const scope = parsed.data.scope as any;
       const res = await engine.check(parsed.data.question as any, scope, 'edge-authoritative');
 
       if (!res.ok) {
@@ -116,8 +129,11 @@ export async function handleQddRoutes(
     }
   }
 
-  // 2. Batch Question Check: POST /api/qdd/check-batch
-  if (url.pathname === '/api/qdd/check-batch' && request.method === 'POST') {
+  // 2. Batch Question Check: POST /api/qdd/check-batch or /api/v1/qdd/check-batch
+  if (
+    (url.pathname === '/api/qdd/check-batch' || url.pathname === '/api/v1/qdd/check-batch') &&
+    request.method === 'POST'
+  ) {
     try {
       const body = await request.json();
       const parsed = QddCheckBatchRequestSchema.safeParse(body);
@@ -131,9 +147,18 @@ export async function handleQddRoutes(
         );
       }
 
+      const scope = parsed.data.scope as any;
+      const targetBlock = url.searchParams.get('block') || scope?.blockId || parsed.data.questions[0]?.blockId;
+      if (targetBlock || scope?.kind === 'block') {
+        const edgeBlockGuard = new EdgeBlockGuard(env.MED_QUESTS_DB);
+        const blockCheck = await edgeBlockGuard.requireKnownBlock(targetBlock || 'cvs');
+        if (!blockCheck.ok) {
+          return blockCheck.response;
+        }
+      }
+
       await syncMissingD1Fingerprints(env.MED_QUESTS_DB);
       const engine = createWorkerQddEngine(env.MED_QUESTS_DB);
-      const scope = parsed.data.scope as any;
       const res = await engine.checkBatch(parsed.data.questions as any, scope);
 
       if (!res.ok) {
