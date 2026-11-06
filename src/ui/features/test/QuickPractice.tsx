@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CVS_TAXONOMY } from '../../../domain/taxonomy/cvsTaxonomy.ts';
+import { useActiveTaxonomy, useBlockContextStore } from '../../../application/stores/useBlockContextStore.ts';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 import { useStatsStore } from '../../../application/stores/useStatsStore.ts';
 import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
@@ -17,6 +17,8 @@ export const QuickPractice: React.FC = () => {
     mistakeQuestionIds 
   } = useStatsStore();
   const { t } = useLocaleStore();
+  const taxonomy = useActiveTaxonomy();
+  const { activeBlockId } = useBlockContextStore();
 
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedChapter, setSelectedChapter] = useState<string>('all');
@@ -25,12 +27,19 @@ export const QuickPractice: React.FC = () => {
   const [repetitionFilter, setRepetitionFilter] = useState<'unanswered' | 'all' | 'incorrect'>('unanswered');
 
   useEffect(() => {
-    refreshStats(questions);
-  }, [questions, refreshStats]);
+    refreshStats(questions, activeBlockId);
+  }, [questions, refreshStats, activeBlockId]);
+
+  useEffect(() => {
+    if (selectedSubject !== 'all' && !taxonomy.subjects.some((s) => s.id === selectedSubject)) {
+      setSelectedSubject('all');
+      setSelectedChapter('all');
+    }
+  }, [activeBlockId, taxonomy.subjects, selectedSubject]);
 
   const availableChapters = selectedSubject === 'all'
-    ? CVS_TAXONOMY.chapters
-    : CVS_TAXONOMY.chapters.filter((c) => c.subjectId === selectedSubject);
+    ? taxonomy.chapters
+    : taxonomy.chapters.filter((c) => c.subjectId === selectedSubject);
 
   const scopeCoverage = useMemo(() => {
     return getScopeCoverage(questions, {
@@ -96,8 +105,8 @@ export const QuickPractice: React.FC = () => {
               }}
               className="w-full text-sm rounded-lg border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 py-2.5 px-3 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
             >
-              <option value="all">{t.test.allSubjects}</option>
-              {CVS_TAXONOMY.subjects.map((s) => (
+              <option value="all">{t.test.allSubjects.replace('{blockName}', taxonomy.block.name)}</option>
+              {taxonomy.subjects.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
