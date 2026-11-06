@@ -199,7 +199,7 @@ export const QuestionBankStatusPill: React.FC = () => {
                 <div className="flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
                   <span className="text-xs sm:text-[13px] font-extrabold text-slate-900 dark:text-white truncate">
-                    {t.bank.syncCenter.blockTitle}
+                    {block ? (locale === 'ar' ? `${block.name.ar} (${block.code})` : `${block.name.en} (${block.code})`) : t.bank.syncCenter.blockTitle}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">
@@ -312,7 +312,7 @@ export const QuestionBankStatusPill: React.FC = () => {
                 <span className="truncate">{t.bank.resetToGlobalBtn}</span>
               </div>
               <span className="text-[10px] uppercase font-mono tracking-wider opacity-70 shrink-0">
-                {pendingDiffPreview?.remoteCanonicalCount ?? defaultCvsBank.length}{' '}
+                {pendingDiffPreview?.remoteCanonicalCount ?? (activeBlockId === 'cns' ? 0 : defaultCvsBank.length)}{' '}
                 {t.bank.syncCenter.canonicalShort}
               </span>
             </button>
@@ -325,6 +325,7 @@ export const QuestionBankStatusPill: React.FC = () => {
       <ResetBankConfirmationModal
         isOpen={showResetModal}
         onClose={() => setShowResetModal(false)}
+        blockId={activeBlockId}
       />
     </div>
   );
