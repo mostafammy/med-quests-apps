@@ -373,4 +373,151 @@ describe('CrossModelVerificationPromptBuilder (External LLM Cross-Examination)',
     expect(result.items[0].aiGeneratedAnswerKey).toBe(true);
     expect(result.items[0].question.choices[1].isCorrect).toBe(true);
   });
+
+  it('directly parses pre-structured CNS JSON arrays with 100% fidelity, auto-detects CNS block, and reconciles chapters', async () => {
+    const rawJsonPayload = JSON.stringify([
+      {
+        id: 'q-cns-ana-001',
+        blockId: 'cns-neuroscience',
+        subjectId: 'anatomy',
+        chapterId: 'cns-ana-org-meninges-csf',
+        topicId: 'cns-ana-neuron-structure',
+        concept: 'Axonal Morphology and Terminal Endings',
+        type: 'single-best-answer',
+        stem: 'A histology researcher is examining parenchymal cells of the central nervous system under electron microscopy. Which anatomical term specifically designates the side branches arising along the course of a single long nerve axon?',
+        choices: [
+          {
+            id: 'a',
+            text: 'Dendritic trees',
+            isCorrect: false,
+            rationale: 'Dendritic trees refer to the extensive branching arborizations formed by dendrites, not side branches of an axon.',
+          },
+          {
+            id: 'b',
+            text: 'Collaterals',
+            isCorrect: true,
+            rationale: 'As explicitly defined in the lecture text, the side branches arising from an axon are termed collaterals, and their terminals are end feet.',
+          },
+          {
+            id: 'c',
+            text: 'End feet',
+            isCorrect: false,
+            rationale: 'End feet represent the terminal swellings of the axon or its collaterals, not the branching shafts themselves.',
+          },
+          {
+            id: 'd',
+            text: 'Perikarya',
+            isCorrect: false,
+            rationale: 'The perikaryon denotes the cell body of the neuron housing the nucleus, not axonal branches.',
+          },
+        ],
+        explanation: 'Neurons are the excitable parenchymal cells of the nervous system consisting of a cell body (perikaryon) and processes (axons and dendrites). Axons are long, slender processes that have relatively few branches, which are termed collaterals. The terminal endings of these collaterals are designated as end feet.',
+        examTip: 'Differentiate between collaterals (axonal side branches) and dendritic trees (arborizing receptive dendrites).',
+        difficulty: 1,
+        cognitiveLevel: 'recall',
+        highYield: true,
+        origin: 'authored-grounded',
+        evidence: [
+          {
+            chunkId: 'SRC-CNS-ANA-L1-01',
+            sourceName: 'neur anatomy lecture 1 (1).pdf',
+            location: 'Page 1, Organization of the nervous system',
+            quote: 'The axon are long and have relatively few branches. The branches of an axon are called collaterals. The terminals of the axon or its collaterals are end feet.',
+            kind: 'text',
+          },
+        ],
+        status: 'active',
+        bankVersion: 2,
+      },
+      {
+        id: 'q-cns-ana-002',
+        blockId: 'cns-neuroscience',
+        subjectId: 'anatomy',
+        chapterId: 'cns-ana-org-meninges-csf',
+        topicId: 'cns-ana-neuroglia-myelination',
+        concept: 'Myelin Sheath Formation and Glial Architecture',
+        type: 'single-best-answer',
+        stem: 'Regarding the cellular architecture of myelination across the human nervous system, which statement accurately reflects the structural relationship between supporting cells and axons?',
+        choices: [
+          {
+            id: 'a',
+            text: 'In the central nervous system, each individual oligodendrocyte provides a myelin sheath for only a single internode of one axon',
+            isCorrect: false,
+            rationale: 'In the central nervous system, each oligodendrocyte forms and maintains myelin sheaths for multiple axons simultaneously.',
+          },
+          {
+            id: 'b',
+            text: 'In the peripheral nervous system, a single Schwann cell forms and maintains the myelin sheath for several adjacent axons',
+            isCorrect: false,
+            rationale: 'In the peripheral nervous system, exactly one Schwann cell corresponds to only one internodal segment of a single nerve fiber.',
+          },
+          {
+            id: 'c',
+            text: 'In the central nervous system, each oligodendrocyte can form and maintain myelin sheaths for many axons',
+            isCorrect: true,
+            rationale: 'According to the lecture text, in the central nervous system, each oligodendrocyte may form and maintain myelin sheaths for many axons, whereas in the PNS there is only one Schwann cell for each segment of one axon.',
+          },
+          {
+            id: 'd',
+            text: 'The myelin sheath represents an intrinsic, non-segmented cytoplasmic extension of the neuronal plasma membrane',
+            isCorrect: false,
+            rationale: 'The myelin sheath is not part of the neuron itself; it is a segmented, discontinuous layer produced by supporting neuroglial or Schwann cells.',
+          },
+        ],
+        explanation: 'Myelin sheaths are produced by supporting cells rather than the neuron itself. In the central nervous system, oligodendrocytes extend processes to form and maintain the myelin sheaths of multiple surrounding axons. In contrast, peripheral nerve myelination depends on Schwann cells, where one Schwann cell encloses exactly one internodal segment of a single axon.',
+        examTip: 'High-yield contrast: 1 oligodendrocyte = multiple axons in CNS; 1 Schwann cell = 1 axonal segment in PNS.',
+        difficulty: 2,
+        cognitiveLevel: 'understanding',
+        highYield: true,
+        origin: 'authored-grounded',
+        evidence: [
+          {
+            chunkId: 'SRC-CNS-ANA-L1-02',
+            sourceName: 'neur anatomy lecture 1 (1).pdf',
+            location: 'Page 1, Neuroglia and Myelin',
+            quote: 'In the central nervous system, each oligodendrocyte may form and maintain myelin sheaths for many axons. In the peripheral nervous system, there is only one Schwann cell for each segment of one nerve fiber (axon)',
+            kind: 'text',
+          },
+        ],
+        status: 'active',
+        bankVersion: 2,
+      },
+    ]);
+
+    const result = await agent.parseRawQuestions({
+      rawText: rawJsonPayload,
+      providerId: 'gemini',
+      modelId: 'gemini-2.5-flash',
+      targetBlockId: 'cvs' as any, // Deliberately pass 'cvs' to prove payload block auto-detection & normalization
+    });
+
+    expect(result.totalParsed).toBe(2);
+    expect(result.totalMissingAnswerKeys).toBe(0);
+
+    const q1 = result.items[0];
+    expect(q1.question.id).toBe('q-cns-ana-001');
+    expect(q1.question.blockId).toBe('cns'); // Normalized from cns-neuroscience!
+    expect(q1.question.subjectId).toBe('anatomy');
+    expect(q1.question.chapterId).toBe('cns-ana-embryology-meninges-csf'); // Reconciled from cns-ana-org-meninges-csf!
+    expect(q1.question.stem).toBe(
+      'A histology researcher is examining parenchymal cells of the central nervous system under electron microscopy. Which anatomical term specifically designates the side branches arising along the course of a single long nerve axon?'
+    );
+    expect(q1.wasAnswerKeyProvidedInInput).toBe(true);
+    expect(q1.aiGeneratedAnswerKey).toBe(false);
+    expect(q1.selectedCorrectChoiceId).toBe('b');
+    expect(q1.question.choices.length).toBe(4);
+    expect(q1.question.choices.find((c) => c.isCorrect)?.id).toBe('b');
+    expect(q1.question.choices.find((c) => c.isCorrect)?.text).toBe('Collaterals');
+    expect(q1.question.evidence[0].chunkId).toBe('SRC-CNS-ANA-L1-01');
+
+    const q2 = result.items[1];
+    expect(q2.question.id).toBe('q-cns-ana-002');
+    expect(q2.question.blockId).toBe('cns');
+    expect(q2.question.chapterId).toBe('cns-ana-embryology-meninges-csf');
+    expect(q2.selectedCorrectChoiceId).toBe('c');
+    expect(q2.question.choices.find((c) => c.isCorrect)?.id).toBe('c');
+
+    expect(QuestionSchema.safeParse(q1.question).success).toBe(true);
+    expect(QuestionSchema.safeParse(q2.question).success).toBe(true);
+  });
 });
