@@ -18,6 +18,13 @@ import { powerActionCacheService } from '../../domain/ai/powerActionCacheService
 import { POWER_ACTIONS, type PowerActionKey } from '../../domain/ai/powerActions.ts';
 import { ChatLanguagePolicy } from '../../domain/ai/languagePolicy.ts';
 import { aiMetricsCacheService } from '../../infrastructure/ai/telemetry/aiMetricsCacheService.ts';
+import { useBlockContextStore } from './useBlockContextStore.ts';
+import { compositionRoot } from '../composition/clientCompositionRoot.ts';
+import type { BlockId } from '../../domain/curriculum/ids.ts';
+import {
+  defaultBlockAiProfileRegistry,
+  type BlockAiProfile,
+} from '../../domain/curriculum/BlockAiProfileRegistry.ts';
 
 interface CopilotState {
   // Drawer visibility & size
@@ -53,6 +60,18 @@ interface CopilotState {
 }
 
 let activeAbortController: AbortController | null = null;
+
+function computeThreadId(surface: CopilotSurface | null, activeBlockId: string): string {
+  if (!surface) {
+    return `block:${activeBlockId}:session:general`;
+  }
+  if (surface.kind === 'session') {
+    return surface.question
+      ? `block:${activeBlockId}:question:${surface.question.id}`
+      : `block:${activeBlockId}:session:${surface.mode || 'practice'}`;
+  }
+  return `block:${activeBlockId}:session:${surface.kind}`;
+}
 
 export const useCopilotStore = create<CopilotState>((set, get) => ({
   isOpen: false,
@@ -220,24 +239,44 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
     await get().sendUserMessage(prompt, actionKey);
   },
 
-  setSurface: (surface) => {
+  setSurface: async (surface) => {
     const prev = get().surface;
     const qId = surface && surface.kind === 'session' ? surface.question.id : null;
     const prevQId = prev && prev.kind === 'session' ? prev.question.id : null;
+    const activeBlockId = useBlockContextStore.getState().activeBlockId || 'cvs';
+    const newThreadId = computeThreadId(surface, activeBlockId);
+    const prevThreadId = get().threadId;
 
     if (qId && qId !== prevQId) {
       // Start live telemetry tracking for the new question
       questionTelemetryTracker.startQuestion(qId);
+    }
+
+    if (newThreadId !== prevThreadId) {
+      let loadedMessages: ChatMessage[] = [];
+      try {
+        const threadRecord = await db.aiThreads.get(newThreadId);
+        if (threadRecord && Array.isArray(threadRecord.messages)) {
+          loadedMessages = threadRecord.messages;
+        }
+      } catch {
+        // Fallback to empty messages
+      }
 
       set({
         surface,
         activeQuestionId: qId,
-        threadId: `question:${qId}`,
+        threadId: newThreadId,
+        messages: loadedMessages,
         activeDiagnosticTool: null,
       });
 
       // Load cached actions for this active question
-      get().loadCachedActionKeys(qId);
+      if (qId) {
+        get().loadCachedActionKeys(qId);
+      } else {
+        set({ cachedActionKeys: new Set() });
+      }
     } else {
       set({ surface });
       if (qId) {
@@ -248,7 +287,17 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
     }
   },
 
-  clearMessages: () => set({ messages: [], error: null, activeDiagnosticTool: null }),
+  clearMessages: () => {
+    const currentThreadId = get().threadId;
+    if (currentThreadId) {
+      try {
+        db.aiThreads.delete(currentThreadId).catch(() => {});
+      } catch {
+        // ignore
+      }
+    }
+    set({ messages: [], error: null, activeDiagnosticTool: null });
+  },
 
   abortStreaming: () => {
     if (activeAbortController) {
@@ -417,6 +466,18 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
             .join('\n'),
         }));
 
+      const activeBlockId = useBlockContextStore.getState().activeBlockId || 'cvs';
+      let profile: BlockAiProfile | undefined;
+      try {
+        const pack = compositionRoot.catalog.get(activeBlockId as BlockId);
+        const aiProfileId = pack?.manifest.block.aiProfileId;
+        if (aiProfileId) {
+          profile = defaultBlockAiProfileRegistry.get(aiProfileId);
+        }
+      } catch {
+        profile = defaultBlockAiProfileRegistry.get('cvs-faculty-v1');
+      }
+
       for await (const event of agenticOrchestrator.runAgentTurn({
         userMessage: userText,
         safeContext,
@@ -425,6 +486,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
         historyTurns,
         settings,
         signal,
+        profile,
       })) {
         if (signal.aborted) break;
 
@@ -480,6 +542,22 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
             : m
         ),
       }));
+
+      // Persist thread state to IndexedDB scoped by blockId
+      const currentThreadId = get().threadId;
+      if (currentThreadId) {
+        try {
+          await db.aiThreads.put({
+            threadId: currentThreadId,
+            questionId: activeQuestion?.id || null,
+            blockId: activeBlockId,
+            messages: get().messages,
+            updatedAt: new Date().toISOString(),
+          });
+        } catch {
+          // Graceful fallback if storage throws
+        }
+      }
 
       const durationMs = Math.round(performance.now() - startTime);
 
