@@ -22,7 +22,7 @@ export class StratifiedSamplingStrategy implements ISamplingStrategy {
     population: readonly Question[],
     config: SamplingConfiguration
   ): SampleExtractionResult {
-    let pool = [...population];
+    let pool = [...population].filter(Boolean);
 
     if (config.highYieldOnly) {
       pool = pool.filter((q) => q.highYield);
@@ -32,13 +32,26 @@ export class StratifiedSamplingStrategy implements ISamplingStrategy {
     }
 
     const totalPopulationSize = pool.length;
-    const requestedSize = Math.max(1, Math.min(config.sampleSize, totalPopulationSize));
     const { generator, effectiveSeed } = createRandomGenerator(config.seed);
+
+    if (totalPopulationSize === 0) {
+      return {
+        sampledQuestions: [],
+        totalPopulationSize: 0,
+        sampleSize: 0,
+        strategyType: this.strategyType,
+        strataRepresentation: {},
+        randomSeed: effectiveSeed,
+      };
+    }
+
+    const requestedSize = Math.max(1, Math.min(config.sampleSize, totalPopulationSize));
 
     // 1. Group into strata based on strategy
     const strataBuckets = new Map<string, Question[]>();
 
     for (const question of pool) {
+      if (!question) continue;
       let stratumKey = 'unknown';
       if (this.strategyType === 'stratified_by_subject') {
         stratumKey = question.subjectId || 'general';
@@ -108,6 +121,7 @@ export class StratifiedSamplingStrategy implements ISamplingStrategy {
 
     // Update telemetry counts
     for (const q of sampledQuestions) {
+      if (!q) continue;
       let stratumKey = 'unknown';
       if (this.strategyType === 'stratified_by_subject') {
         stratumKey = q.subjectId || 'general';
