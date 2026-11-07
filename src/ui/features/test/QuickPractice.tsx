@@ -39,7 +39,7 @@ export const QuickPractice: React.FC = () => {
 
   const availableChapters = selectedSubject === 'all'
     ? taxonomy.chapters
-    : taxonomy.chapters.filter((c) => c.subjectId === selectedSubject);
+    : taxonomy.chapters.filter((c) => c && c.subjectId === selectedSubject);
 
   const scopeCoverage = useMemo(() => {
     return getScopeCoverage(questions, {
