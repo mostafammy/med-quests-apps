@@ -199,3 +199,15 @@ class MedQuestsDB extends Dexie {
 }
 
 export const db = new MedQuestsDB();
+
+// Automatic schema integrity hook: heal any legacy alias records on database open
+db.on('ready', async () => {
+  try {
+    const legacy = await db.questions.where('blockId').equals('cns-neuroscience').toArray();
+    if (legacy.length > 0) {
+      await db.questions.bulkPut(legacy.map((q) => ({ ...q, blockId: 'cns' })));
+    }
+  } catch {
+    // Ignore in non-browser/SSR environments
+  }
+});
