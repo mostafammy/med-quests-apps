@@ -8,6 +8,7 @@ import { edgeQuestionBankGateway } from '../../infrastructure/questionBank/edgeQ
 import { NonDestructiveBankMergeStrategy } from '../../domain/questionBank/nonDestructiveMergeStrategy.ts';
 import { BankResetPlanner } from '../../domain/questionBank/bankResetPlanner.ts';
 import { QuestionCanonicalHasher } from '../../domain/questionBank/canonicalHasher.ts';
+import { normalizeBlockId } from '../../domain/questionBank/aiQuestionParser/QuestionParsingAgent.ts';
 import { useAuthStore } from './useAuthStore.ts';
 import { edgeAuthGateway } from '../../infrastructure/auth/edgeAuthGateway.ts';
 import { analytics } from '../../infrastructure/analytics/medQuestsAnalyticsFacade.ts';
@@ -134,13 +135,35 @@ const useQuestionStoreBase = create<QuestionStoreState>((set, get) => ({
       let stored = (await repo.all()) as Question[];
 
       if (stored.length === 0) {
-        const rawBank = await defaultViteBlockPackSource.loadBank(targetBlockId);
-        if (Array.isArray(rawBank) && rawBank.length > 0) {
-          const enrichedSeed = enrichBundledQuestions(rawBank as Question[]);
-          await repo.put(enrichedSeed as unknown as Question[]);
-          stored = enrichedSeed as unknown as Question[];
+        // Check if edgeQuestionBankGateway has local canonical questions for this block
+        const canonical = edgeQuestionBankGateway.getLocalCanonicalBank(targetBlockId);
+        if (canonical.length > 0) {
+          await repo.put(canonical as unknown as Question[]);
+          stored = (await repo.all()) as Question[];
+          if (stored.length === 0) {
+            stored = canonical as unknown as Question[];
+          }
+        } else {
+          const rawBank = await defaultViteBlockPackSource.loadBank(targetBlockId);
+          if (Array.isArray(rawBank) && rawBank.length > 0) {
+            const enrichedSeed = enrichBundledQuestions(rawBank as Question[]);
+            await repo.put(enrichedSeed as unknown as Question[]);
+            stored = enrichedSeed as unknown as Question[];
+          }
         }
       } else {
+        // Non-destructive reconciliation: Ensure any canonical questions in edge gateway are in IndexedDB
+        const canonical = edgeQuestionBankGateway.getLocalCanonicalBank(targetBlockId);
+        if (canonical.length > 0) {
+          const storedIds = new Set(stored.map((q) => q.id));
+          const missingFromDb = canonical.filter((q) => !storedIds.has(q.id));
+          if (missingFromDb.length > 0) {
+            await repo.put(missingFromDb as unknown as Question[]);
+            const refreshed = (await repo.all()) as Question[];
+            stored = refreshed.length > 0 ? refreshed : [...stored, ...(missingFromDb as unknown as Question[])];
+          }
+        }
+
         // Non-destructive upgrade: Reconcile unedited canonical questions to bankVersion 2
         const rawBank = await defaultViteBlockPackSource.loadBank(targetBlockId);
         if (Array.isArray(rawBank) && rawBank.length > 0) {
@@ -167,7 +190,7 @@ const useQuestionStoreBase = create<QuestionStoreState>((set, get) => ({
       }
 
       // 2. Read local sync cursor (or initialize Rev #1 if missing)
-      const cursorRecord = await db.bankSyncMeta.get(targetBlockId);
+      const cursorRecord = await db.bankSyncMeta.get(targetBlockId).catch(() => null);
       const activeStored = filterActiveQuestions(stored);
       const cursor: BankSyncCursor = cursorRecord
         ? {
@@ -192,7 +215,7 @@ const useQuestionStoreBase = create<QuestionStoreState>((set, get) => ({
           lastSyncedAt: cursor.lastSyncedAt,
           etag: cursor.etag,
           totalCanonicalCount: activeStored.length,
-        });
+        }).catch(() => {});
       }
 
       set({
@@ -536,8 +559,10 @@ const useQuestionStoreBase = create<QuestionStoreState>((set, get) => ({
     parsed.forEach((item, index) => {
       const res = QuestionSchema.safeParse(item);
       if (res.success) {
+        const blockId = normalizeBlockId(res.data.blockId, get().activeBlockId || 'cvs') as BlockId;
         const customItem: GovernedQuestion = {
           ...res.data,
+          blockId,
           provenanceScope: 'local-custom',
           editorialStatus: 'local_draft',
           stemHash: QuestionCanonicalHasher.computeStemHashSync(res.data.stem),
