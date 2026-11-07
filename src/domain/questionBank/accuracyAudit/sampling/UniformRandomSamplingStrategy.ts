@@ -16,7 +16,7 @@ export class UniformRandomSamplingStrategy implements ISamplingStrategy {
     population: readonly Question[],
     config: SamplingConfiguration
   ): SampleExtractionResult {
-    let pool = [...population];
+    let pool = [...population].filter(Boolean);
 
     if (config.highYieldOnly) {
       pool = pool.filter((q) => q.highYield);
@@ -26,9 +26,20 @@ export class UniformRandomSamplingStrategy implements ISamplingStrategy {
     }
 
     const totalPopulationSize = pool.length;
-    const requestedSize = Math.max(1, Math.min(config.sampleSize, totalPopulationSize));
-
     const { generator, effectiveSeed } = createRandomGenerator(config.seed);
+
+    if (totalPopulationSize === 0) {
+      return {
+        sampledQuestions: [],
+        totalPopulationSize: 0,
+        sampleSize: 0,
+        strategyType: this.strategyType,
+        strataRepresentation: {},
+        randomSeed: effectiveSeed,
+      };
+    }
+
+    const requestedSize = Math.max(1, Math.min(config.sampleSize, totalPopulationSize));
 
     // Modern Fisher-Yates partial shuffle to extract requestedSize items without biasing
     const sampledIndices: number[] = [];
@@ -42,11 +53,14 @@ export class UniformRandomSamplingStrategy implements ISamplingStrategy {
       sampledIndices.push(available[i]);
     }
 
-    const sampledQuestions = sampledIndices.map((idx) => pool[idx]);
+    const sampledQuestions = sampledIndices
+      .map((idx) => pool[idx])
+      .filter((q): q is Question => Boolean(q));
 
     // Build strata representation telemetry (by subject)
     const strataRepresentation: Record<string, { populationCount: number; sampleCount: number; percentage: number }> = {};
     for (const q of pool) {
+      if (!q) continue;
       const subject = q.subjectId || 'general';
       if (!strataRepresentation[subject]) {
         strataRepresentation[subject] = { populationCount: 0, sampleCount: 0, percentage: 0 };
@@ -55,6 +69,7 @@ export class UniformRandomSamplingStrategy implements ISamplingStrategy {
     }
 
     for (const q of sampledQuestions) {
+      if (!q) continue;
       const subject = q.subjectId || 'general';
       if (strataRepresentation[subject]) {
         strataRepresentation[subject].sampleCount++;
