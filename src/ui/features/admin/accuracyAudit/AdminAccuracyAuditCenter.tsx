@@ -27,6 +27,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { useAuthStore } from '../../../../application/stores/useAuthStore.ts';
+import { useActiveBlock } from '../../../../application/stores/useBlockContextStore.ts';
 import {
   useAdminAccuracyAuditStore,
   type AuditFilterVerdict,
@@ -97,6 +98,7 @@ const DIMENSION_LABELS: Record<AuditEvaluationDimension, { label: string; icon: 
 
 export const AdminAccuracyAuditCenter: React.FC = () => {
   const { authState } = useAuthStore();
+  const { activeBlockId, block } = useActiveBlock();
   const {
     samplingConfig,
     setSamplingConfig,
@@ -158,12 +160,13 @@ export const AdminAccuracyAuditCenter: React.FC = () => {
 
   // Filter questions
   const filteredQuestions = (currentReport?.questionResults || []).filter((q) => {
+    if (!q) return false;
     if (filterVerdict !== 'all' && q.verdict !== filterVerdict) return false;
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      const matchStem = q.questionStem.toLowerCase().includes(query);
+      const matchStem = (q.questionStem || '').toLowerCase().includes(query);
       const matchConcept = (q.concept || '').toLowerCase().includes(query);
-      const matchId = q.questionId.toLowerCase().includes(query);
+      const matchId = (q.questionId || '').toLowerCase().includes(query);
       if (!matchStem && !matchConcept && !matchId) return false;
     }
     return true;
@@ -221,16 +224,37 @@ export const AdminAccuracyAuditCenter: React.FC = () => {
 
       {/* SAMPLING & EXECUTION CONTROL PANEL */}
       <div className="p-6 rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl shadow-lg space-y-6">
-        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/60 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-100 dark:border-zinc-800/60 pb-4 gap-3">
           <div className="flex items-center gap-2">
             <Sliders className="w-4 h-4 text-indigo-500" />
             <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
               Audit Sampling Parameters
             </h2>
           </div>
-          <span className="text-[11px] text-zinc-500">
-            Finite Population Correction (FPC) Applied
-          </span>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Apple HIG Read-Only Active Block Indicator Pill */}
+            <div
+              data-testid="accuracy-audit-active-block-pill"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/60 text-xs font-semibold text-zinc-900 dark:text-zinc-100 shadow-xs"
+            >
+              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+              <span>{block?.code ?? (activeBlockId || 'cvs').toUpperCase()}</span>
+              <span className="text-zinc-400">•</span>
+              <span>
+                {typeof block?.name === 'string'
+                  ? block.name
+                  : block?.name.en ?? activeBlockId}
+              </span>
+              <span className="text-[10px] text-zinc-400 font-normal hidden sm:inline">
+                (Controlled via Navbar)
+              </span>
+            </div>
+
+            <span className="text-[11px] text-zinc-500 hidden md:inline">
+              Finite Population Correction (FPC) Applied
+            </span>
+          </div>
         </div>
 
         {/* Row 1: Model Selection & Sampling Strategy */}
@@ -655,7 +679,7 @@ export const AdminAccuracyAuditCenter: React.FC = () => {
                               {q.concept || q.questionId}
                             </span>
                             <span className="text-[11px] text-zinc-400 font-mono">
-                              ({q.subjectId} • diff {q.difficulty})
+                              ({q.subjectId || 'general'} • diff {q.difficulty ?? 2})
                             </span>
                           </div>
                           <p className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2">
