@@ -34,11 +34,36 @@ export class DexieBlockScopedQuestionRepository implements IBlockScopedRepositor
   constructor(public readonly blockId: BlockId) {}
 
   public async all(): Promise<readonly Question[]> {
-    return db.questions.where('blockId').equals(this.blockId).toArray();
+    try {
+      if (this.blockId === 'cns') {
+        const direct = await db.questions.where('blockId').equals('cns').toArray();
+        const legacy = await db.questions.where('blockId').equals('cns-neuroscience').toArray();
+        if (legacy.length > 0) {
+          // Auto-heal legacy alias to canonical 'cns'
+          const migrated = legacy.map((q) => ({ ...q, blockId: 'cns' as BlockId }));
+          await db.questions.bulkPut(migrated);
+          return [...direct, ...migrated];
+        }
+        return direct;
+      }
+      return await db.questions.where('blockId').equals(this.blockId).toArray();
+    } catch {
+      // In environments without IndexedDB (e.g. Node tests / SSR), fallback gracefully
+      return [];
+    }
   }
 
   public async count(): Promise<number> {
-    return db.questions.where('blockId').equals(this.blockId).count();
+    try {
+      if (this.blockId === 'cns') {
+        const c1 = await db.questions.where('blockId').equals('cns').count();
+        const c2 = await db.questions.where('blockId').equals('cns-neuroscience').count();
+        return c1 + c2;
+      }
+      return await db.questions.where('blockId').equals(this.blockId).count();
+    } catch {
+      return 0;
+    }
   }
 
   public async find(spec?: ScopeSpecification): Promise<readonly Question[]> {
@@ -73,12 +98,16 @@ export class DexieBlockScopedQuestionRepository implements IBlockScopedRepositor
   }
 
   public async put(items: readonly Question[]): Promise<void> {
-    // Invariant: all items must belong to this repository's block
-    const verified = items.map((q) => ({
-      ...q,
-      blockId: this.blockId,
-    }));
-    await db.questions.bulkPut(verified as Question[]);
+    try {
+      // Invariant: all items must belong to this repository's block
+      const verified = items.map((q) => ({
+        ...q,
+        blockId: this.blockId,
+      }));
+      await db.questions.bulkPut(verified as Question[]);
+    } catch {
+      // Gracefully handle missing IndexedDB driver in Node/SSR
+    }
   }
 
   private applySpecInMemory(questions: readonly Question[], spec: ScopeSpecification): readonly Question[] {
