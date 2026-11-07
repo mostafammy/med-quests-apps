@@ -37,6 +37,7 @@ import { useAuthStore } from '../../../../application/stores/useAuthStore.ts';
 import { useAdminAiQuestionParserStore } from '../../../../application/stores/useAdminAiQuestionParserStore.ts';
 import { useQuestionStore } from '../../../../application/stores/useQuestionStore.ts';
 import { useBankGovernanceStore } from '../../../../application/stores/useBankGovernanceStore.ts';
+import { useActiveBlock } from '../../../../application/stores/useBlockContextStore.ts';
 import { edgeQuestionBankGateway } from '../../../../infrastructure/questionBank/edgeQuestionBankGateway.ts';
 import defaultCvsBank from '../../../../../content/cvs/dist/bank.v1.json';
 import { compositionRoot } from '../../../../application/composition/clientCompositionRoot.ts';
@@ -162,6 +163,7 @@ Explanation: Class III antiarrhythmics (e.g. sotalol, dofetilide, ibutilide) blo
 
 export const AdminAiQuestionParserLab: React.FC = () => {
   const { authState, elevateToPlatformOwner } = useAuthStore();
+  const { activeBlockId: globalActiveBlockId, block: activeBlock } = useActiveBlock();
   const {
     rawInputText,
     setRawInputText,
@@ -169,7 +171,6 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     selectedModelId,
     setSelectedModel,
     targetBlockId,
-    setTargetBlockId,
     targetSubjectId,
     targetChapterId,
     setTargetTaxonomy,
@@ -467,10 +468,6 @@ export const AdminAiQuestionParserLab: React.FC = () => {
     MODEL_OPTIONS.find((m) => m.providerId === selectedProvider && m.modelId === selectedModelId) ||
     MODEL_OPTIONS[0];
 
-  const availableBlocks = React.useMemo(() => {
-    return compositionRoot.catalog.list('faculty-reviewer');
-  }, []);
-
   const currentBlockPack = React.useMemo(() => {
     return compositionRoot.catalog.get(targetBlockId);
   }, [targetBlockId]);
@@ -650,23 +647,28 @@ export const AdminAiQuestionParserLab: React.FC = () => {
               </div>
             </div>
 
-            {/* Target Curriculum Block */}
-            <div className="space-y-1 pt-1">
-              <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
-                Target Curriculum Block
-              </label>
-              <select
-                value={targetBlockId}
-                onChange={(e) => setTargetBlockId(e.target.value as BlockId)}
-                disabled={isParsing}
-                className="w-full text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100 font-medium focus:ring-2 focus:ring-purple-500 transition-all cursor-pointer"
+            {/* Active Curriculum Block (Single Global Source: Controlled via Navbar Switcher) */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                  Target Curriculum Block
+                </label>
+                <span className="text-[10px] text-zinc-400 font-medium">Controlled via Navbar Switcher</span>
+              </div>
+              <div
+                data-testid="ai-parser-active-block-pill"
+                className="w-full text-xs rounded-xl border border-purple-200/80 dark:border-purple-800/60 bg-purple-50/50 dark:bg-purple-950/20 px-3 py-2 text-purple-900 dark:text-purple-200 font-bold flex items-center justify-between shadow-2xs"
               >
-                {availableBlocks.map((b) => (
-                  <option key={b.blockId} value={b.blockId}>
-                    {b.manifest.block.name.en} ({b.manifest.block.code}) [{b.manifest.block.status.toUpperCase()}]
-                  </option>
-                ))}
-              </select>
+                <div className="flex items-center gap-2">
+                  <span className="px-1.5 py-0.5 rounded-md bg-purple-200/80 dark:bg-purple-800/60 text-[10px] uppercase font-black text-purple-950 dark:text-purple-100">
+                    {activeBlock?.code || globalActiveBlockId.toUpperCase()}
+                  </span>
+                  <span>{activeBlock?.shortName || activeBlock?.code || globalActiveBlockId.toUpperCase()}</span>
+                </div>
+                <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 uppercase font-semibold">
+                  {activeBlock?.status || 'Active'}
+                </span>
+              </div>
             </div>
 
             {isAutoCurriculumMode ? (
