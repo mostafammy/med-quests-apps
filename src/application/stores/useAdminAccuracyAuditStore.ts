@@ -22,6 +22,9 @@ import type {
 import type { CloudProviderId } from '../../domain/ai/settings.ts';
 import { useAuthStore } from './useAuthStore.ts';
 import { useQuestionStore } from './useQuestionStore.ts';
+import { useBlockContextStoreBase } from './useBlockContextStore.ts';
+import type { BlockId } from '../../domain/curriculum/ids.ts';
+import { edgeQuestionBankGateway } from '../../infrastructure/questionBank/edgeQuestionBankGateway.ts';
 
 export type AuditFilterVerdict = 'all' | AuditVerdict;
 
@@ -74,7 +77,7 @@ export const useAdminAccuracyAuditStore = create<AdminAccuracyAuditStoreState>((
     sampleSize: 20,
     seed: undefined,
     highYieldOnly: false,
-    blockId: 'cvs',
+    blockId: (useBlockContextStoreBase.getState().activeBlockId || 'cvs') as BlockId,
     providerId: 'gemini',
     modelId: 'gemini-2.5-pro',
   },
@@ -174,23 +177,45 @@ export const useAdminAccuracyAuditStore = create<AdminAccuracyAuditStoreState>((
     });
 
     try {
-      // Determine question bank population
+      // Determine question bank population for target block
+      const targetBlockId = (get().samplingConfig.blockId || useBlockContextStoreBase.getState().activeBlockId || 'cvs') as BlockId;
       let population: readonly Question[] = questionsOverride ?? [];
       if (population.length === 0) {
-        // Try question store
+        // 1. Check question store
+        const storeBlockId = useQuestionStore.getState().activeBlockId;
         const storeQuestions = useQuestionStore.getState().questions;
-        if (storeQuestions && storeQuestions.length > 0) {
-          population = storeQuestions;
-        } else {
-          // Fall back to default CVS bank
-          population = defaultCvsBank as Question[];
+        if (storeQuestions && storeQuestions.length > 0 && storeBlockId === targetBlockId) {
+          population = storeQuestions.filter((q) => q && q.blockId === targetBlockId);
         }
+
+        // 2. If empty, check canonical bank from edge gateway
+        if (population.length === 0) {
+          const canonical = edgeQuestionBankGateway.getLocalCanonicalBank(targetBlockId);
+          if (canonical && canonical.length > 0) {
+            population = canonical;
+          } else if (targetBlockId === 'cvs') {
+            population = defaultCvsBank as Question[];
+          }
+        }
+      }
+
+      if (population.length === 0) {
+        set({
+          isAuditing: false,
+          abortController: null,
+          error: `Cannot execute accuracy audit: Question population for block "${targetBlockId.toUpperCase()}" is empty. Ingest or seed questions first.`,
+          progress: null,
+        });
+        return null;
       }
 
       const report = await auditService.executeAdminAudit(
         adminActor,
         population,
-        get().samplingConfig,
+        {
+          ...get().samplingConfig,
+          blockId: targetBlockId,
+        },
         (progress) => {
           set({ progress });
         },
@@ -348,3 +373,20 @@ export const useAdminAccuracyAuditStore = create<AdminAccuracyAuditStoreState>((
     return '';
   },
 }));
+
+// Reactive store bridge: keep audit target block synchronized with active Navbar block
+useBlockContextStoreBase.subscribe((state) => {
+  if (state.activeBlockId) {
+    const current = useAdminAccuracyAuditStore.getState().samplingConfig.blockId;
+    if (current !== state.activeBlockId) {
+      useAdminAccuracyAuditStore.setState((prev) => ({
+        samplingConfig: {
+          ...prev.samplingConfig,
+          blockId: state.activeBlockId,
+        },
+        error: null,
+      }));
+    }
+  }
+});
+
