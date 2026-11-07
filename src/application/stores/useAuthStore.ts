@@ -101,7 +101,7 @@ export interface AuthStoreState {
   purgeDemoData: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthStoreState>((set, get) => ({
+const useAuthStoreBase = create<AuthStoreState>((set, get) => ({
   authState: edgeAuthGateway.getInitialOptimisticState(),
   isModalOpen: false,
   activeModalTab: 'sign-in',
@@ -770,3 +770,17 @@ export const useAuthStore = create<AuthStoreState>((set, get) => ({
     });
   },
 }));
+
+export const useAuthStore = Object.assign(
+  function useAuthStore<U = AuthStoreState>(
+    selector?: (state: AuthStoreState) => U
+  ): U {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      const state = useAuthStoreBase.getState();
+      return selector ? selector(state) : (state as unknown as U);
+    }
+    return useAuthStoreBase(selector as any);
+  },
+  useAuthStoreBase
+) as typeof useAuthStoreBase;
+
