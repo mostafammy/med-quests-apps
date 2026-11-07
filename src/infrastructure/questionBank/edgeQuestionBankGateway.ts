@@ -97,6 +97,22 @@ export class EdgeQuestionBankGateway
         if (deletedIds.size > 0) {
           parsed = parsed.filter((q) => !deletedIds.has(q.id));
         }
+
+        if (blockId !== 'cvs') {
+          // Purge any leaked CVS questions that were mistakenly seeded in earlier sessions
+          const initialLength = parsed.length;
+          parsed = parsed.filter((q) => {
+            const qBlock = (q.blockId || '').toLowerCase();
+            return qBlock === blockId || qBlock.startsWith(blockId) || qBlock.includes(blockId);
+          }).map((q) => ({
+            ...q,
+            blockId: blockId as BlockId,
+          }));
+          if (parsed.length !== initialLength) {
+            this.saveLocalCanonicalBank(blockId, parsed);
+          }
+        }
+
         // If bundled seed bank grew or was rebalanced (e.g. 106 questions updated to bankVersion 2),
         // reconcile existing seed questions and merge any missing bundled seed items.
         // Also bump the global block revision so clients never see "Local v6.0 -> Global v6.0" with additions!
@@ -156,8 +172,8 @@ export class EdgeQuestionBankGateway
       // Ignore
     }
 
-    // Seed from default bundled bank if empty
-    if (Array.isArray(defaultCvsBank)) {
+    // Seed from default bundled bank if empty (CVS only; non-CVS blocks start isolated and empty)
+    if (blockId === 'cvs' && Array.isArray(defaultCvsBank)) {
       const deletedKey = `${STORAGE_KEYS.DELETED_QUESTIONS}_${blockId}`;
       let deletedIds = new Set<string>();
       try {
@@ -706,7 +722,7 @@ export class EdgeQuestionBankGateway
       QuestionBankDomainError
     >
   > {
-    const blockId: BlockId = 'cvs';
+    const blockId: BlockId = (command as any).blockId || 'cvs';
     const submissions = this.getLocalSubmissions(blockId);
     const targetIdx = submissions.findIndex(
       (s) => s.ticketId === command.ticketId || s.question.id === command.questionId
@@ -946,7 +962,7 @@ export class EdgeQuestionBankGateway
   > {
     const { questionId, patch, actorId, actorDisplayName, actorRole, changeReason } = params;
 
-    const blockId: BlockId = 'cvs';
+    const blockId: BlockId = (params as any).blockId || 'cvs';
     const canonical = this.getLocalCanonicalBank(blockId);
     const idx = canonical.findIndex((q) => q.id === questionId);
 
@@ -1040,7 +1056,7 @@ export class EdgeQuestionBankGateway
   > {
     const { questionId, archive, actorId, actorDisplayName, actorRole, reason } = params;
 
-    const blockId: BlockId = 'cvs';
+    const blockId: BlockId = (params as any).blockId || 'cvs';
     const canonical = this.getLocalCanonicalBank(blockId);
     const idx = canonical.findIndex((q) => q.id === questionId);
 
@@ -1127,7 +1143,7 @@ export class EdgeQuestionBankGateway
   > {
     const { questionId, actorId, actorDisplayName, actorRole, reason, permanent = true } = params;
 
-    const blockId: BlockId = 'cvs';
+    const blockId: BlockId = (params as any).blockId || 'cvs';
     const canonical = this.getLocalCanonicalBank(blockId);
     const idx = canonical.findIndex((q) => q.id === questionId);
 
