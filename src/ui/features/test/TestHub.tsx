@@ -204,7 +204,7 @@ export const TestHub: React.FC = () => {
   const subjectCounts = useMemo(() => {
     const counts: Record<string, number> = { all: questions.length };
     taxonomy.subjects.forEach((s) => {
-      counts[s.id] = questions.filter((q) => q.subjectId === s.id).length;
+      counts[s.id] = questions.filter((q) => q && q.subjectId === s.id).length;
     });
     return counts;
   }, [questions, taxonomy.subjects]);
