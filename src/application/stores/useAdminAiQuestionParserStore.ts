@@ -10,7 +10,7 @@
 import { create } from 'zustand';
 import type { CloudProviderId } from '../../domain/ai/settings.ts';
 import { QuestionSchema, type ChoiceId, type Question } from '../../domain/model/types.ts';
-import { QuestionParsingAgent } from '../../domain/questionBank/aiQuestionParser/QuestionParsingAgent.ts';
+import { QuestionParsingAgent, normalizeBlockId } from '../../domain/questionBank/aiQuestionParser/QuestionParsingAgent.ts';
 import { CrossModelVerificationPromptBuilder } from '../../domain/questionBank/aiQuestionParser/CrossModelVerificationPromptBuilder.ts';
 import type { ParsedQuestionItem, QuestionStemMode, AgentExecutionTelemetry } from '../../domain/questionBank/aiQuestionParser/types.ts';
 import { multiModelConsensusEngine } from '../../domain/questionBank/aiQuestionParser/MultiModelConsensusEngine.ts';
@@ -21,6 +21,7 @@ import { db } from '../../infrastructure/storage/db.ts';
 import { useAuthStore } from './useAuthStore.ts';
 import { useBankGovernanceStore } from './useBankGovernanceStore.ts';
 import { useQuestionStore } from './useQuestionStore.ts';
+import { useBlockContextStoreBase } from './useBlockContextStore.ts';
 
 import { LEGACY_DEFAULT_BLOCK_ID, type BlockId } from '../../domain/curriculum/ids.ts';
 import { compositionRoot } from '../composition/clientCompositionRoot.ts';
@@ -116,7 +117,9 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
   rawInputText: '',
   selectedProvider: 'gemini',
   selectedModelId: 'gemini-2.5-flash',
-  targetBlockId: LEGACY_DEFAULT_BLOCK_ID,
+  targetBlockId: (typeof useBlockContextStoreBase !== 'undefined'
+    ? useBlockContextStoreBase.getState().activeBlockId
+    : LEGACY_DEFAULT_BLOCK_ID) as BlockId,
   targetSubjectId: 'auto',
   targetChapterId: 'auto',
   stemMode: 'verbatim',
@@ -814,7 +817,20 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
     set({ isCommitting: true, commitFeedback: null });
 
     try {
-      const canonicalQuestions = itemsToCommit.map((item) => item.question);
+      const globalActiveBlock = typeof useBlockContextStoreBase !== 'undefined'
+        ? useBlockContextStoreBase.getState().activeBlockId
+        : get().targetBlockId;
+      const rawBlockId =
+        itemsToCommit[0]?.question?.blockId ||
+        get().targetBlockId ||
+        globalActiveBlock ||
+        LEGACY_DEFAULT_BLOCK_ID;
+      const commitBlockId = normalizeBlockId(rawBlockId, globalActiveBlock) as BlockId;
+
+      const canonicalQuestions = itemsToCommit.map((item) => ({
+        ...item.question,
+        blockId: commitBlockId,
+      }));
       const { createCanonicalQuestions } = useBankGovernanceStore.getState();
 
       const success = await createCanonicalQuestions(canonicalQuestions, {
@@ -827,10 +843,13 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
         // Persist committed canonical questions directly into IndexedDB and refresh question store
         try {
           await db.questions.bulkPut(canonicalQuestions);
+          const allCanonical = edgeQuestionBankGateway.getLocalCanonicalBank(commitBlockId);
+          if (allCanonical.length > 0) {
+            await db.questions.bulkPut(allCanonical as unknown as Question[]);
+          }
         } catch {
           // Ignore IndexedDB write error in non-browser environment
         }
-        const commitBlockId = (itemsToCommit[0]?.question?.blockId || get().targetBlockId || LEGACY_DEFAULT_BLOCK_ID) as BlockId;
         await useQuestionStore.getState().loadQuestions(commitBlockId);
 
         // Clear committed items from list
@@ -884,3 +903,10 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
     return CrossModelVerificationPromptBuilder.buildBatchQuestionsPrompt(items);
   },
 }));
+
+// Reactive bridge: Automatically synchronize parser target block whenever the user switches curriculum blocks via the Navbar
+useBlockContextStoreBase.subscribe((state, prevState) => {
+  if (state.activeBlockId !== prevState.activeBlockId) {
+    useAdminAiQuestionParserStore.getState().setTargetBlockId(state.activeBlockId);
+  }
+});
