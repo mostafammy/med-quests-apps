@@ -40,13 +40,13 @@ export class LegacyTaxonomyAdapter {
       order: s.order,
     }));
 
-    const chapters: Chapter[] = manifest.chapters.map((c) => ({
+    const chapters: Chapter[] = (manifest.chapters || []).filter(Boolean).map((c) => ({
       id: c.id,
       blockId: manifest.block.id,
-      subjectId: c.subjectId,
-      name: c.name[locale] || c.name.en,
-      order: c.order,
-      sourceIds: c.sourceIds,
+      subjectId: c.subjectId || 'general',
+      name: typeof c.name === 'string' ? c.name : (c.name?.[locale] || c.name?.en || c.id),
+      order: c.order || 1,
+      sourceIds: c.sourceIds || [],
     }));
 
     const topics: Topic[] = manifest.topics.map((t) => ({
