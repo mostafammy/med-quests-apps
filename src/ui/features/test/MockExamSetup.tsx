@@ -72,7 +72,7 @@ export const MockExamSetup: React.FC = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             {taxonomy.subjects.map((sub) => {
-              const count = questions.filter((q) => q.subjectId === sub.id).length;
+              const count = questions.filter((q) => q && q.subjectId === sub.id).length;
               return (
                 <span
                   key={sub.id}
