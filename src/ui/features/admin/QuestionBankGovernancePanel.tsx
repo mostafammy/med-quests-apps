@@ -25,8 +25,8 @@ import { useBankGovernanceStore } from '../../../application/stores/useBankGover
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 import { useAuthStore } from '../../../application/stores/useAuthStore.ts';
 import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
+import { useBlockContextStore } from '../../../application/stores/useBlockContextStore.ts';
 import { compositionRoot } from '../../../application/composition/clientCompositionRoot.ts';
-import type { BlockId } from '../../../domain/curriculum/ids.ts';
 import { AiPromptStudioModal } from './AiPromptStudioModal.tsx';
 import { AdminExportBankModal } from './AdminExportBankModal.tsx';
 import type {
@@ -35,9 +35,11 @@ import type {
 } from '../../../../specs/005-global-question-bank-governance/contracts/question-bank-governance-ports.ts';
 
 export const QuestionBankGovernancePanel: React.FC = () => {
+  const { activeBlockId: globalActiveBlockId } = useBlockContextStore();
+  const activeBlockPack = compositionRoot.catalog.get(globalActiveBlockId);
+
   const {
     activeBlockId,
-    setActiveBlockId,
     activeWorkspaceTab,
     reviewQueue,
     catalogQuestions,
@@ -106,10 +108,10 @@ export const QuestionBankGovernancePanel: React.FC = () => {
   const [isPromptStudioOpen, setIsPromptStudioOpen] = useState(false);
 
   useEffect(() => {
-    loadGovernanceData(activeBlockId);
-  }, [loadGovernanceData, activeBlockId]);
+    loadGovernanceData(globalActiveBlockId);
+  }, [loadGovernanceData, globalActiveBlockId]);
 
-  const currentSubjects = compositionRoot.catalog.subjects(activeBlockId);
+  const currentSubjects = compositionRoot.catalog.subjects(globalActiveBlockId);
 
   const filteredCatalog = getFilteredCatalog();
   const filteredQueue = getFilteredQueue();
@@ -342,21 +344,24 @@ export const QuestionBankGovernancePanel: React.FC = () => {
             <span>Global Bank Curator ({catalogQuestions.length})</span>
           </button>
 
-          {/* Block Selector */}
-          <div className="flex items-center space-x-1.5 pl-2 sm:border-l border-zinc-200 dark:border-zinc-800">
+          {/* Active Curriculum Block Indicator (Single Global Source: Controlled via Navbar Switcher) */}
+          <div
+            className="flex items-center space-x-2 pl-2 sm:border-l border-zinc-200 dark:border-zinc-800"
+            title="Active curriculum block is controlled globally from the Navbar Switcher"
+          >
             <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Block:</span>
-            <select
-              value={activeBlockId}
-              aria-label="Select Curriculum Block"
-              onChange={(e) => setActiveBlockId(e.target.value as BlockId)}
-              className="py-1.5 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden cursor-pointer"
+            <div
+              data-testid="governance-active-block-pill"
+              className="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/80 text-xs font-bold text-indigo-700 dark:text-indigo-300 shadow-2xs"
             >
-              {compositionRoot.catalog.list().map((pack) => (
-                <option key={pack.manifest.block.id} value={pack.manifest.block.id}>
-                  {pack.manifest.block.code}: {pack.manifest.block.name.en}
-                </option>
-              ))}
-            </select>
+              <span className="font-mono text-[11px] font-extrabold uppercase">
+                {activeBlockPack?.manifest.block.code || globalActiveBlockId.toUpperCase()}
+              </span>
+              <span className="text-zinc-300 dark:text-zinc-600">·</span>
+              <span className="truncate max-w-[150px]">
+                {activeBlockPack?.manifest.block.name.en || globalActiveBlockId}
+              </span>
+            </div>
           </div>
         </div>
 
