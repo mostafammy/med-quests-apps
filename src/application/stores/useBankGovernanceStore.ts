@@ -13,6 +13,7 @@ import { QuestionSpecificationBuilder } from '../../domain/questionBank/question
 import type { Question } from '../../domain/model/types.ts';
 import type { BlockId } from '../../domain/curriculum/ids.ts';
 import { LEGACY_DEFAULT_BLOCK_ID } from '../../domain/curriculum/ids.ts';
+import { useBlockContextStoreBase } from './useBlockContextStore.ts';
 
 interface BankGovernanceStoreState {
   activeBlockId: BlockId;
@@ -77,7 +78,9 @@ const DEFAULT_FILTERS: QuestionCuratorFilterCriteria = {
 };
 
 export const useBankGovernanceStore = create<BankGovernanceStoreState>((set, get) => ({
-  activeBlockId: LEGACY_DEFAULT_BLOCK_ID,
+  activeBlockId: (typeof useBlockContextStoreBase !== 'undefined'
+    ? useBlockContextStoreBase.getState().activeBlockId
+    : LEGACY_DEFAULT_BLOCK_ID) as BlockId,
   activeWorkspaceTab: 'review-queue',
   reviewQueue: [],
   catalogQuestions: [],
@@ -287,3 +290,10 @@ export const useBankGovernanceStore = create<BankGovernanceStoreState>((set, get
     });
   },
 }));
+
+// Reactive bridge: Automatically synchronize governance state whenever the user switches curriculum blocks via the Navbar
+useBlockContextStoreBase.subscribe((state, prevState) => {
+  if (state.activeBlockId !== prevState.activeBlockId) {
+    useBankGovernanceStore.getState().setActiveBlockId(state.activeBlockId);
+  }
+});
