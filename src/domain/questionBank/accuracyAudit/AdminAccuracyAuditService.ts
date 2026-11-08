@@ -18,7 +18,14 @@ import type {
   AccuracyAuditRunReport,
   AuditProgressCallback,
 } from './types.ts';
+import type { SecurityAuditLogEntry } from '../../auth/governanceAnalytics.ts';
 import { edgeAuthGateway } from '../../../infrastructure/auth/edgeAuthGateway.ts';
+
+export interface SecurityAuditLoggerPort {
+  logSecurityAudit(
+    entry: Omit<SecurityAuditLogEntry, 'id' | 'createdAt'>
+  ): SecurityAuditLogEntry | void;
+}
 
 export class AdminAuthorizationError extends Error {
   constructor(message = 'Access Denied: Only administrators have privilege to perform Question Bank Accuracy Audits.') {
@@ -36,11 +43,16 @@ export interface AdminActorContext {
 export class AdminAccuracyAuditService {
   private readonly policyEvaluator = new RolePolicyEvaluator();
   private readonly auditEngine: AccuracyAuditEngine;
+  private readonly auditLogger: SecurityAuditLoggerPort;
   private inMemoryHistory: AccuracyAuditRunReport[] = [];
   private static readonly STORAGE_KEY = 'medquests_accuracy_audit_history_v1';
 
-  constructor(auditEngine?: AccuracyAuditEngine) {
+  constructor(
+    auditEngine?: AccuracyAuditEngine,
+    auditLogger: SecurityAuditLoggerPort = edgeAuthGateway
+  ) {
     this.auditEngine = auditEngine ?? new AccuracyAuditEngine();
+    this.auditLogger = auditLogger;
   }
 
   /**
@@ -89,12 +101,12 @@ export class AdminAccuracyAuditService {
 
     // 4. Record security audit log entry
     try {
-      edgeAuthGateway.logSecurityAudit({
+      this.auditLogger.logSecurityAudit({
         actorUserId: actor.userId,
         actorDisplayName: actor.displayName,
         targetUserId: actor.userId,
         targetDisplayName: 'Global Question Bank',
-        action: 'ROLE_MODIFIED' as any, // Audit action
+        action: 'ROLE_UPDATED',
         summary: `Admin executed Question Bank Accuracy Audit (${report.kpis.totalSampled} items, Score: ${report.kpis.overallAccuracyIndex}%, Strategy: ${config.strategyType})`,
         edgeColo: 'SFO-APPLE-EDGE',
         latencyMs: report.durationMs,
