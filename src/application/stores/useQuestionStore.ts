@@ -1,29 +1,26 @@
 import { create } from 'zustand';
-import { Question, QuestionSchema } from '../../domain/model/types.ts';
+import type { Question } from '../../domain/model/types.ts';
 import { db } from '../../infrastructure/storage/db.ts';
-import { defaultViteBlockPackSource } from '../../infrastructure/curriculum/ViteBlockPackSource.ts';
-import { DexieBlockScopedQuestionRepository } from '../../infrastructure/storage/DexieBlockScopedRepositories.ts';
 import type { BlockId } from '../../domain/curriculum/ids.ts';
 import { edgeQuestionBankGateway } from '../../infrastructure/questionBank/edgeQuestionBankGateway.ts';
-import { NonDestructiveBankMergeStrategy } from '../../domain/questionBank/nonDestructiveMergeStrategy.ts';
-import { BankResetPlanner } from '../../domain/questionBank/bankResetPlanner.ts';
-import { QuestionCanonicalHasher } from '../../domain/questionBank/canonicalHasher.ts';
-import { normalizeBlockId } from '../../domain/questionBank/aiQuestionParser/QuestionParsingAgent.ts';
-import { useAuthStore } from './useAuthStore.ts';
-import { edgeAuthGateway } from '../../infrastructure/auth/edgeAuthGateway.ts';
-import { analytics } from '../../infrastructure/analytics/medQuestsAnalyticsFacade.ts';
-import { createClientQddEngine } from '../../domain/questionBank/duplication/clientCompositionRoot.ts';
+import type { UserRole } from '../../domain/auth/types.ts';
 import type {
   BankSyncCursor,
   LocalBankMergeReport,
-  GovernedQuestion,
   QuestionReviewSubmission,
-  BankRevisionNumber,
   BankVersionDiffPreview,
 } from '../../../specs/005-global-question-bank-governance/contracts/question-bank-governance-ports.ts';
-
-const mergeStrategy = new NonDestructiveBankMergeStrategy();
-const resetPlanner = new BankResetPlanner(mergeStrategy);
+import {
+  applyGlobalMergeToLocalDb,
+  executeNonDestructiveBankReset,
+  hydrateLocalBlockBank,
+  probeAndComputeGlobalDiff,
+} from './questionBankSyncOrchestrator.ts';
+import {
+  exportAuthoritativeBankJson,
+  submitQuestionsForGlobalReviewWithQdd,
+  validateAndIngestLocalQuestions,
+} from './questionBankIngestionAndExportService.ts';
 
 export type SyncTelemetryPhase =
   | 'idle'
@@ -36,7 +33,7 @@ export type SyncTelemetryPhase =
   | 'resetting-bank'
   | 'error';
 
-interface QuestionStoreState {
+export interface QuestionStoreState {
   questions: Question[];
   activeBlockId: string;
   isLoading: boolean;
@@ -69,7 +66,11 @@ interface QuestionStoreState {
   }>;
   submitQuestionsForGlobalReview: (
     rawJson: string | unknown[],
-    authorContext?: { authorId?: string; authorDisplayName?: string; authorRole?: any }
+    authorContext?: {
+      authorId?: string;
+      authorDisplayName?: string;
+      authorRole?: UserRole;
+    }
   ) => Promise<{ count: number; errors: string[]; ticketCount: number }>;
   loadMySubmissions: (authorId?: string) => Promise<void>;
   exportBankJson: (blockId?: string) => string;
@@ -79,38 +80,6 @@ interface QuestionStoreState {
     revision: number;
     report: LocalBankMergeReport;
   }>;
-}
-
-function filterActiveQuestions(list: readonly (Question | GovernedQuestion)[]): Question[] {
-  return list.filter(
-    (q) =>
-      q.status !== 'quarantined' &&
-      (q as GovernedQuestion).editorialStatus !== 'archived'
-  ) as Question[];
-}
-
-function enrichBundledQuestions(rawList: readonly Question[]): GovernedQuestion[] {
-  const nowIso = new Date().toISOString();
-  return rawList.map((q) => ({
-    ...q,
-    provenanceScope: (q as GovernedQuestion).provenanceScope || 'seed-bundled',
-    editorialStatus: (q as GovernedQuestion).editorialStatus || 'published',
-    stemHash:
-      (q as GovernedQuestion).stemHash ||
-      QuestionCanonicalHasher.computeStemHashSync(q.stem),
-    globalRevision: (q as GovernedQuestion).globalRevision || 1,
-    authorId: (q as GovernedQuestion).authorId || 'usr-curriculum-faculty',
-    authorDisplayName:
-      (q as GovernedQuestion).authorDisplayName || 'Curriculum Faculty Committee',
-    reviewedById: (q as GovernedQuestion).reviewedById || 'usr-admin-initial',
-    reviewedByDisplayName:
-      (q as GovernedQuestion).reviewedByDisplayName || 'Board Administrator',
-    reviewerNotes:
-      (q as GovernedQuestion).reviewerNotes || 'Official faculty syllabus verified item.',
-    publishedAt: (q as GovernedQuestion).publishedAt || nowIso,
-    createdAt: (q as GovernedQuestion).createdAt || nowIso,
-    updatedAt: (q as GovernedQuestion).updatedAt || nowIso,
-  }));
 }
 
 const useQuestionStoreBase = create<QuestionStoreState>((set, get) => ({
@@ -130,93 +99,7 @@ const useQuestionStoreBase = create<QuestionStoreState>((set, get) => ({
     const targetBlockId = (blockId || get().activeBlockId || 'cvs') as BlockId;
     set({ isLoading: true, error: null });
     try {
-      // 1. Instant 0ms Local Hydration from IndexedDB
-      const repo = new DexieBlockScopedQuestionRepository(targetBlockId);
-      let stored = (await repo.all()) as Question[];
-
-      if (stored.length === 0) {
-        // Check if edgeQuestionBankGateway has local canonical questions for this block
-        const canonical = edgeQuestionBankGateway.getLocalCanonicalBank(targetBlockId);
-        if (canonical.length > 0) {
-          await repo.put(canonical as unknown as Question[]);
-          stored = (await repo.all()) as Question[];
-          if (stored.length === 0) {
-            stored = canonical as unknown as Question[];
-          }
-        } else {
-          const rawBank = await defaultViteBlockPackSource.loadBank(targetBlockId);
-          if (Array.isArray(rawBank) && rawBank.length > 0) {
-            const enrichedSeed = enrichBundledQuestions(rawBank as Question[]);
-            await repo.put(enrichedSeed as unknown as Question[]);
-            stored = enrichedSeed as unknown as Question[];
-          }
-        }
-      } else {
-        // Non-destructive reconciliation: Ensure any canonical questions in edge gateway are in IndexedDB
-        const canonical = edgeQuestionBankGateway.getLocalCanonicalBank(targetBlockId);
-        if (canonical.length > 0) {
-          const storedIds = new Set(stored.map((q) => q.id));
-          const missingFromDb = canonical.filter((q) => !storedIds.has(q.id));
-          if (missingFromDb.length > 0) {
-            await repo.put(missingFromDb as unknown as Question[]);
-            const refreshed = (await repo.all()) as Question[];
-            stored = refreshed.length > 0 ? refreshed : [...stored, ...(missingFromDb as unknown as Question[])];
-          }
-        }
-
-        // Non-destructive upgrade: Reconcile unedited canonical questions to bankVersion 2
-        const rawBank = await defaultViteBlockPackSource.loadBank(targetBlockId);
-        if (Array.isArray(rawBank) && rawBank.length > 0) {
-          const bundledMap = new Map((rawBank as Question[]).map((q) => [q.id, q]));
-          const toUpgrade: Question[] = [];
-          for (const q of stored) {
-            const governed = q as GovernedQuestion;
-            if (governed.provenanceScope !== 'local-custom' && (governed.bankVersion || 1) < 2) {
-              const bundled = bundledMap.get(q.id);
-              if (bundled && (bundled.bankVersion || 1) >= 2) {
-                toUpgrade.push({
-                  ...q,
-                  choices: bundled.choices,
-                  bankVersion: bundled.bankVersion || 2,
-                });
-              }
-            }
-          }
-          if (toUpgrade.length > 0) {
-            await repo.put(toUpgrade);
-            stored = (await repo.all()) as Question[];
-          }
-        }
-      }
-
-      // 2. Read local sync cursor (or initialize Rev #1 if missing)
-      const cursorRecord = await db.bankSyncMeta.get(targetBlockId).catch(() => null);
-      const activeStored = filterActiveQuestions(stored);
-      const cursor: BankSyncCursor = cursorRecord
-        ? {
-            blockId: targetBlockId,
-            serverRevision: cursorRecord.serverRevision as BankRevisionNumber,
-            lastSyncedAt: cursorRecord.lastSyncedAt,
-            etag: cursorRecord.etag,
-            totalCanonicalCount: cursorRecord.totalCanonicalCount,
-          }
-        : {
-            blockId: targetBlockId,
-            serverRevision: 1 as BankRevisionNumber,
-            lastSyncedAt: new Date().toISOString(),
-            etag: 'W/rev-1',
-            totalCanonicalCount: activeStored.length,
-          };
-
-      if (!cursorRecord) {
-        await db.bankSyncMeta.put({
-          blockId: targetBlockId,
-          serverRevision: 1,
-          lastSyncedAt: cursor.lastSyncedAt,
-          etag: cursor.etag,
-          totalCanonicalCount: activeStored.length,
-        }).catch(() => {});
-      }
+      const { activeStored, cursor } = await hydrateLocalBlockBank(targetBlockId);
 
       set({
         questions: activeStored,
@@ -225,8 +108,7 @@ const useQuestionStoreBase = create<QuestionStoreState>((set, get) => ({
         isLoading: false,
       });
 
-      // 3. Background non-blocking check for global updates (populates pendingDiffPreview if changes exist)
-      get().checkForGlobalUpdates(targetBlockId);
+      void get().checkForGlobalUpdates(targetBlockId);
     } catch (err) {
       set({ error: (err as Error).message, isLoading: false, syncPhase: 'error' });
     }
@@ -235,174 +117,28 @@ const useQuestionStoreBase = create<QuestionStoreState>((set, get) => ({
   checkForGlobalUpdates: async (blockId = 'cvs', options: { force?: boolean } = {}) => {
     set({ isSyncing: true, syncPhase: 'probing-edge', error: null });
     try {
-      const storedCursor = await db.bankSyncMeta.get(blockId);
-      const cursor: BankSyncCursor | null = storedCursor
-        ? {
-            blockId,
-            serverRevision: storedCursor.serverRevision as BankRevisionNumber,
-            lastSyncedAt: storedCursor.lastSyncedAt,
-            etag: storedCursor.etag,
-            totalCanonicalCount: storedCursor.totalCanonicalCount,
-          }
-        : get().syncCursor;
-
-      const localRev = cursor ? Number(cursor.serverRevision) : 1;
-
-      // Fast path: a cheap edge probe avoids downloading the full canonical bank every
-      // 60 seconds. A full snapshot is still fetched whenever the revision/count differs
-      // or the user explicitly asks for a review (force: true).
-      if (!options.force && storedCursor) {
-        const probe = await edgeQuestionBankGateway.probeRemoteRevision(blockId);
-        const countMatches = probe.canonicalCount === Number(storedCursor.totalCanonicalCount);
-        if (probe.source === 'edge' && probe.revision <= localRev && countMatches) {
-          const currentQuestions = (await db.questions
-            .where('blockId')
-            .equals(blockId)
-            .toArray()) as GovernedQuestion[];
-          const activeQuestions = filterActiveQuestions(currentQuestions);
-          const retained =
-            get().dismissedRemoteRevision !== null &&
-            Number(get().dismissedRemoteRevision) === Number(probe.revision);
-          const nowIso = new Date().toISOString();
-          const alignedCursor: BankSyncCursor = {
-            blockId,
-            serverRevision: Math.max(localRev, probe.revision) as BankRevisionNumber,
-            lastSyncedAt: nowIso,
-            etag: probe.etag,
-            totalCanonicalCount: probe.canonicalCount,
-          };
-          await db.bankSyncMeta.put({
-            blockId,
-            serverRevision: Number(alignedCursor.serverRevision),
-            lastSyncedAt: nowIso,
-            etag: alignedCursor.etag,
-            totalCanonicalCount: alignedCursor.totalCanonicalCount,
-          });
-          const cleanPreview: BankVersionDiffPreview = {
-            blockId,
-            localRevision: Number(alignedCursor.serverRevision),
-            remoteRevision: Number(alignedCursor.serverRevision),
-            remoteEtag: alignedCursor.etag,
-            localTotalCount: activeQuestions.length,
-            remoteCanonicalCount: probe.canonicalCount,
-            isOutOfDate: false,
-            hasChanges: false,
-            addedQuestions: [],
-            editedQuestions: [],
-            deletedQuestions: [],
-            preservedCustomQuestions: [],
-            rawDelta: {
-              status: 'up-to-date',
-              blockId,
-              revision: alignedCursor.serverRevision,
-              syncedAt: nowIso,
-              etag: alignedCursor.etag,
-              upsertedQuestions: [],
-              archivedQuestionIds: [],
-            },
-            checkedAt: nowIso,
-          };
-          set({
-            syncCursor: alignedCursor,
-            pendingDiffPreview: cleanPreview,
-            isSyncing: false,
-            syncPhase: retained ? 'local-retained' : 'up-to-date',
-          });
-          return cleanPreview;
-        }
-      }
-
-      // Always fetch full canonical state from revision 0 when computing diff so we can accurately detect
-      // any missing seed questions, edited explanations/stems, or soft-retired tombstones!
-      const syncResult = await edgeQuestionBankGateway.fetchDeltaSync(blockId, {
+      const outcome = await probeAndComputeGlobalDiff({
         blockId,
-        serverRevision: 0 as BankRevisionNumber,
-        lastSyncedAt: '',
-        etag: '',
-        totalCanonicalCount: 0,
+        force: options.force,
+        currentSyncCursor: get().syncCursor,
+        dismissedRemoteRevision: get().dismissedRemoteRevision,
+        onComputingDiff: () => set({ syncPhase: 'computing-diff' }),
       });
 
-      if (!syncResult.ok) {
+      if (!outcome.preview) {
         set({ isSyncing: false, syncPhase: 'idle' });
         return null;
       }
 
-      set({ syncPhase: 'computing-diff' });
-      const delta = syncResult.value;
-      const currentQuestions = (await db.questions
-        .where('blockId')
-        .equals(blockId)
-        .toArray()) as GovernedQuestion[];
-
-      let diffPreview = mergeStrategy.computeDiffPreview({
-        blockId,
-        localRevision: localRev,
-        currentLocalQuestions: currentQuestions,
-        delta,
-        remoteCanonicalCount: delta.upsertedQuestions.length,
+      set({
+        ...(outcome.alignedCursor ? { syncCursor: outcome.alignedCursor } : {}),
+        pendingDiffPreview: outcome.preview,
+        isSyncing: false,
+        syncPhase: outcome.phase,
+        ...(outcome.clearDismissedRevision ? { dismissedRemoteRevision: null } : {}),
       });
 
-      // Ensure gateway local revision never lags behind effective remote revision when content diverged
-      if (diffPreview.remoteRevision > Number(delta.revision)) {
-        edgeQuestionBankGateway.ensureMinimumLocalRevision(blockId, diffPreview.remoteRevision);
-      }
-
-      // If there are ZERO canonical content changes (+0 Added, ~0 Edited, -0 Deleted),
-      // fast-forward the local revision cursor so Local and Global versions match 100%
-      if (!diffPreview.hasChanges && diffPreview.localRevision !== diffPreview.remoteRevision) {
-        const syncedRev = Math.max(diffPreview.localRevision, diffPreview.remoteRevision);
-        edgeQuestionBankGateway.ensureMinimumLocalRevision(blockId, syncedRev);
-        const alignedCursor: BankSyncCursor = {
-          blockId,
-          serverRevision: syncedRev as BankRevisionNumber,
-          lastSyncedAt: new Date().toISOString(),
-          etag: `W/rev-${syncedRev}`,
-          totalCanonicalCount: diffPreview.remoteCanonicalCount,
-        };
-        await db.bankSyncMeta.put({
-          blockId,
-          serverRevision: syncedRev,
-          lastSyncedAt: alignedCursor.lastSyncedAt,
-          etag: alignedCursor.etag,
-          totalCanonicalCount: alignedCursor.totalCanonicalCount,
-        });
-        diffPreview = {
-          ...diffPreview,
-          localRevision: syncedRev,
-          remoteRevision: syncedRev,
-          isOutOfDate: false,
-          hasChanges: false,
-        };
-        set({ syncCursor: alignedCursor });
-      }
-
-      const retainedByUser =
-        !options.force &&
-        get().dismissedRemoteRevision !== null &&
-        Number(get().dismissedRemoteRevision) === Number(diffPreview.remoteRevision);
-
-      if ((diffPreview.hasChanges || diffPreview.isOutOfDate) && !retainedByUser) {
-        set({
-          pendingDiffPreview: diffPreview,
-          isSyncing: false,
-          syncPhase: 'changes-detected',
-          dismissedRemoteRevision: options.force ? null : get().dismissedRemoteRevision,
-        });
-      } else if (retainedByUser) {
-        set({
-          pendingDiffPreview: diffPreview,
-          isSyncing: false,
-          syncPhase: 'local-retained',
-        });
-      } else {
-        set({
-          pendingDiffPreview: diffPreview,
-          isSyncing: false,
-          syncPhase: 'up-to-date',
-        });
-      }
-
-      return diffPreview;
+      return outcome.preview;
     } catch (err) {
       console.warn('[useQuestionStore] Diff check deferred:', err);
       set({ isSyncing: false, syncPhase: 'idle' });
@@ -423,95 +159,20 @@ const useQuestionStoreBase = create<QuestionStoreState>((set, get) => ({
         return null;
       }
 
-      const currentQuestions = (await db.questions
-        .where('blockId')
-        .equals(blockId)
-        .toArray()) as GovernedQuestion[];
-
-      const mergeOutcome = mergeStrategy.mergeGlobalDeltaIntoLocal({
-        blockId,
-        currentLocalQuestions: currentQuestions,
-        incomingGlobalQuestions: preview.rawDelta.upsertedQuestions,
-        archivedGlobalIds: preview.rawDelta.archivedQuestionIds,
-        previousRevision: preview.localRevision,
-        newRevision: preview.rawDelta.revision,
-        syncedAt: preview.rawDelta.syncedAt,
-      });
-
-      // Persist all merged questions (including quarantined tombstones) to IndexedDB
-      await db.questions.bulkPut([...mergeOutcome.mergedQuestions] as unknown as Question[]);
-
-      const activeQuestions = filterActiveQuestions(mergeOutcome.mergedQuestions);
-
-      // Persist new sync cursor
-      const newCursor: BankSyncCursor = {
-        blockId,
-        serverRevision: preview.rawDelta.revision,
-        lastSyncedAt: preview.rawDelta.syncedAt,
-        etag: preview.rawDelta.etag,
-        totalCanonicalCount: activeQuestions.filter(
-          (q) => (q as GovernedQuestion).provenanceScope !== 'local-custom'
-        ).length,
-      };
-
-      await db.bankSyncMeta.put({
-        blockId,
-        serverRevision: Number(newCursor.serverRevision),
-        lastSyncedAt: newCursor.lastSyncedAt,
-        etag: newCursor.etag,
-        totalCanonicalCount: newCursor.totalCanonicalCount,
-      });
-
-      // Recompute clean up-to-date preview
-      const updatedPreview: BankVersionDiffPreview = {
-        ...preview,
-        localRevision: Number(newCursor.serverRevision),
-        remoteRevision: Number(newCursor.serverRevision),
-        localTotalCount: activeQuestions.length,
-        isOutOfDate: false,
-        hasChanges: false,
-        addedQuestions: [],
-        editedQuestions: [],
-        deletedQuestions: [],
-        checkedAt: new Date().toISOString(),
-      };
+      const { activeQuestions, newCursor, updatedPreview, report } =
+        await applyGlobalMergeToLocalDb(blockId, preview);
 
       set({
         questions: activeQuestions,
         syncCursor: newCursor,
         pendingDiffPreview: updatedPreview,
         dismissedRemoteRevision: null,
-        lastMergeReport: mergeOutcome.report,
+        lastMergeReport: report,
         isSyncing: false,
         syncPhase: 'up-to-date',
       });
 
-      analytics.capture('bank:global_sync_executed', {
-        block_id: blockId,
-        sync_outcome: 'delta-merged',
-        remote_revision: Number(preview.rawDelta.revision),
-        added_count: mergeOutcome.report.insertedCount,
-        updated_count: mergeOutcome.report.updatedCanonicalCount,
-        retained_local_custom_count: mergeOutcome.report.preservedLocalCustomCount,
-        sync_duration_ms: 24,
-      });
-
-      // Broadcast sync event to peer tabs in the same browser
-      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-        try {
-          const channel = new BroadcastChannel('medquests_bank_sync');
-          channel.postMessage({
-            type: 'BANK_SYNCED',
-            blockId,
-            revision: newCursor.serverRevision,
-          });
-          channel.close();
-        } catch {
-          // Ignore
-        }
-      }
-
-      return mergeOutcome.report;
+      return report;
     } catch (err) {
       console.warn('[useQuestionStore] Merge application failed:', err);
       set({ isSyncing: false, syncPhase: 'error', error: (err as Error).message });
@@ -536,97 +197,29 @@ const useQuestionStoreBase = create<QuestionStoreState>((set, get) => ({
     return await get().applyPendingGlobalMerge(blockId);
   },
 
-  // Dual Action 1: Save Locally to Device (Private Sandbox, 0ms)
   ingestQuestions: async (rawInput: string | unknown[]) => {
-    let parsed: unknown[];
-    if (typeof rawInput === 'string') {
-      try {
-        parsed = JSON.parse(rawInput);
-      } catch (e) {
-        return { count: 0, errors: [`JSON Parse Error: ${(e as Error).message}`] };
-      }
-    } else {
-      parsed = rawInput;
-    }
-
-    if (!Array.isArray(parsed)) {
-      return { count: 0, errors: ['Input must be a JSON array of questions'] };
-    }
-
-    const validated: Question[] = [];
-    const errors: string[] = [];
-
-    parsed.forEach((item, index) => {
-      const res = QuestionSchema.safeParse(item);
-      if (res.success) {
-        const blockId = normalizeBlockId(res.data.blockId, get().activeBlockId || 'cvs') as BlockId;
-        const customItem: GovernedQuestion = {
-          ...res.data,
-          blockId,
-          provenanceScope: 'local-custom',
-          editorialStatus: 'local_draft',
-          stemHash: QuestionCanonicalHasher.computeStemHashSync(res.data.stem),
-          globalRevision: 0,
-          authorId: 'usr-local-author',
-          authorDisplayName: 'Local Author',
-          reviewedById: null,
-          reviewedByDisplayName: null,
-          reviewerNotes: null,
-          publishedAt: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        validated.push(customItem as Question);
-      } else {
-        const issues = res.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ');
-        errors.push(`Item #${index + 1}: ${issues}`);
-      }
+    const res = await validateAndIngestLocalQuestions({
+      rawInput,
+      activeBlockId: get().activeBlockId,
+      currentQuestions: get().questions,
     });
-
-    const duplicateWarnings: string[] = [];
-
-    if (validated.length > 0) {
-      // Launch prebuilt DuplicationDetectionEngine to audit incoming questions
-      try {
-        const qddEngine = await createClientQddEngine(get().questions);
-        const qddResult = await qddEngine.checkBatch(validated, { kind: 'block', blockId: 'cvs' });
-        if (qddResult.ok) {
-          for (const verdict of qddResult.value) {
-            if (verdict.relation === 'EXACT') {
-              const cand = verdict.candidates[0];
-              duplicateWarnings.push(
-                `Question "${verdict.questionId}" is an exact duplicate of existing bank item (${cand?.matchedQuestionId || 'bank question'}).`
-              );
-            } else if (verdict.relation === 'CONFLICT') {
-              const cand = verdict.candidates[0];
-              duplicateWarnings.push(
-                `Question "${verdict.questionId}" has an answer-key conflict with question (${cand?.matchedQuestionId || 'bank question'}).`
-              );
-            }
-          }
-        }
-      } catch {
-        // Non-blocking duplicate audit
-      }
-
-      await db.questions.bulkPut(validated);
-      const current = get().questions;
-      const map = new Map<string, Question>();
-      current.forEach((q) => map.set(q.id, q));
-      validated.forEach((q) => map.set(q.id, q));
-      set({ questions: filterActiveQuestions(Array.from(map.values())) });
+    if (res.updatedQuestions) {
+      set({ questions: res.updatedQuestions });
     }
-
-    return { count: validated.length, errors, ingested: validated, duplicateWarnings };
+    return {
+      count: res.count,
+      errors: res.errors,
+      ingested: res.ingested,
+      duplicateWarnings: res.duplicateWarnings,
+    };
   },
 
-  // Dual Action 2: Save Locally AND Submit for Global Curriculum Review
   submitQuestionsForGlobalReview: async (
     rawInput: string | unknown[],
     authorContext = {
       authorId: 'usr_local_author',
       authorDisplayName: 'Medical Scholar',
-      authorRole: 'student-pro',
+      authorRole: 'student-pro' as UserRole,
     }
   ) => {
     const localResult = await get().ingestQuestions(rawInput);
@@ -643,75 +236,23 @@ const useQuestionStoreBase = create<QuestionStoreState>((set, get) => ({
       return { count: 0, errors: localResult.errors, ticketCount: 0 };
     }
 
-    // Launch prebuilt DuplicationDetectionEngine to verify candidates before submitting
-    try {
-      const qddEngine = await createClientQddEngine(get().questions);
-      const qddRes = await qddEngine.checkBatch(candidates, { kind: 'block', blockId: 'cvs' });
-      if (qddRes.ok) {
-        const blockedItems = qddRes.value.filter(
-          (v) => v.decision === 'BLOCK' && v.candidates.some((c) => c.matchedQuestionId !== v.questionId)
-        );
-        if (blockedItems.length > 0) {
-          const reasons = blockedItems.map(
-            (b) => `Question "${b.questionId}" is a duplicate of ${b.candidates[0]?.matchedQuestionId}`
-          );
-          return {
-            count: localResult.count,
-            errors: [
-              ...localResult.errors,
-              `Submission stopped by DuplicationDetectionEngine: ${reasons.join(', ')}`,
-            ],
-            ticketCount: 0,
-          };
-        }
-      }
-    } catch {
-      // Fallback
-    }
-
-    const submissionRes = await edgeQuestionBankGateway.submitQuestionsForGlobalReview({
-      questions: candidates,
-      authorId: authorContext.authorId || 'usr_local_author',
-      authorDisplayName: authorContext.authorDisplayName || 'Medical Scholar',
-      authorRole: authorContext.authorRole || 'student-pro',
+    const submissionOutcome = await submitQuestionsForGlobalReviewWithQdd({
+      candidates,
+      localCount: localResult.count,
+      localErrors: localResult.errors,
+      currentQuestions: get().questions,
+      authorContext,
     });
 
-    if (!submissionRes.ok) {
-      return {
-        count: localResult.count,
-        errors: [...localResult.errors, `Review queue submission warning: ${submissionRes.error.code}`],
-        ticketCount: 0,
-      };
+    if (submissionOutcome.updatedQuestions) {
+      set({ questions: submissionOutcome.updatedQuestions });
+      await get().loadMySubmissions(authorContext.authorId);
     }
 
-    const acceptedQuestionIds = new Set(
-      submissionRes.value.submittedTickets.map((ticket) => ticket.question.id)
-    );
-
-    const updatedSubmittedQuestions = candidates
-      .filter((q) => acceptedQuestionIds.has(q.id))
-      .map((q) => ({
-        ...q,
-        provenanceScope: 'submitted-pending' as const,
-        editorialStatus: 'pending_review' as const,
-        authorId: authorContext.authorId || 'usr_local_author',
-        authorDisplayName: authorContext.authorDisplayName || 'Medical Scholar',
-        updatedAt: new Date().toISOString(),
-      }));
-
-    await db.questions.bulkPut(updatedSubmittedQuestions as unknown as Question[]);
-
-    const currentMap = new Map<string, Question>();
-    get().questions.forEach((q) => currentMap.set(q.id, q));
-    updatedSubmittedQuestions.forEach((q) => currentMap.set(q.id, q as unknown as Question));
-    set({ questions: filterActiveQuestions(Array.from(currentMap.values())) });
-
-    await get().loadMySubmissions(authorContext.authorId);
-
     return {
-      count: localResult.count,
-      errors: localResult.errors,
-      ticketCount: submissionRes.value.submittedTickets.length,
+      count: submissionOutcome.count,
+      errors: submissionOutcome.errors,
+      ticketCount: submissionOutcome.ticketCount,
     };
   },
 
@@ -727,48 +268,11 @@ const useQuestionStoreBase = create<QuestionStoreState>((set, get) => ({
   },
 
   exportBankJson: (blockId = 'cvs') => {
-    const authState = useAuthStore.getState().authState;
-    const isAdmin = authState.status === 'authenticated-active' && authState.user.role === 'admin';
-    if (!isAdmin) {
-      const actorId = authState.status === 'authenticated-active' ? authState.user.id : 'usr_anonymous';
-      const actorName = authState.status === 'authenticated-active' ? authState.user.displayName : 'Local Scholar';
-      const actorRole = authState.status === 'authenticated-active' ? authState.user.role : 'unauthenticated';
-
-      edgeAuthGateway.logSecurityAudit({
-        actorUserId: actorId,
-        actorDisplayName: `${actorName} (${actorRole})`,
-        targetUserId: actorId,
-        targetDisplayName: `Question Bank [${blockId.toUpperCase()}]`,
-        action: 'QUESTION_BANK_EXPORTED',
-        summary: `BLOCKED unauthorized export attempt of question bank by ${actorName} [Role: ${actorRole}]. Admin privileges strictly required.`,
-        edgeColo: 'CAI',
-        latencyMs: 0.9,
-      });
-
-      useAuthStore.setState({ auditLogs: [...edgeAuthGateway.getAuditLogs()] });
-
-      throw new Error(
-        'Access Denied (403): Exporting the question bank is strictly restricted to Authoritative Platform Administrators within the Admin Governance Dashboard.'
-      );
-    }
-
-    const list = get().questions.filter((q) => !blockId || q.blockId === blockId);
-
-    // Record verified administrative export in immutable security audit trail
-    edgeAuthGateway.logSecurityAudit({
-      actorUserId: authState.user.id,
-      actorDisplayName: authState.user.displayName,
-      targetUserId: authState.user.id,
-      targetDisplayName: `Authoritative Curriculum [${blockId.toUpperCase()}]`,
-      action: 'QUESTION_BANK_EXPORTED',
-      summary: `Exported authoritative question bank for block [${blockId.toUpperCase()}] (${list.length} questions, Rev #${get().syncCursor?.serverRevision ?? 1})`,
-      edgeColo: 'CAI',
-      latencyMs: 1.2,
+    return exportAuthoritativeBankJson({
+      blockId,
+      questions: get().questions,
+      syncCursor: get().syncCursor,
     });
-
-    useAuthStore.setState({ auditLogs: [...edgeAuthGateway.getAuditLogs()] });
-
-    return JSON.stringify(list, null, 2);
   },
 
   clearBank: async (blockId = 'cvs') => {
@@ -788,143 +292,23 @@ const useQuestionStoreBase = create<QuestionStoreState>((set, get) => ({
   resetLocalBankToGlobal: async (blockId = 'cvs') => {
     set({ isSyncing: true, syncPhase: 'resetting-bank', error: null });
     try {
-      // 1. Capture the pre-reset state for an exact, user-facing report.
-      const previousQuestions = (await db.questions
-        .where('blockId')
-        .equals(blockId)
-        .toArray()) as GovernedQuestion[];
-      const prevCursor = await db.bankSyncMeta.get(blockId);
-      const previousRevision = prevCursor ? prevCursor.serverRevision : 1;
-
-      // 2. Pull the authoritative canonical snapshot. Network I/O happens BEFORE the
-      //    Dexie write transaction so we never hold an IndexedDB lock across the network.
-      const deltaRes = await edgeQuestionBankGateway.fetchDeltaSync(blockId, {
-        blockId,
-        serverRevision: 0 as BankRevisionNumber,
-        lastSyncedAt: '',
-        etag: '',
-        totalCanonicalCount: 0,
-      });
-
-      let canonicalQuestions: GovernedQuestion[] = [];
-      let revision = Number(previousRevision);
-      let etag = prevCursor?.etag || `W/rev-${revision}`;
-
-      if (
-        deltaRes.ok &&
-        deltaRes.value.upsertedQuestions &&
-        deltaRes.value.upsertedQuestions.length > 0
-      ) {
-        canonicalQuestions = enrichBundledQuestions(
-          deltaRes.value.upsertedQuestions as unknown as Question[]
-        );
-        revision = Number(deltaRes.value.revision);
-        etag = deltaRes.value.etag;
-      } else {
-        const rawBank = await defaultViteBlockPackSource.loadBank(blockId as BlockId);
-        if (Array.isArray(rawBank) && rawBank.length > 0) {
-          canonicalQuestions = enrichBundledQuestions(rawBank as Question[]);
-          revision = Number(edgeQuestionBankGateway.getLocalRevision(blockId) || 1);
-          etag = `W/rev-${revision}`;
-        }
-      }
-
-      // A failed/empty fetch must NEVER wipe a learner's bank.
-      if (canonicalQuestions.length === 0) {
-        throw new Error(
-          'Unable to retrieve the authoritative global bank. Your local bank was left untouched.'
-        );
-      }
-
-      const nowIso = new Date().toISOString();
-
-      // 3. Non-destructive reset plan: restore canonical, preserve local-custom and
-      //    submitted-pending items, soft-archive stale canonical rows instead of deleting them.
-      const resetPlan = resetPlanner.buildPlan({
-        blockId,
-        currentLocalQuestions: previousQuestions,
-        canonicalQuestions,
-        previousRevision,
-        newRevision: revision as BankRevisionNumber,
-        syncedAt: nowIso,
-      });
-
-      const activeQuestions = filterActiveQuestions(resetPlan.questions);
-
-      // 4. Atomic persistence: questions + sync cursor move together or not at all.
-      await db.transaction('rw', db.questions, db.bankSyncMeta, async () => {
-        await db.questions.bulkPut([...resetPlan.questions] as unknown as Question[]);
-        await db.bankSyncMeta.put({
-          blockId,
-          serverRevision: revision,
-          lastSyncedAt: nowIso,
-          etag,
-          totalCanonicalCount: canonicalQuestions.length,
-        });
-      });
-
-      const newCursor: BankSyncCursor = {
-        blockId,
-        serverRevision: revision as BankRevisionNumber,
-        lastSyncedAt: nowIso,
-        etag,
-        totalCanonicalCount: canonicalQuestions.length,
-      };
-
-      const cleanPreview: BankVersionDiffPreview = {
-        blockId,
-        localRevision: revision,
-        remoteRevision: revision,
-        remoteEtag: etag,
-        localTotalCount: activeQuestions.length,
-        remoteCanonicalCount: canonicalQuestions.length,
-        isOutOfDate: false,
-        hasChanges: false,
-        addedQuestions: [],
-        editedQuestions: [],
-        deletedQuestions: [],
-        preservedCustomQuestions: [],
-        rawDelta: {
-          status: 'up-to-date',
-          blockId,
-          revision: revision as BankRevisionNumber,
-          syncedAt: nowIso,
-          etag,
-          upsertedQuestions: canonicalQuestions,
-          archivedQuestionIds: [],
-        },
-        checkedAt: nowIso,
-      };
+      const { activeQuestions, newCursor, cleanPreview, report, revision } =
+        await executeNonDestructiveBankReset(blockId);
 
       set({
         questions: activeQuestions,
         syncCursor: newCursor,
         pendingDiffPreview: cleanPreview,
         dismissedRemoteRevision: null,
-        lastMergeReport: resetPlan.report,
+        lastMergeReport: report,
         isSyncing: false,
         syncPhase: 'up-to-date',
       });
 
-      // 5. Notify peer tabs in the same browser so every open tab converges instantly.
-      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-        try {
-          const channel = new BroadcastChannel('medquests_bank_sync');
-          channel.postMessage({
-            type: 'BANK_RESET_COMPLETED',
-            blockId,
-            revision,
-          });
-          channel.close();
-        } catch {
-          // Ignore
-        }
-      }
-
       return {
         resetCount: activeQuestions.length,
         revision,
-        report: resetPlan.report,
+        report,
       };
     } catch (err) {
       console.error('[useQuestionStore] Reset to global bank failed:', err);
@@ -942,7 +326,7 @@ export const useQuestionStore = Object.assign(
       const state = useQuestionStoreBase.getState();
       return selector ? selector(state) : (state as unknown as U);
     }
-    return useQuestionStoreBase(selector as any);
+    return useQuestionStoreBase(selector as (state: QuestionStoreState) => U);
   },
   useQuestionStoreBase
 ) as typeof useQuestionStoreBase;
@@ -951,7 +335,6 @@ export const useQuestionStore = Object.assign(
 // BACKGROUND SYNC REVALIDATION ENGINE (Multi-tab, Admin Event, Focus & 60s Pulse)
 // =========================================================================
 if (typeof window !== 'undefined') {
-  // 1. Cross-Tab Instant Synchronization (0ms)
   if ('BroadcastChannel' in window) {
     try {
       const rxChannel = new BroadcastChannel('medquests_bank_sync');
@@ -959,9 +342,9 @@ if (typeof window !== 'undefined') {
         const type = event.data?.type;
         const activeBlock = useQuestionStore.getState().activeBlockId;
         if (type === 'BANK_SYNCED' || type === 'BANK_RESET_COMPLETED') {
-          useQuestionStore.getState().loadQuestions(activeBlock);
+          void useQuestionStore.getState().loadQuestions(activeBlock);
         } else if (type === 'GLOBAL_BANK_MUTATED') {
-          useQuestionStore.getState().checkForGlobalUpdates(activeBlock);
+          void useQuestionStore.getState().checkForGlobalUpdates(activeBlock);
         }
       };
     } catch {
@@ -969,17 +352,15 @@ if (typeof window !== 'undefined') {
     }
   }
 
-  // 2. Same-Tab Admin / Reviewer Mutation Listener (Instant Diff Detection)
   window.addEventListener('medquests:global-bank-mutated', () => {
     const state = useQuestionStore.getState();
-    state.checkForGlobalUpdates(state.activeBlockId);
+    void state.checkForGlobalUpdates(state.activeBlockId);
   });
 
-  // 3. Window Focus & Visibility Change Revalidation
   const triggerRevalidation = () => {
     const state = useQuestionStore.getState();
     if (!state.isSyncing) {
-      state.checkForGlobalUpdates(state.activeBlockId);
+      void state.checkForGlobalUpdates(state.activeBlockId);
     }
   };
 
@@ -990,7 +371,6 @@ if (typeof window !== 'undefined') {
     }
   });
 
-  // 4. Periodic Background Sync Heartbeat (every 60 seconds)
   setInterval(() => {
     if (document.visibilityState === 'visible') {
       triggerRevalidation();
