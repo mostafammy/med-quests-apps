@@ -65,17 +65,20 @@ export class MedQuestsAnalyticsFacade
     // Register identity change listener to automatically notify transport
     this.identityManager.onIdentify((data) => {
       // Send an identify event through the normal pipeline
-      this.capture('$identify' as any, {
-        $anon_distinct_id: data.previousAnonymousId,
-        $set: {
-          user_role: data.role,
-          account_status: data.accountStatus,
-          university_cohort: data.universityCohort ?? 'Unassigned',
-        },
-        $set_once: {
-          first_identified_at: data.identifiedAtIso,
-        },
-      } as any);
+      this.capture(
+        '$identify' as unknown as MedQuestsAnalyticsEventName,
+        {
+          $anon_distinct_id: data.previousAnonymousId,
+          $set: {
+            user_role: data.role,
+            account_status: data.accountStatus,
+            university_cohort: data.universityCohort ?? 'Unassigned',
+          },
+          $set_once: {
+            first_identified_at: data.identifiedAtIso,
+          },
+        } as unknown as MedQuestsAnalyticsEventMap[MedQuestsAnalyticsEventName]
+      );
     });
   }
 
@@ -215,7 +218,9 @@ export class MedQuestsAnalyticsFacade
   }
 
   public pauseDuringCriticalAnimation(durationMs: number): void {
-    this.scheduler.pauseDuringCriticalAnimation(durationMs as any);
+    this.scheduler.pauseDuringCriticalAnimation(
+      durationMs as Parameters<IdleFlushScheduler['pauseDuringCriticalAnimation']>[0]
+    );
   }
 }
 
