@@ -9,7 +9,17 @@
  * - Dependency Inversion: Exposes ICurriculumTaxonomyRegistry abstraction.
  */
 
-import type { Taxonomy, Subject, Chapter, Topic, SubjectId, ChapterId } from '../model/types.ts';
+import type {
+  Taxonomy,
+  Subject,
+  Chapter,
+  Topic,
+  SubjectId,
+  ChapterId,
+  BlockId,
+  TopicId,
+  SourceId,
+} from '../model/types.ts';
 import { CVS_TAXONOMY } from './cvsTaxonomy.ts';
 import cnsManifest from '../../../content/cns/manifest.json';
 
@@ -18,8 +28,12 @@ export interface ICurriculumTaxonomyRegistry {
   getSubjects(blockId?: string): readonly Subject[];
   getChapters(subjectId?: SubjectId, blockId?: string): readonly Chapter[];
   getTopics(chapterId?: ChapterId, blockId?: string): readonly Topic[];
-  registerSubject(subject: Omit<Subject, 'order'> & { blockId?: string }): Subject;
-  registerChapter(chapter: Omit<Chapter, 'order' | 'sourceIds'> & { blockId?: string }): Chapter;
+  registerSubject(
+    subject: Omit<Subject, 'order' | 'blockId'> & { blockId?: string }
+  ): Subject;
+  registerChapter(
+    chapter: Omit<Chapter, 'order' | 'sourceIds' | 'blockId'> & { blockId?: string }
+  ): Chapter;
   hasSubject(id: SubjectId, blockId?: string): boolean;
   hasChapter(id: ChapterId, blockId?: string): boolean;
   resetToCanonical(): void;
@@ -113,8 +127,10 @@ export class CurriculumTaxonomyRegistry implements ICurriculumTaxonomyRegistry {
     return false;
   }
 
-  public registerSubject(subjectInput: Omit<Subject, 'order'> & { blockId?: string }): Subject {
-    const targetBlockId = subjectInput.blockId || 'cvs';
+  public registerSubject(
+    subjectInput: Omit<Subject, 'order' | 'blockId'> & { blockId?: string }
+  ): Subject {
+    const targetBlockId = (subjectInput.blockId || 'cvs') as BlockId;
     const existing = this.currentTaxonomy.subjects.find(
       (s) => s.id === subjectInput.id && (!s.blockId || s.blockId === targetBlockId)
     );
@@ -145,9 +161,9 @@ export class CurriculumTaxonomyRegistry implements ICurriculumTaxonomyRegistry {
   }
 
   public registerChapter(
-    chapterInput: Omit<Chapter, 'order' | 'sourceIds'> & { blockId?: string }
+    chapterInput: Omit<Chapter, 'order' | 'sourceIds' | 'blockId'> & { blockId?: string }
   ): Chapter {
-    const targetBlockId = chapterInput.blockId || 'cvs';
+    const targetBlockId = (chapterInput.blockId || 'cvs') as BlockId;
     const existing = this.currentTaxonomy.chapters.find(
       (c) => c.id === chapterInput.id && (!c.blockId || c.blockId === targetBlockId)
     );
@@ -168,12 +184,12 @@ export class CurriculumTaxonomyRegistry implements ICurriculumTaxonomyRegistry {
       subjectId: chapterInput.subjectId,
       name: chapterInput.name,
       order: this.currentTaxonomy.chapters.length + 1,
-      sourceIds: [`SRC-${targetBlockId.toUpperCase()}-${chapterInput.subjectId.toUpperCase().slice(0, 3)}-EXPANSION`],
+      sourceIds: [`SRC-${targetBlockId.toUpperCase()}-${chapterInput.subjectId.toUpperCase().slice(0, 3)}-EXPANSION` as SourceId],
     };
 
     // Auto-create a default review topic for this chapter
     const defaultTopic: Topic = {
-      id: `${newChapter.id}/core-concepts`,
+      id: `${newChapter.id}/core-concepts` as TopicId,
       blockId: targetBlockId,
       chapterId: newChapter.id,
       name: `${newChapter.name} - Core Clinical Concepts`,
