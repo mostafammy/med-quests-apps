@@ -41,13 +41,15 @@ export const StagingMasterRail: React.FC<StagingMasterRailProps> = ({
   subjectMetaMap,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterMode, setFilterMode] = useState<'all' | 'inferred' | 'duplicates'>('all');
+  const [filterMode, setFilterMode] = useState<'all' | 'inferred' | 'duplicates' | 'reclassified' | 'proposals'>('all');
 
   const filteredQuestions = useMemo(() => {
     return questions.map((item, originalIndex) => ({ item, originalIndex })).filter(({ item }) => {
       // Filter mode check
       if (filterMode === 'inferred' && !item.aiGeneratedAnswerKey) return false;
       if (filterMode === 'duplicates' && (!item.qddVerdict || item.qddVerdict.relation === 'UNIQUE')) return false;
+      if (filterMode === 'reclassified' && !item.isReclassified) return false;
+      if (filterMode === 'proposals' && !item.taxonomyClassification?.newChapterProposal && !item.taxonomyClassification?.newSubjectProposal) return false;
 
       // Search query check
       if (searchQuery.trim()) {
@@ -95,7 +97,7 @@ export const StagingMasterRail: React.FC<StagingMasterRailProps> = ({
           </div>
 
           {/* Quick Filter Buttons */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-wrap">
             <button
               type="button"
               onClick={() => setFilterMode('all')}
@@ -106,6 +108,30 @@ export const StagingMasterRail: React.FC<StagingMasterRailProps> = ({
               }`}
             >
               All
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterMode('reclassified')}
+              title="Show only questions reclassified from draft scope by AI"
+              className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                filterMode === 'reclassified'
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'text-zinc-500 hover:text-indigo-600'
+              }`}
+            >
+              ⚡ Reclassified
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterMode('proposals')}
+              title="Show only questions that will create a new chapter or subject"
+              className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer ${
+                filterMode === 'proposals'
+                  ? 'bg-purple-600 text-white shadow-2xs'
+                  : 'text-zinc-500 hover:text-purple-600'
+              }`}
+            >
+              ✨ Proposals
             </button>
             <button
               type="button"
@@ -234,6 +260,36 @@ export const StagingMasterRail: React.FC<StagingMasterRailProps> = ({
                 {/* Footer Badges */}
                 <div className="flex items-center justify-between gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800/60 text-[9px]">
                   <div className="flex items-center gap-1 flex-wrap">
+                    {/* Reclassification Badge */}
+                    {item.isReclassified && (
+                      <span
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30"
+                        title={`Reclassified from draft: ${item.originalDraftTaxonomy?.chapterName || 'Unmapped'}`}
+                      >
+                        ⚡ Reclassified
+                      </span>
+                    )}
+
+                    {/* New Chapter Proposal Badge */}
+                    {item.taxonomyClassification?.newChapterProposal && (
+                      <span
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30"
+                        title={`Will create new chapter: ${item.taxonomyClassification.newChapterProposal.name}`}
+                      >
+                        ✨ New Chapter
+                      </span>
+                    )}
+
+                    {/* New Subject Proposal Badge */}
+                    {item.taxonomyClassification?.newSubjectProposal && (
+                      <span
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+                        title={`Will create new subject: ${item.taxonomyClassification.newSubjectProposal.name}`}
+                      >
+                        ✨ New Subject
+                      </span>
+                    )}
+
                     {/* Inferred vs Verified Key Badge */}
                     {item.aiGeneratedAnswerKey ? (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
