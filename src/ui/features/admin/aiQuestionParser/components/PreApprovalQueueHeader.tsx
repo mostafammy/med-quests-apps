@@ -6,6 +6,8 @@ import {
   Sparkles,
   CheckCircle2,
   AlertTriangle,
+  Zap,
+  FolderPlus,
 } from 'lucide-react';
 import type { ParsedQuestionItem } from '../../../../../domain/questionBank/aiQuestionParser/types.ts';
 import { TaxonomyDisplayResolver } from '../../../../../domain/taxonomy/TaxonomyDisplayResolver.ts';
@@ -39,17 +41,43 @@ export const PreApprovalQueueHeader: React.FC<PreApprovalQueueHeaderProps> = ({
     new Set(effectiveQuestions.map((q) => q.question.subjectId))
   );
 
+  const reclassifiedCount = effectiveQuestions.filter((q) => q.isReclassified).length;
+  const newChapterCount = effectiveQuestions.filter(
+    (q) => Boolean(q.taxonomyClassification?.newChapterProposal)
+  ).length;
+  const newSubjectCount = effectiveQuestions.filter(
+    (q) => Boolean(q.taxonomyClassification?.newSubjectProposal)
+  ).length;
+
   return (
     <div className="p-6 rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl shadow-lg space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800/80 pb-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-base font-bold font-heading text-zinc-900 dark:text-zinc-50">
               Pre-Approval Inspection Queue ({totalCount} Items)
             </h2>
             <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
               {selectedCount} Selected
             </span>
+            {reclassifiedCount > 0 && (
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 flex items-center gap-1">
+                <Zap className="w-3 h-3 text-indigo-500" />
+                <span>{reclassifiedCount} Reclassified</span>
+              </span>
+            )}
+            {newChapterCount > 0 && (
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-purple-500" />
+                <span>{newChapterCount} New Chapter Proposal{newChapterCount > 1 ? 's' : ''}</span>
+              </span>
+            )}
+            {newSubjectCount > 0 && (
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                <FolderPlus className="w-3 h-3 text-amber-500" />
+                <span>{newSubjectCount} New Subject Proposal{newSubjectCount > 1 ? 's' : ''}</span>
+              </span>
+            )}
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
             Inspect the structured questions below before committing to the
@@ -160,6 +188,41 @@ export const PreApprovalQueueHeader: React.FC<PreApprovalQueueHeaderProps> = ({
           })}
         </div>
       </div>
+
+      {/* DYNAMIC RECLASSIFICATION & PROPOSAL BATCH BANNER */}
+      {(reclassifiedCount > 0 || newChapterCount > 0 || newSubjectCount > 0) && (
+        <div className="p-3.5 rounded-2xl border border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-950/20 backdrop-blur-md flex items-center justify-between gap-3 flex-wrap text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            {reclassifiedCount > 0 && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/90 dark:bg-zinc-800/90 border border-indigo-300 dark:border-indigo-700 text-indigo-900 dark:text-indigo-200 font-medium shadow-2xs">
+                <Zap className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <span>
+                  <strong className="font-bold">{reclassifiedCount} Item{reclassifiedCount > 1 ? 's' : ''} Reclassified:</strong>{' '}
+                  <span className="text-zinc-600 dark:text-zinc-400">Auto-classifier re-anchored items from draft scope to active syllabus.</span>
+                </span>
+              </div>
+            )}
+            {newChapterCount > 0 && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/90 dark:bg-zinc-800/90 border border-purple-300 dark:border-purple-700 text-purple-900 dark:text-purple-200 font-medium shadow-2xs">
+                <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                <span>
+                  <strong className="font-bold">{newChapterCount} New Chapter Proposal{newChapterCount > 1 ? 's' : ''}:</strong>{' '}
+                  <span className="text-zinc-600 dark:text-zinc-400">Will register and create new chapter(s) upon commit or approval.</span>
+                </span>
+              </div>
+            )}
+            {newSubjectCount > 0 && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/90 dark:bg-zinc-800/90 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 font-medium shadow-2xs">
+                <FolderPlus className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>
+                  <strong className="font-bold">{newSubjectCount} New Subject Proposal{newSubjectCount > 1 ? 's' : ''}:</strong>{' '}
+                  <span className="text-zinc-600 dark:text-zinc-400">Will register new subject discipline(s) in curriculum.</span>
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {commitFeedback && (
         <div
