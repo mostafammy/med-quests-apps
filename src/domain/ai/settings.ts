@@ -22,6 +22,7 @@ export const AiSettingsSchema = z.object({
 });
 
 export type AiSettings = z.infer<typeof AiSettingsSchema>;
+export type AiCopilotSettings = AiSettings;
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {
   engine: 'groq',
@@ -75,10 +76,14 @@ export function parseAiSettings(raw: unknown): AiSettings {
   }
   // Migration fallback: if legacy row had 'offline-tutor', migrate to current active settings
   if (raw && typeof raw === 'object' && 'engine' in raw && (raw as { engine?: string }).engine === 'offline-tutor') {
+    const legacy = raw as { groqApiKey?: unknown; geminiApiKey?: unknown };
     return {
       ...DEFAULT_AI_SETTINGS,
-      groqApiKey: typeof (raw as any).groqApiKey === 'string' && (raw as any).groqApiKey.trim() ? (raw as any).groqApiKey : DEFAULT_AI_SETTINGS.groqApiKey,
-      geminiApiKey: typeof (raw as any).geminiApiKey === 'string' ? (raw as any).geminiApiKey : '',
+      groqApiKey:
+        typeof legacy.groqApiKey === 'string' && legacy.groqApiKey.trim()
+          ? legacy.groqApiKey
+          : DEFAULT_AI_SETTINGS.groqApiKey,
+      geminiApiKey: typeof legacy.geminiApiKey === 'string' ? legacy.geminiApiKey : '',
     };
   }
   return DEFAULT_AI_SETTINGS;
