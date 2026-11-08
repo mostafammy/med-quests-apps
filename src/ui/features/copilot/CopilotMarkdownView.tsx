@@ -24,8 +24,19 @@ export const CopilotMarkdownView: React.FC<Props> = ({ content }) => {
 
     const blockDir = ScriptDirectionDetector.detectTextDirection(rawLine);
 
-    // 2. Horizontal Divider (--- or ***)
-    if (/^(\-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+    // 1b. Standalone <br> tags on their own line
+    if (
+      /^(?:<(?:\/br|br\s*[\/\\]?)>|&(?:lt|#60);(?:\/br|br\s*[\/\\]?)&(?:gt|#62);|\s)+$/i.test(
+        trimmed
+      )
+    ) {
+      elements.push(<div key={`br-${i}`} className="h-2" aria-hidden="true" />);
+      i++;
+      continue;
+    }
+
+    // 2. Horizontal Divider (--- or *** or <hr>)
+    if (/^(\-{3,}|\*{3,}|_{3,}|<hr\s*[\/\\]?>)$/i.test(trimmed)) {
       elements.push(
         <div key={`hr-${i}`} className="py-2.5">
           <div className="h-[1px] bg-gradient-to-r from-transparent via-slate-300 dark:via-zinc-700 to-transparent" />
@@ -324,14 +335,25 @@ function renderTable(key: string, tableLines: string[], dir: 'ltr' | 'rtl'): Rea
 }
 
 /**
- * Tokenizes and renders bold (**text**), italics (*text*), code (`code`), flow arrows (→, ->), and checkmarks (✅)
- * with strict BiDi Unicode isolation so inline equations and English medical acronyms never scramble in Arabic prose.
+ * Tokenizes and renders bold (**text**), italics (*text*), code (`code`), flow arrows (→, ->), checkmarks (✅),
+ * and line breaks (<br>, <br/>, <br />, </br>) with strict BiDi Unicode isolation so inline equations and English
+ * medical acronyms never scramble in Arabic prose.
  */
-function formatInline(text: string): React.ReactNode {
-  // Regex to match **bold**, *italic*, `code`, arrows, and checkmarks
-  const parts = text.split(/(\*\*.*?\*\*|\*[^*\n]+?\*|`[^`\n]+?`|->|→|✅)/g);
+export function formatInline(text: string): React.ReactNode {
+  // Regex to match <br> tags (raw and HTML entity encoded), **bold**, *italic*, `code`, arrows, and checkmarks
+  const parts = text.split(
+    /(<(?:\/br|br\s*[\/\\]?)>|&(?:lt|#60);(?:\/br|br\s*[\/\\]?)&(?:gt|#62);|\*\*.*?\*\*|\*[^*\n]+?\*|`[^`\n]+?`|->|→|✅)/gi
+  );
 
   return parts.map((part, i) => {
+    if (!part) return null;
+
+    if (
+      /^<(?:\/br|br\s*[\/\\]?)>$/i.test(part) ||
+      /^&(?:lt|#60);(?:\/br|br\s*[\/\\]?)&(?:gt|#62);$/i.test(part)
+    ) {
+      return <br key={i} />;
+    }
     if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
       return (
         <strong key={i} className="font-extrabold text-slate-900 dark:text-white">
