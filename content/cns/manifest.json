@@ -124,6 +124,16 @@
       "sourceIds": ["SRC-CNS-ANA-01"]
     },
     {
+      "id": "cns-ana-diencephalon-limbic-system",
+      "subjectId": "anatomy",
+      "name": {
+        "en": "Diencephalon & Limbic System",
+        "ar": "الدماغ البيني والجهاز الحوفي"
+      },
+      "order": 7,
+      "sourceIds": ["SRC-CNS-ANA-01"]
+    },
+    {
       "id": "cns-phy-excitable-synaptic",
       "subjectId": "physiology",
       "name": {
@@ -403,6 +413,33 @@
       "name": {
         "en": "Internal Capsule Blood Supply & Lenticulostriate Stroke Syndromes",
         "ar": "التروية الشريانية للمحفظة ومتلازمات السكتة الدماغية المحفظية"
+      },
+      "order": 3
+    },
+    {
+      "id": "cns-ana-diencephalon-limbic-system/thalamus-subthalamus-epithalamus",
+      "chapterId": "cns-ana-diencephalon-limbic-system",
+      "name": {
+        "en": "Thalamic Nuclei, Metathalamus, Subthalamus & Epithalamus",
+        "ar": "نوى المهاد، ما بعد المهاد، تحت المهاد وفوق المهاد"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-ana-diencephalon-limbic-system/hypothalamic-nuclei-connections",
+      "chapterId": "cns-ana-diencephalon-limbic-system",
+      "name": {
+        "en": "Hypothalamus Boundaries, Nuclear Zones & Neuroendocrine Connections",
+        "ar": "حدود الوطاء، مناطقه النووية واتصالاته العصبية الصماوية"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-ana-diencephalon-limbic-system/limbic-system-hippocampus-fornix",
+      "chapterId": "cns-ana-diencephalon-limbic-system",
+      "name": {
+        "en": "Limbic System Structures, Hippocampal Formation & Papez Circuit",
+        "ar": "بنى الجهاز الحوفي، التشكيل الحصيني ودارة بابيز"
       },
       "order": 3
     },
