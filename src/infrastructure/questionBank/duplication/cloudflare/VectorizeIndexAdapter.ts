@@ -21,10 +21,10 @@ export interface CloudflareVectorizeBinding {
       namespace?: string;
       returnValues?: boolean;
       returnMetadata?: boolean;
-      filter?: Record<string, any>;
+      filter?: Record<string, unknown>;
     }
   ): Promise<{
-    matches: Array<{ id: string; score: number; metadata?: Record<string, any> }>;
+    matches: Array<{ id: string; score: number; metadata?: Record<string, unknown> }>;
     count: number;
   }>;
   upsert(
@@ -32,7 +32,7 @@ export interface CloudflareVectorizeBinding {
       id: string;
       values: number[] | Float32Array;
       namespace?: string;
-      metadata?: Record<string, any>;
+      metadata?: Record<string, unknown>;
     }>
   ): Promise<{ mutationId: string }>;
   deleteByIds(ids: string[]): Promise<{ mutationId: string }>;
@@ -65,8 +65,8 @@ export class VectorizeIndexAdapter implements IVectorIndex {
       }));
 
       return { ok: true, value: matches };
-    } catch (err: any) {
-      const message = err?.message || String(err);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       if (message.includes('timeout') || message.includes('aborted')) {
         return { ok: false, error: 'STAGE_TIMEOUT' };
       }
