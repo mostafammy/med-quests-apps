@@ -120,7 +120,7 @@ export const useSessionLeaveDialogStore = Object.assign(
       const state = useSessionLeaveDialogStoreBase.getState();
       return selector ? selector(state) : (state as unknown as U);
     }
-    return useSessionLeaveDialogStoreBase(selector as any);
+    return useSessionLeaveDialogStoreBase(selector as (state: SessionLeaveDialogState) => U);
   },
   useSessionLeaveDialogStoreBase
 ) as typeof useSessionLeaveDialogStoreBase;
