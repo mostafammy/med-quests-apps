@@ -84,6 +84,50 @@ export class CurriculumClassificationAgent {
   ): TaxonomyClassificationResult {
     const combined = `${stem} ${choicesText} ${explanationText}`.toLowerCase();
 
+    const isExplicitCns = targetDescriptor?.id === 'cns';
+    const isExplicitCvs = targetDescriptor?.id === 'cvs';
+
+    const cnsKeywords = [
+      'internal capsule',
+      'projection fiber',
+      'projection fibers',
+      'corticospinal',
+      'corticobulbar',
+      'corticonuclear',
+      'thalamocortical',
+      'neural tube',
+      'meninges',
+      'cerebrospinal',
+      'csf',
+      'cerebral hemisphere',
+      'cerebral cortex',
+      'brainstem',
+      'cerebellum',
+      'basal ganglia',
+      'lentiform',
+      'putamen',
+      'globus pallidus',
+      'caudate',
+      'thalamus',
+      'substantia nigra',
+      'cranial nerve',
+      'optic radiation',
+      'auditory radiation',
+      'charcot',
+      'lenticulostriate',
+      'brodmann',
+      'neuroanatomy',
+      'supratentorial',
+      'infratentorial',
+      'spinal cord',
+    ];
+
+    const isCnsContent = !isExplicitCvs && (isExplicitCns || cnsKeywords.some((kw) => combined.includes(kw)));
+
+    if (isCnsContent) {
+      return this.classifyCns(combined, targetDescriptor);
+    }
+
     // 1. GAP ANALYSIS: Check if content belongs to an unmapped specialty (e.g. Pharmacology or Pathology)
     const gapAssessment = this.detectCurriculumGaps(combined);
     const result = gapAssessment || this.matchAgainstRegisteredTaxonomy(combined);
@@ -97,6 +141,345 @@ export class CurriculumClassificationAgent {
     }
 
     return result;
+  }
+
+  /**
+   * Autonomous Central Nervous System (CNS - Block 207) Curriculum Classifier
+   */
+  private classifyCns(
+    text: string,
+    customBlock?: BlockDescriptorContext
+  ): TaxonomyClassificationResult {
+    const blockDescriptor: BlockDescriptorContext = customBlock || {
+      id: 'cns',
+      name: 'Central Nervous System',
+      code: 'Block 207',
+      shortName: 'CNS',
+    };
+
+    // 1. Projection Fibers & Internal Capsule (Anatomy)
+    const internalCapsuleKeywords = [
+      'internal capsule',
+      'projection fiber',
+      'projection fibers',
+      'anterior limb',
+      'posterior limb',
+      'genu',
+      'retrolentiform',
+      'retrolenticular',
+      'sublentiform',
+      'sublenticular',
+      'thalamocortical radiation',
+      'thalamocortical radiations',
+      'sensory radiation',
+      'optic radiation',
+      'auditory radiation',
+      'corticofugal',
+      'corticopontine',
+      'frontopontine',
+      'lenticulostriate',
+      'charcot',
+      'capsular stroke',
+      'capsular hemorrhage',
+      'lentiform nucleus',
+    ];
+
+    if (internalCapsuleKeywords.some((kw) => text.includes(kw))) {
+      const hasRegisteredChap = this.taxonomyRegistry.hasChapter('cns-ana-white-matter-internal-capsule', 'cns');
+      return this.createResult(
+        {
+          subjectId: 'anatomy',
+          subjectName: 'CNS Neuroanatomy & Embryology',
+          chapterId: 'cns-ana-white-matter-internal-capsule',
+          chapterName: 'Cerebral White Matter & Internal Capsule',
+          confidenceScore: 98,
+          rationale:
+            'Evaluates cerebral projection fibers, internal capsule nuclear boundaries, thalamocortical radiations, somatotopy, and capsular blood supply.',
+          isNewDomainSuggested: !hasRegisteredChap,
+          newChapterProposal: !hasRegisteredChap
+            ? {
+                id: 'cns-ana-white-matter-internal-capsule',
+                name: 'Cerebral White Matter & Internal Capsule',
+                subjectId: 'anatomy',
+                rationale:
+                  'Covers cerebral projection fibers, internal capsule boundaries, thalamocortical radiations, and capsular arterial supply.',
+              }
+            : undefined,
+        },
+        blockDescriptor
+      );
+    }
+
+    // 2. Cerebral Hemispheres, Cortical Areas & Circle of Willis (Anatomy)
+    if (
+      text.includes('brodmann') ||
+      text.includes('motor cortex') ||
+      text.includes('precentral gyrus') ||
+      text.includes('postcentral gyrus') ||
+      text.includes('somatosensory cortex') ||
+      text.includes('frontal lobe') ||
+      text.includes('parietal lobe') ||
+      text.includes('temporal lobe') ||
+      text.includes('occipital lobe') ||
+      text.includes('circle of willis') ||
+      text.includes('middle cerebral artery') ||
+      text.includes('anterior cerebral artery') ||
+      text.includes('posterior cerebral artery') ||
+      text.includes('aphasia') ||
+      text.includes('broca') ||
+      text.includes('wernicke')
+    ) {
+      return this.createResult(
+        {
+          subjectId: 'anatomy',
+          subjectName: 'CNS Neuroanatomy & Embryology',
+          chapterId: 'cns-ana-cerebral-cortex-vascular',
+          chapterName: 'Cerebral Hemispheres, Cortical Areas & Circle of Willis',
+          confidenceScore: 95,
+          rationale:
+            'Evaluates cortical localization, cerebral hemisphere functional areas, or Circle of Willis cerebral hemodynamics.',
+          isNewDomainSuggested: false,
+        },
+        blockDescriptor
+      );
+    }
+
+    // 3. Cerebellum, Basal Ganglia & Diencephalon (Anatomy)
+    if (
+      text.includes('basal ganglia') ||
+      text.includes('caudate') ||
+      text.includes('putamen') ||
+      text.includes('globus pallidus') ||
+      text.includes('substantia nigra') ||
+      text.includes('subthalamic') ||
+      text.includes('striatum') ||
+      text.includes('parkinson') ||
+      text.includes('huntington') ||
+      text.includes('chorea') ||
+      text.includes('cerebellum') ||
+      text.includes('vermis') ||
+      text.includes('purkinje') ||
+      text.includes('ataxia') ||
+      text.includes('diencephalon')
+    ) {
+      return this.createResult(
+        {
+          subjectId: 'anatomy',
+          subjectName: 'CNS Neuroanatomy & Embryology',
+          chapterId: 'cns-ana-cerebellum-basal-ganglia',
+          chapterName: 'Cerebellum, Basal Ganglia & Diencephalon',
+          confidenceScore: 95,
+          rationale: 'Evaluates extrapyramidal motor circuits, deep cerebellar nuclei, or diencephalic coordination.',
+          isNewDomainSuggested: false,
+        },
+        blockDescriptor
+      );
+    }
+
+    // 4. Brainstem Levels & Cranial Nerve Nuclei (Anatomy)
+    if (
+      text.includes('brainstem') ||
+      text.includes('midbrain') ||
+      text.includes('pons') ||
+      text.includes('medulla') ||
+      text.includes('cranial nerve') ||
+      text.includes('oculomotor') ||
+      text.includes('trochlear') ||
+      text.includes('trigeminal') ||
+      text.includes('abducens') ||
+      text.includes('facial nerve') ||
+      text.includes('vestibulocochlear') ||
+      text.includes('glossopharyngeal') ||
+      text.includes('vagus') ||
+      text.includes('hypoglossal') ||
+      text.includes('solitary nucleus') ||
+      text.includes('nucleus ambiguus') ||
+      text.includes('wallenberg')
+    ) {
+      return this.createResult(
+        {
+          subjectId: 'anatomy',
+          subjectName: 'CNS Neuroanatomy & Embryology',
+          chapterId: 'cns-ana-brainstem-cranial-nerves',
+          chapterName: 'Brainstem Levels & Cranial Nerve Nuclei',
+          confidenceScore: 94,
+          rationale: 'Evaluates brainstem cross-sectional anatomy, cranial nerve nuclei columns, and localized brainstem syndromes.',
+          isNewDomainSuggested: false,
+        },
+        blockDescriptor
+      );
+    }
+
+    // 5. Spinal Cord Structure & Ascending/Descending Tracts (Anatomy)
+    if (
+      text.includes('spinal cord') ||
+      text.includes('dorsal column') ||
+      text.includes('gracilis') ||
+      text.includes('cuneatus') ||
+      text.includes('spinothalamic') ||
+      text.includes('anterior horn') ||
+      text.includes('substantia gelatinosa') ||
+      text.includes('brown-sequard') ||
+      text.includes('syringomyelia')
+    ) {
+      return this.createResult(
+        {
+          subjectId: 'anatomy',
+          subjectName: 'CNS Neuroanatomy & Embryology',
+          chapterId: 'cns-ana-spinal-cord-tracts',
+          chapterName: 'Spinal Cord Structure & Ascending/Descending Tracts',
+          confidenceScore: 94,
+          rationale: 'Evaluates spinal cord tracts, ascending sensory pathways, and spinal cord hemisection deficits.',
+          isNewDomainSuggested: false,
+        },
+        blockDescriptor
+      );
+    }
+
+    // 6. Neural Tube, Meninges & CSF Dynamics (Anatomy)
+    if (
+      text.includes('neural tube') ||
+      text.includes('spina bifida') ||
+      text.includes('anencephaly') ||
+      text.includes('meninges') ||
+      text.includes('dura mater') ||
+      text.includes('arachnoid') ||
+      text.includes('pia mater') ||
+      text.includes('csf') ||
+      text.includes('cerebrospinal fluid') ||
+      text.includes('choroid plexus') ||
+      text.includes('hydrocephalus') ||
+      text.includes('foramen of monro') ||
+      text.includes('aqueduct of sylvius') ||
+      text.includes('foramen of magendie') ||
+      text.includes('luschka')
+    ) {
+      return this.createResult(
+        {
+          subjectId: 'anatomy',
+          subjectName: 'CNS Neuroanatomy & Embryology',
+          chapterId: 'cns-ana-embryology-meninges-csf',
+          chapterName: 'Neural Tube, Meninges & CSF Dynamics',
+          confidenceScore: 96,
+          rationale: 'Direct correlation with CNS embryology, meningeal coverings, ventricular circulation, and CSF hydrodynamics.',
+          isNewDomainSuggested: false,
+        },
+        blockDescriptor
+      );
+    }
+
+    // 7. Neurophysiology
+    if (
+      text.includes('resting potential') ||
+      text.includes('action potential') ||
+      text.includes('synaptic') ||
+      text.includes('neurotransmitter') ||
+      text.includes('gaba') ||
+      text.includes('glutamate') ||
+      text.includes('eeg') ||
+      text.includes('rem sleep') ||
+      text.includes('somatosensory') ||
+      text.includes('pain modulation')
+    ) {
+      return this.createResult(
+        {
+          subjectId: 'physiology',
+          subjectName: 'CNS Neurophysiology',
+          chapterId: 'cns-phy-excitable-synaptic',
+          chapterName: 'Membrane Potentials & Synaptic Transmission',
+          confidenceScore: 92,
+          rationale: 'Evaluates neurophysiological membrane kinetics, excitability, and synaptic transmission.',
+          isNewDomainSuggested: false,
+        },
+        blockDescriptor
+      );
+    }
+
+    // 8. Neurohistology
+    if (
+      text.includes('astrocyte') ||
+      text.includes('oligodendrocyte') ||
+      text.includes('microglia') ||
+      text.includes('schwann') ||
+      text.includes('myelin') ||
+      text.includes('node of ranvier') ||
+      text.includes('ependyma')
+    ) {
+      return this.createResult(
+        {
+          subjectId: 'histology',
+          subjectName: 'CNS Neurohistology',
+          chapterId: 'cns-his-glial-cells',
+          chapterName: 'CNS Neurohistology & Glial Architecture',
+          confidenceScore: 93,
+          rationale: 'Evaluates microscopic neurocellular architecture and neuroglial subtypes.',
+          isNewDomainSuggested: false,
+        },
+        blockDescriptor
+      );
+    }
+
+    // 9. Neuropathology / Microbiology
+    if (
+      text.includes('meningitis') ||
+      text.includes('encephalitis') ||
+      text.includes('glioblastoma') ||
+      text.includes('meningioma') ||
+      text.includes('multiple sclerosis') ||
+      text.includes('alzheimer') ||
+      text.includes('prion')
+    ) {
+      return this.createResult(
+        {
+          subjectId: 'pathology-micro',
+          subjectName: 'CNS Pathology & Microbiology',
+          chapterId: 'cns-pat-neurodegenerative-infections',
+          chapterName: 'CNS Infections & Neurodegenerative Pathology',
+          confidenceScore: 92,
+          rationale: 'Evaluates central nervous system infections, inflammatory demyelination, or neuropathology.',
+          isNewDomainSuggested: false,
+        },
+        blockDescriptor
+      );
+    }
+
+    // 10. Neuropharmacology
+    if (
+      text.includes('antiepileptic') ||
+      text.includes('phenytoin') ||
+      text.includes('carbamazepine') ||
+      text.includes('valproate') ||
+      text.includes('levodopa') ||
+      text.includes('haloperidol') ||
+      text.includes('benzodiazepine')
+    ) {
+      return this.createResult(
+        {
+          subjectId: 'pharmacology',
+          subjectName: 'CNS Neuropharmacology',
+          chapterId: 'cns-pha-neuro-drugs',
+          chapterName: 'CNS Neuropharmacology & Synaptic Modulators',
+          confidenceScore: 93,
+          rationale: 'Evaluates neurological and psychiatric pharmacotherapy.',
+          isNewDomainSuggested: false,
+        },
+        blockDescriptor
+      );
+    }
+
+    // Default CNS Anatomy to Cerebral Hemispheres, Cortical Areas & Circle of Willis
+    return this.createResult(
+      {
+        subjectId: 'anatomy',
+        subjectName: 'CNS Neuroanatomy & Embryology',
+        chapterId: 'cns-ana-cerebral-cortex-vascular',
+        chapterName: 'Cerebral Hemispheres, Cortical Areas & Circle of Willis',
+        confidenceScore: 82,
+        rationale: 'Grounded within general CNS neuroanatomy and cortical vascular territories.',
+        isNewDomainSuggested: false,
+      },
+      blockDescriptor
+    );
   }
 
   /**
