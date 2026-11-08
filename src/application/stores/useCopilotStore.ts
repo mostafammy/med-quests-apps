@@ -4,7 +4,8 @@
  * and high-frequency token buffering at locked 60fps.
  */
 import { create } from 'zustand';
-import type { CopilotSurface, SafeAiContext } from '../../domain/ai/context.ts';
+import type { Attempt } from '../../domain/model/types.ts';
+import type { CopilotSurface, SafeAiContext, BankOverview } from '../../domain/ai/context.ts';
 import type { ChatMessage, MessagePart } from '../../domain/ai/conversation.ts';
 import { buildSafeAiContext } from '../../domain/ai/policyGate.ts';
 import { questionTelemetryTracker } from '../../domain/ai/telemetry.ts';
@@ -323,7 +324,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
             ? questions.find((q) => q.id === activeQuestionId) || null
             : null);
 
-    let attemptsOnQ: any[] = [];
+    let attemptsOnQ: Attempt[] = [];
     let existingNote: string | null = null;
     if (activeQuestion) {
       try {
@@ -365,7 +366,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
         highYieldCount: questions.filter((q) => q.topicId === t.topicId && q.highYield).length,
         attempts: t.totalAttempts,
         accuracy: t.accuracy / 100,
-        band: (t.status === 'unattempted' ? 'insufficient-data' : t.status) as any,
+        band: (t.status === 'unattempted' ? 'insufficient-data' : t.status) as BankOverview['topics'][number]['band'],
       })),
     };
 
