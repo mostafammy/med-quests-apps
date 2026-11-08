@@ -125,7 +125,7 @@ export class CurriculumClassificationAgent {
     const isCnsContent = !isExplicitCvs && (isExplicitCns || cnsKeywords.some((kw) => combined.includes(kw)));
 
     if (isCnsContent) {
-      return this.classifyCns(combined, targetDescriptor);
+      return this.classifyCns(combined, targetDescriptor, stem.toLowerCase());
     }
 
     // 1. GAP ANALYSIS: Check if content belongs to an unmapped specialty (e.g. Pharmacology or Pathology)
@@ -148,7 +148,8 @@ export class CurriculumClassificationAgent {
    */
   private classifyCns(
     text: string,
-    customBlock?: BlockDescriptorContext
+    customBlock?: BlockDescriptorContext,
+    stemText = ''
   ): TaxonomyClassificationResult {
     const blockDescriptor: BlockDescriptorContext = customBlock || {
       id: 'cns',
@@ -156,6 +157,103 @@ export class CurriculumClassificationAgent {
       code: 'Block 207',
       shortName: 'CNS',
     };
+
+    // 0. Diencephalon & Limbic System (Anatomy)
+    const diencephalonLimbicKeywords = [
+      'diencephalon',
+      'thalamus',
+      'thalamic',
+      'pulvinar',
+      'metathalamus',
+      'medial geniculate',
+      'lateral geniculate',
+      'geniculate body',
+      'subthalamus',
+      'subthalamic',
+      'hemiballismus',
+      'hypothalamus',
+      'hypothalamic',
+      'supraoptic',
+      'paraventricular',
+      'suprachiasmatic',
+      'tuber cinereum',
+      'tuberal',
+      'ventromedial nucleus',
+      'arcuate nucleus',
+      'infundibulum',
+      'mammillary',
+      'epithalamus',
+      'pineal',
+      'habenula',
+      'habenular',
+      'stria medullaris',
+      'limbic system',
+      'limbic',
+      'hippocampus',
+      'hippocampal',
+      'dentate gyrus',
+      'subiculum',
+      'cornu ammonis',
+      'fornix',
+      'fimbria',
+      'pes hippocampi',
+      'alveus',
+      'papez circuit',
+      'korsakoff',
+      'craniopharyngioma',
+      'internal medullary lamina',
+      'foramen of monro',
+    ];
+
+    const isStemDiencephalonLimbic = diencephalonLimbicKeywords.some((kw) =>
+      stemText.includes(kw)
+    );
+    const isTextDiencephalonLimbic = diencephalonLimbicKeywords.some((kw) =>
+      text.includes(kw)
+    );
+    const isInternalCapsuleStemFocus =
+      stemText.includes('internal capsule') ||
+      stemText.includes('projection fiber') ||
+      stemText.includes('projection fibers') ||
+      stemText.includes('thalamocortical radiation') ||
+      stemText.includes('thalamocortical radiations') ||
+      stemText.includes('corticofugal') ||
+      stemText.includes('capsular stroke') ||
+      stemText.includes('capsular hemorrhage') ||
+      stemText.includes('lenticulostriate') ||
+      stemText.includes('charcot');
+
+    if (
+      !isInternalCapsuleStemFocus &&
+      (isStemDiencephalonLimbic || isTextDiencephalonLimbic)
+    ) {
+      const hasRegisteredChap = this.taxonomyRegistry.hasChapter(
+        'cns-ana-diencephalon-limbic-system',
+        'cns'
+      );
+      return this.createResult(
+        {
+          subjectId: 'anatomy',
+          subjectName: 'CNS Neuroanatomy & Embryology',
+          chapterId: 'cns-ana-diencephalon-limbic-system',
+          chapterName: 'Diencephalon & Limbic System',
+          confidenceScore: 98,
+          rationale:
+            'Evaluates diencephalic subdivisions (thalamus, metathalamus, subthalamus, hypothalamus, epithalamus) and limbic system components (hippocampal formation, fornix, amygdala, Papez circuit).',
+          isNewDomainSuggested: !hasRegisteredChap,
+          newChapterProposal: !hasRegisteredChap
+            ? {
+                id: 'cns-ana-diencephalon-limbic-system',
+                name: 'Diencephalon & Limbic System',
+                subjectId: 'anatomy',
+                rationale:
+                  'Covers diencephalic subdivisions (thalamus, hypothalamus, epithalamus, subthalamus) and the limbic system (hippocampal formation, fornix, amygdala).',
+              }
+            : undefined,
+        },
+        blockDescriptor
+      );
+    }
 
     // 1. Projection Fibers & Internal Capsule (Anatomy)
     const internalCapsuleKeywords = [
@@ -244,14 +342,13 @@ export class CurriculumClassificationAgent {
       );
     }
 
-    // 3. Cerebellum, Basal Ganglia & Diencephalon (Anatomy)
+    // 3. Cerebellum & Basal Ganglia (Anatomy)
     if (
       text.includes('basal ganglia') ||
       text.includes('caudate') ||
       text.includes('putamen') ||
       text.includes('globus pallidus') ||
       text.includes('substantia nigra') ||
-      text.includes('subthalamic') ||
       text.includes('striatum') ||
       text.includes('parkinson') ||
       text.includes('huntington') ||
@@ -259,8 +356,7 @@ export class CurriculumClassificationAgent {
       text.includes('cerebellum') ||
       text.includes('vermis') ||
       text.includes('purkinje') ||
-      text.includes('ataxia') ||
-      text.includes('diencephalon')
+      text.includes('ataxia')
     ) {
       return this.createResult(
         {
@@ -269,7 +365,7 @@ export class CurriculumClassificationAgent {
           chapterId: 'cns-ana-cerebellum-basal-ganglia',
           chapterName: 'Cerebellum, Basal Ganglia & Diencephalon',
           confidenceScore: 95,
-          rationale: 'Evaluates extrapyramidal motor circuits, deep cerebellar nuclei, or diencephalic coordination.',
+          rationale: 'Evaluates extrapyramidal motor circuits, deep cerebellar nuclei, and coordination.',
           isNewDomainSuggested: false,
         },
         blockDescriptor
