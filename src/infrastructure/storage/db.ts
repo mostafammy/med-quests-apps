@@ -1,8 +1,9 @@
-import Dexie, { type EntityTable } from 'dexie';
+import Dexie, { type EntityTable, type Transaction } from 'dexie';
 import { Question, Attempt, ReviewCard } from '../../domain/model/types.ts';
 import type { AiSettings } from '../../domain/ai/settings.ts';
 import type { ChatMessage, MessagePart } from '../../domain/ai/conversation.ts';
 import type { AiModelMetricRecord } from '../../domain/ai/metrics.ts';
+import type { ClinicalDiscriminator } from '../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
 
 export interface BookmarkRecord {
   questionId: string;
@@ -90,23 +91,32 @@ export interface QuestionFingerprintRecord {
   canonicalCorrectAnswer?: string;
   minhash: Uint32Array | number[];
   lshBands: string[];
-  discriminators: any[];
+  discriminators: ClinicalDiscriminator[];
   embeddingModel: string | null;
   embeddedAt: string | null;
   contentVersion: number;
   updatedAt: string;
 }
 
-export async function upgradeV8ToV9(tx: any): Promise<void> {
+export interface UpgradeV8TableLike {
+  table(name: string): {
+    each(cb: (item: { id: string; blockId?: string }) => void): Promise<void>;
+    toCollection(): {
+      modify(cb: (card: { blockId?: string; questionId?: string | null; highYieldTopicId?: string }) => void): Promise<unknown>;
+    };
+  };
+}
+
+export async function upgradeV8ToV9(tx: Transaction | UpgradeV8TableLike): Promise<void> {
   const questionsTable = tx.table('questions');
   const srsTable = tx.table('srsCards');
 
   const questionBlockMap = new Map<string, string>();
-  await questionsTable.each((q: any) => {
+  await questionsTable.each((q: { id: string; blockId?: string }) => {
     questionBlockMap.set(q.id, q.blockId || 'cvs');
   });
 
-  await srsTable.toCollection().modify((card: any) => {
+  await srsTable.toCollection().modify((card: { blockId?: string; questionId?: string | null; highYieldTopicId?: string }) => {
     if (!card.blockId) {
       const inferredFromQuestion = card.questionId ? questionBlockMap.get(card.questionId) : undefined;
       const topicParts = card.highYieldTopicId?.split('-');
