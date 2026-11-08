@@ -11,6 +11,7 @@
 
 import type { Taxonomy, Subject, Chapter, Topic, SubjectId, ChapterId } from '../model/types.ts';
 import { CVS_TAXONOMY } from './cvsTaxonomy.ts';
+import cnsManifest from '../../../content/cns/manifest.json';
 
 export interface ICurriculumTaxonomyRegistry {
   getTaxonomy(): Taxonomy;
@@ -58,6 +59,19 @@ export class CurriculumTaxonomyRegistry implements ICurriculumTaxonomyRegistry {
     if (blockId && blockId !== 'all') {
       chapters = chapters.filter((c) => !c.blockId || c.blockId === blockId);
     }
+    if (blockId === 'cns') {
+      const cnsCanonical: Chapter[] = cnsManifest.chapters.map((c, idx) => ({
+        id: c.id,
+        blockId: 'cns',
+        subjectId: c.subjectId,
+        name: typeof c.name === 'string' ? c.name : (c.name as { en?: string })?.en || c.id,
+        order: idx + 1,
+        sourceIds: c.sourceIds || [],
+      }));
+      const existingIds = new Set(chapters.map((c) => c.id));
+      const extras = cnsCanonical.filter((c) => !existingIds.has(c.id));
+      chapters = [...chapters, ...extras];
+    }
     if (!subjectId || subjectId === 'all') {
       return chapters;
     }
@@ -76,15 +90,27 @@ export class CurriculumTaxonomyRegistry implements ICurriculumTaxonomyRegistry {
   }
 
   public hasSubject(id: SubjectId, blockId?: string): boolean {
-    return this.currentTaxonomy.subjects.some(
+    if (this.currentTaxonomy.subjects.some(
       (s) => s.id === id && (!blockId || !s.blockId || s.blockId === blockId)
-    );
+    )) {
+      return true;
+    }
+    if (blockId === 'cns') {
+      return cnsManifest.subjects.some((s) => s.id === id);
+    }
+    return false;
   }
 
   public hasChapter(id: ChapterId, blockId?: string): boolean {
-    return this.currentTaxonomy.chapters.some(
+    if (this.currentTaxonomy.chapters.some(
       (c) => c.id === id && (!blockId || !c.blockId || c.blockId === blockId)
-    );
+    )) {
+      return true;
+    }
+    if (blockId === 'cns') {
+      return cnsManifest.chapters.some((c) => c.id === id);
+    }
+    return false;
   }
 
   public registerSubject(subjectInput: Omit<Subject, 'order'> & { blockId?: string }): Subject {
