@@ -24,6 +24,7 @@ import type { ParsedQuestionItem } from '../../../../domain/questionBank/aiQuest
 import type { ChoiceId } from '../../../../domain/model/types.ts';
 import { curriculumTaxonomyRegistry } from '../../../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
 import { TaxonomyDisplayResolver } from '../../../../domain/taxonomy/TaxonomyDisplayResolver.ts';
+import { compositionRoot } from '../../../../application/composition/clientCompositionRoot.ts';
 import { CanvasSbaTab } from './components/CanvasSbaTab.tsx';
 import { CanvasCurriculumTab } from './components/CanvasCurriculumTab.tsx';
 import { CanvasQuorumTab } from './components/CanvasQuorumTab.tsx';
@@ -133,10 +134,16 @@ export const StagingDetailCanvas: React.FC<StagingDetailCanvasProps> = ({
     }
   };
 
-  const currentSubjects = curriculumTaxonomyRegistry.getSubjects().map((s) => ({
-    id: s.id,
-    name: s.name,
-  }));
+  const blockPack = compositionRoot.catalog.get(item.question.blockId);
+  const currentSubjects = blockPack
+    ? blockPack.manifest.subjects.map((s) => ({
+        id: s.id,
+        name: typeof s.name === 'string' ? s.name : (s.name as { en?: string })?.en || s.id,
+      }))
+    : curriculumTaxonomyRegistry.getSubjects(item.question.blockId).map((s) => ({
+        id: s.id,
+        name: s.name,
+      }));
 
   const classification = item.taxonomyClassification;
   const subjectMeta = TaxonomyDisplayResolver.resolveSubjectMeta(
@@ -180,7 +187,34 @@ export const StagingDetailCanvas: React.FC<StagingDetailCanvasProps> = ({
                 {displayChapterName}
               </span>
             </span>
-            </div>
+            {item.isReclassified && (
+              <span
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30"
+                title={`Reclassified from draft scope: ${item.originalDraftTaxonomy?.chapterName || item.originalDraftTaxonomy?.subjectName || 'Unmapped'}`}
+              >
+                <span>⚡</span>
+                <span>Reclassified</span>
+              </span>
+            )}
+            {classification?.newChapterProposal && (
+              <span
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30"
+                title={`Will create new chapter: ${classification.newChapterProposal.name}`}
+              >
+                <span>✨</span>
+                <span>Will Create New Chapter</span>
+              </span>
+            )}
+            {classification?.newSubjectProposal && (
+              <span
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+                title={`Will create new subject: ${classification.newSubjectProposal.name}`}
+              >
+                <span>✨</span>
+                <span>Will Create New Subject</span>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Global Item Actions */}
