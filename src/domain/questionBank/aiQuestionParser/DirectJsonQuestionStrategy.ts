@@ -203,6 +203,15 @@ export class DirectJsonQuestionStrategy {
         confidenceScore: 100,
         warnings: itemWarnings,
         isApproved: false,
+        isReclassified: Boolean(item.chapterId && item.chapterId !== repaired.chapterId),
+        originalDraftTaxonomy: item.chapterId
+          ? {
+              chapterName: String(item.chapterId),
+              subjectName: typeof item.subjectId === 'string' ? item.subjectId : undefined,
+              blockId: typeof item.blockId === 'string' ? item.blockId : undefined,
+              blockName: typeof item.blockId === 'string' ? item.blockId : undefined,
+            }
+          : undefined,
         taxonomyClassification: {
           blockId: targetBlockId,
           blockName: TaxonomyDisplayResolver.humanizeTaxonomySlug(targetBlockId),
@@ -254,12 +263,7 @@ export class DirectJsonQuestionStrategy {
     const exactChap = candidateChapters.find((c) => c.id === rawChapterId);
     if (exactChap) {
       resolvedChapterId = exactChap.id;
-    } else if (rawChapterId) {
-      const rawTokens = rawChapterId
-        .toLowerCase()
-        .split(/[-_/\s]+/)
-        .filter((t) => t.length > 2 && t !== blockId && t !== subjectId);
-
+    } else {
       let bestChap = candidateChapters[0];
       let maxOverlap = -1;
 
@@ -269,22 +273,46 @@ export class DirectJsonQuestionStrategy {
         const nameTokens = nameEn.toLowerCase().split(/[-_/\s]+/);
         const allChapTokens = new Set([...chapTokens, ...nameTokens]);
 
-        const overlap = rawTokens.filter((t) => {
-          for (const ct of allChapTokens) {
-            if (ct === t || ct.includes(t) || t.includes(ct)) return true;
+        let score = 0;
+        if (rawChapterId) {
+          const rawTokens = rawChapterId
+            .toLowerCase()
+            .split(/[-_/\s]+/)
+            .filter((t) => t.length > 2 && t !== blockId && t !== subjectId);
+          for (const t of rawTokens) {
+            if (allChapTokens.has(t)) score += 3;
           }
-          return false;
-        }).length;
+        }
+        if (concept) {
+          const conceptTokens = concept
+            .toLowerCase()
+            .split(/[-_/\s]+/)
+            .filter((t) => t.length > 2);
+          for (const t of conceptTokens) {
+            if (allChapTokens.has(t)) score += 2;
+          }
+        }
+        if (_stem) {
+          const stemLower = _stem.toLowerCase();
+          for (const ct of allChapTokens) {
+            if (ct.length > 3 && stemLower.includes(ct)) score += 1;
+          }
+        }
 
-        if (overlap > maxOverlap) {
-          maxOverlap = overlap;
+        if (score > maxOverlap) {
+          maxOverlap = score;
           bestChap = chap;
         }
       }
 
       if (bestChap && maxOverlap > 0) {
         resolvedChapterId = bestChap.id;
-        chapterWarning = `Chapter ID '${rawChapterId}' mapped to canonical '${bestChap.id}' via curriculum reconciliation.`;
+        if (rawChapterId && rawChapterId !== bestChap.id) {
+          chapterWarning = `Chapter ID '${rawChapterId}' mapped to canonical '${bestChap.id}' via curriculum reconciliation.`;
+        }
+      } else if (rawChapterId && /^[a-z0-9-_/]+$/i.test(rawChapterId)) {
+        resolvedChapterId = rawChapterId.toLowerCase().replace(/_/g, '-');
+        chapterWarning = `Preserved custom chapter ID '${resolvedChapterId}' pending faculty review.`;
       }
     }
 
