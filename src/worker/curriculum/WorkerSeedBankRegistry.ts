@@ -4,16 +4,17 @@
  * SPEC-010 Phase 8: Faculty Studio & Edge Block Registry
  */
 
+import type { Question } from '../../domain/model/types.ts';
 import defaultCvsBank from '../../../content/cvs/dist/bank.v1.json';
 import defaultCnsBank from '../../../content/cns/dist/bank.v1.json';
 
 export class WorkerSeedBankRegistry {
-  private static readonly banks: Record<string, any[]> = {
-    cvs: defaultCvsBank as any[],
-    cns: defaultCnsBank as any[],
+  private static readonly banks: Record<string, Question[]> = {
+    cvs: defaultCvsBank as unknown as Question[],
+    cns: defaultCnsBank as unknown as Question[],
   };
 
-  public static getSeedQuestions(blockId: string): any[] {
+  public static getSeedQuestions(blockId: string): Question[] {
     return this.banks[blockId] || [];
   }
 
