@@ -7,7 +7,6 @@ import {
   FolderPlus,
   Layers,
   Zap,
-  ArrowRight,
   CheckCircle2,
 } from 'lucide-react';
 import type { ParsedQuestionItem } from '../../../../../domain/questionBank/aiQuestionParser/types.ts';
