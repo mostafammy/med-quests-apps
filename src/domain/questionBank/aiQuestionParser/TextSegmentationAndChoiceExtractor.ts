@@ -6,6 +6,11 @@ export interface ExtractedBlockStructure {
   readonly stemLines: string[];
   readonly rawChoices: Array<{ id: string; text: string }>;
   readonly detectedExplanation: string;
+  readonly draftScope?: {
+    readonly block?: string;
+    readonly subject?: string;
+    readonly chapter?: string;
+  };
 }
 
 /**
@@ -107,10 +112,12 @@ export class TextSegmentationAndChoiceExtractor {
     const stemLines: string[] = [];
     const rawChoices: Array<{ id: string; text: string }> = [];
     let detectedExplanation = '';
+    let draftScope: { block?: string; subject?: string; chapter?: string } | undefined;
 
-    const explanationRegex = /^(?:Explanation|Rationale|Note|Why)[:\s]+(.*)$/i;
+    const explanationRegex =
+      /^\*{0,2}(?:Draft Explanation|Explanation|Rationale|Note|Why)\*{0,2}[:\s]+(.*)$/i;
     const answerKeyLineRegex =
-      /^(?:Answer|Ans|Correct(?:\s*Answer)?|Key|Option)\s*[:=-]?\s*\(?[A-E]\)?$/i;
+      /^\*{0,2}(?:Answer|Ans|Correct(?:\s*Answer)?|Key|Option|Draft Key)\*{0,2}\s*[:=-]?\s*\(?[A-E]\)?/i;
 
     // Detect if the block uses explicit lettered choices (A., B., C., D., E., (A), A), A - etc.)
     const hasExplicitLetteredChoices = lines
@@ -204,6 +211,40 @@ export class TextSegmentationAndChoiceExtractor {
           rawChoices.push(item);
         }
       } else if (!inChoices) {
+        // If the line has explicit "**Stem**: <text>", extract the stem payload directly!
+        const explicitStemMatch = line.match(/^\*{0,2}Stem\*{0,2}\s*:\s*(.*)$/i);
+        if (explicitStemMatch) {
+          const content = explicitStemMatch[1].trim();
+          if (content) stemLines.push(content);
+          continue;
+        }
+
+        // Capture author's draft curriculum scope if present in block header
+        const scopeMatch = line.match(/^\*{0,2}Curriculum Scope\*{0,2}\s*:\s*(.*)$/i);
+        if (scopeMatch) {
+          const rawScope = scopeMatch[1];
+          const blockM = rawScope.match(/Block\s*:\s*([^|]+)/i);
+          const subjM = rawScope.match(/Subject\s*:\s*([^|]+)/i);
+          const chapM = rawScope.match(/Chapter\s*:\s*([^|]+)/i);
+          draftScope = {
+            block: blockM?.[1]?.trim(),
+            subject: subjM?.[1]?.trim(),
+            chapter: chapM?.[1]?.trim(),
+          };
+          continue;
+        }
+
+        // Ignore metadata and header lines when before choices
+        const isHeaderOrMeta =
+          /^(?:---|\*{3,}|_{3,}|#{1,6}\s*(?:Question|Item|Q)\s*\d+)/i.test(line.trim()) ||
+          /^\*{0,2}(?:Curriculum Scope|Difficulty|Cognitive|Cognitive Level|Concept|Choices|Options|Role|Instructions)\*{0,2}\s*:/i.test(
+            line.trim()
+          );
+
+        if (isHeaderOrMeta) {
+          continue;
+        }
+
         stemLines.push(line);
       } else if (rawChoices.length > 0) {
         const trimmedLine = line.trim();
@@ -236,7 +277,7 @@ export class TextSegmentationAndChoiceExtractor {
       });
     }
 
-    return { stemLines, rawChoices, detectedExplanation };
+    return { stemLines, rawChoices, detectedExplanation, draftScope };
   }
 
   /**
