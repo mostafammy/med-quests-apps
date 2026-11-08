@@ -5,6 +5,7 @@
 
 import { ok, err, type Result } from '../../../../domain/shared/result.ts';
 import type {
+  AnswerKeyHash,
   CanonicalItemHash,
   CanonicalStemHash,
   IFingerprintRepository,
@@ -58,7 +59,7 @@ export class D1FingerprintRepository implements IFingerprintRepository {
       minhashBytes = new Uint8Array(row.minhash);
     } else {
       // In node/miniflare it might be passed as an array or buffer-like
-      minhashBytes = new Uint8Array(row.minhash as any);
+      minhashBytes = new Uint8Array(row.minhash as ArrayLike<number>);
     }
 
     const alignedCopy = minhashBytes.slice();
@@ -75,7 +76,7 @@ export class D1FingerprintRepository implements IFingerprintRepository {
       normalizerVersion: row.normalizer_version as NormalizerVersion,
       stemHash: row.stem_hash as CanonicalStemHash,
       itemHash: row.item_hash as CanonicalItemHash,
-      answerKeyHash: row.answer_key_hash as any,
+      answerKeyHash: row.answer_key_hash as AnswerKeyHash,
       minhash: minhashUint32,
       lshBands: [], // Populated on-demand or loaded via query
       discriminators: JSON.parse(row.discriminators_json || '[]'),
@@ -227,10 +228,11 @@ export class D1FingerprintRepository implements IFingerprintRepository {
       }
 
       return ok(undefined);
-    } catch (err_: any) {
+    } catch (err_: unknown) {
+      const msg = err_ instanceof Error ? err_.message : String(err_);
       return err({
         code: 'STORAGE_FAILURE',
-        message: `D1 Fingerprint upsert failed: ${err_?.message || String(err_)}`,
+        message: `D1 Fingerprint upsert failed: ${msg}`,
       });
     }
   }
@@ -240,10 +242,11 @@ export class D1FingerprintRepository implements IFingerprintRepository {
       await this.db.prepare('DELETE FROM question_lsh_bands WHERE question_id = ?').bind(questionId).run();
       await this.db.prepare('DELETE FROM question_fingerprints WHERE question_id = ?').bind(questionId).run();
       return ok(undefined);
-    } catch (err_: any) {
+    } catch (err_: unknown) {
+      const msg = err_ instanceof Error ? err_.message : String(err_);
       return err({
         code: 'STORAGE_FAILURE',
-        message: `D1 Fingerprint remove failed: ${err_?.message || String(err_)}`,
+        message: `D1 Fingerprint remove failed: ${msg}`,
       });
     }
   }
