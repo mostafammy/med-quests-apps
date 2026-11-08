@@ -310,3 +310,10 @@ export interface ITelemetryExportStrategy {
   generateArtifact(context: TelemetryExportContext): TelemetryExportArtifact;
 }
 
+// Type Aliases for UI Component Compatibility
+export type HourlyEdgeTrafficPoint = HourlyUnifiedTelemetryPoint;
+export type EdgeColoNodeMetric = EdgeColoTelemetryNode;
+export type AiTelemetryBriefing = AiExecutiveTelemetryBriefing;
+export type EdgeObservabilitySnapshot = UnifiedEdgeObservabilitySnapshot;
+export type HistoricalSyncCheckpoint = HistoricalTelemetryCheckpoint;
+
