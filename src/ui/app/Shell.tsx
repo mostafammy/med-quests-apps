@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { DesktopNavBar } from './navigation/DesktopNavBar.tsx';
 import { MobileBottomDock } from './navigation/MobileBottomDock.tsx';
-import { BlockSwitcher } from './navigation/BlockSwitcher.tsx';
 import { SessionLeaveConfirmDialog } from './navigation/SessionLeaveConfirmDialog.tsx';
 import { ThemeToggle } from './ThemeToggle';
 import { LocaleToggle } from './LocaleToggle.tsx';
@@ -102,11 +101,8 @@ export const Shell: React.FC = () => {
           {/* Center Navigation: Apple-Caliber Adaptive Fluid Segmented Nav with Progressive Overflow */}
           <DesktopNavBar isAdmin={isAdmin} t={t} />
 
-          {/* Right Header: Curriculum Block Switcher, Identity & Edge Pill, AI Co-Pilot, Theme Switcher */}
+          {/* Right Header: Bilingual Language Switcher, Identity & Edge Pill, AI Co-Pilot, Theme Switcher, Unified Block & Question Bank Island */}
           <div className="flex items-center gap-1 sm:gap-2 min-w-0 shrink-0">
-            {/* Curriculum Block Switcher */}
-            <BlockSwitcher />
-
             {/* Bilingual Language Switcher */}
             <LocaleToggle />
 
@@ -119,7 +115,7 @@ export const Shell: React.FC = () => {
             {/* Apple Dynamic Appearance Switcher */}
             <ThemeToggle />
 
-            {/* Question Bank Status & Actions Capsule - Available to all users across every screen */}
+            {/* Unified Curriculum Block Switcher & Question Bank Status Island - Far Edge of Screen */}
             <QuestionBankStatusPill />
           </div>
         </div>
