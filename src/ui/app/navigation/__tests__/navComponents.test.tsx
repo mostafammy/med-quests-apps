@@ -3,6 +3,7 @@ import { renderToString } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { DesktopNavBar } from '../DesktopNavBar.tsx';
 import { MobileBottomDock } from '../MobileBottomDock.tsx';
+import { Shell } from '../../Shell.tsx';
 import { enDictionary } from '../../../../domain/i18n/dictionaries/en.ts';
 
 describe('DesktopNavBar Component (Apple Progressive Disclosure)', () => {
@@ -60,3 +61,19 @@ describe('MobileBottomDock Component (Floating Dynamic Glass Island)', () => {
     expect(html).toContain('grid-cols-6');
   });
 });
+
+describe('Shell Navbar Layout (Unified Single Island Architecture)', () => {
+  it('renders unified QuestionBankStatusPill at edge and eliminates duplicate standalone BlockSwitcher', () => {
+    const html = renderToString(
+      <MemoryRouter initialEntries={['/']}>
+        <Shell />
+      </MemoryRouter>
+    );
+
+    // QuestionBankStatusPill must be present at the edge of the navbar
+    expect(html).toContain('data-testid="question-bank-status-trigger"');
+    // Must NOT contain the standalone curriculum-block-listbox combobox from BlockSwitcher
+    expect(html).not.toContain('aria-controls="curriculum-block-listbox"');
+  });
+});
+
