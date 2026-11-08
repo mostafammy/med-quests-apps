@@ -176,9 +176,9 @@ export abstract class OpenAiCompatibleProvider {
             signal,
           });
           if (modelsRes.ok) {
-            const data = await modelsRes.json();
+            const data = (await modelsRes.json()) as { data?: Array<{ id: string }> };
             availableModels = (data.data || [])
-              .map((m: any) => m.id)
+              .map((m) => m.id)
               .filter(
                 (id: string) =>
                   !id.includes('whisper') &&
@@ -267,7 +267,20 @@ export abstract class OpenAiCompatibleProvider {
           if (trimmed === 'data: [DONE]') break;
           if (!trimmed.startsWith('data: ')) continue;
 
-          let payload: any;
+          let payload: {
+            choices?: Array<{
+              delta?: {
+                reasoning_content?: string;
+                reasoning?: string;
+                content?: string;
+                tool_calls?: Array<{
+                  index?: number;
+                  id?: string;
+                  function?: { name?: string; arguments?: string };
+                }>;
+              };
+            }>;
+          };
           try {
             payload = JSON.parse(trimmed.slice(6));
           } catch {
