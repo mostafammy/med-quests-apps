@@ -140,7 +140,10 @@ export class PrescribeMicroCurriculumTool
 
     // Pick verified drill questions from the bank matching topic/chapter
     const candidates = bank.filter((q) => q.id !== activeQ?.id && (q.topicId === targetTopicId || q.chapterId === activeQ?.chapterId));
-    const selected = candidates.slice(0, args.drillQuestionCount || 3).map((q) => q.id);
+    const selected = candidates
+      .slice(0, args.drillQuestionCount || 3)
+      .map((q) => q.id)
+      .filter((id): id is string => Boolean(id));
 
     const retestScheduledAt = new Date(Date.now() + (args.retestInHours || 48) * 60 * 60 * 1000).toISOString();
 
