@@ -102,13 +102,17 @@ export class ClientQddAuditRunner {
         const signature = this.minHasher.signature(canonical.shingles);
         const bandKeys = this.minHasher.bandKeys(signature);
 
+        const qWithEditorial = q as Question & {
+          editorialStatus?: 'published' | 'flagged' | 'archived';
+          createdAt?: string;
+        };
         const metadata: CandidateQuestionMetadata = {
           id: q.id,
           status: q.status,
-          editorialStatus: (q as any).editorialStatus,
+          editorialStatus: qWithEditorial.editorialStatus,
           evidenceCount: q.evidence?.length ?? 0,
           attemptCount: 0,
-          createdAt: (q as any).createdAt,
+          createdAt: qWithEditorial.createdAt,
         };
 
         metadataMap.set(q.id, metadata);
