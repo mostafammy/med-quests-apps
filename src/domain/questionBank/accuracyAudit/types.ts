@@ -67,10 +67,15 @@ export type SamplingStrategyType =
   | 'stratified_by_difficulty'
   | 'stratified_by_cognitive_level';
 
+export type ConfidenceLevel = '90%' | '95%' | '99%' | number;
+
 export interface SamplingConfiguration {
   readonly strategyType: SamplingStrategyType;
   readonly sampleSize: number;
   readonly seed?: number; // Optional seed for deterministic reproducibility in testing & audit verification
+  readonly randomSeed?: number;
+  readonly confidenceLevel?: ConfidenceLevel;
+  readonly marginOfErrorPercentage?: number;
   readonly highYieldOnly?: boolean;
   readonly blockId?: BlockId;
   readonly providerId?: CloudProviderId;
@@ -157,3 +162,6 @@ export interface AuditProgressTelemetry {
 }
 
 export type AuditProgressCallback = (telemetry: AuditProgressTelemetry) => void;
+
+export type AccuracyAuditReport = AccuracyAuditRunReport;
+export type QuestionAccuracyResult = QuestionAccuracyAuditResult;
