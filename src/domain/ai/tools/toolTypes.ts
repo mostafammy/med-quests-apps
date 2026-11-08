@@ -126,10 +126,27 @@ export type MicroCurriculumArgs = z.infer<typeof MicroCurriculumSchema>;
 // OOP TOOL EXECUTION INTERFACE
 // ============================================================================
 
+export interface ToolExecutionQuestionShape {
+  readonly id?: string;
+  readonly stem?: string;
+  readonly choices?: ReadonlyArray<{ id: string; text: string; isCorrect?: boolean }>;
+  readonly correctChoiceId?: string;
+  readonly explanation?: string;
+  readonly examTip?: string | null;
+  readonly mnemonic?: string | null;
+  readonly concept?: string;
+  readonly topicId?: string;
+  readonly chapterId?: string;
+  readonly subjectId?: string;
+  readonly difficulty?: number;
+  readonly highYield?: boolean;
+  readonly cognitiveLevel?: string;
+}
+
 export interface ToolExecutionContext {
-  readonly activeQuestion: any | null;
-  readonly safeContext: any;
-  readonly questionsBank: any[];
+  readonly activeQuestion: ToolExecutionQuestionShape | null;
+  readonly safeContext: unknown;
+  readonly questionsBank: ReadonlyArray<ToolExecutionQuestionShape>;
 }
 
 export interface IAgentTool<TArgs, TResult extends AgentToolResultPayload> {
