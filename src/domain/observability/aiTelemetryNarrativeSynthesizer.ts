@@ -274,7 +274,7 @@ export class CloudLlmTelemetryNarrativeStrategy implements IAiTelemetryNarrative
       let rawText = '';
       if ('streamTurn' in provider && typeof provider.streamTurn === 'function') {
         const controller = new AbortController();
-        const stream = (provider as any).streamTurn(
+        const stream = provider.streamTurn(
           [{ role: 'user', content: prompt }],
           [],
           controller.signal
@@ -359,14 +359,14 @@ Return ONLY a valid JSON object matching this schema (no markdown fences, no pre
         headline: String(obj.headline),
         executiveSummary: String(obj.executiveSummary),
         healthScore: typeof obj.healthScore === 'number' ? Math.min(100, Math.max(0, obj.healthScore)) : 98,
-        sections: obj.sections.map((s: any) => ({
+        sections: obj.sections.map((s: Record<string, unknown>) => ({
           title: String(s.title || 'Diagnostic Finding'),
           badge: String(s.badge || 'Verified Metric'),
           summary: String(s.summary || ''),
           keyTakeaways: Array.isArray(s.keyTakeaways) ? s.keyTakeaways.map(String) : [],
           recommendation: String(s.recommendation || ''),
-          sentiment: ['optimal', 'positive', 'warning', 'critical'].includes(s.sentiment)
-            ? s.sentiment
+          sentiment: ['optimal', 'positive', 'warning', 'critical'].includes(String(s.sentiment))
+            ? (s.sentiment as 'optimal' | 'positive' | 'warning' | 'critical')
             : 'optimal',
         })),
       };
@@ -395,6 +395,9 @@ export class EdgeObservabilityFacade {
       return res.value;
     }
     const fallback = await this.deterministicSynthesizer.synthesizeBriefing(params);
-    return (fallback as any).value;
+    if (fallback.ok) {
+      return fallback.value;
+    }
+    throw new Error('Unexpected deterministic narrative failure');
   }
 }
