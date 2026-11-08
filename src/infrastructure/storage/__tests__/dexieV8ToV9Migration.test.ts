@@ -65,7 +65,7 @@ describe('Dexie v9 Schema & Block-Scoped Repositories (INV-2)', () => {
       },
     };
 
-    await upgradeV8ToV9(mockTx);
+    await upgradeV8ToV9(mockTx as any);
 
     expect(srsCards[0].blockId).toBe('cvs'); // Inferred from questionId
     expect(srsCards[1].blockId).toBe('cns'); // Inferred from questionId
