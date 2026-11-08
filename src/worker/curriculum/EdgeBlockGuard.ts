@@ -11,6 +11,7 @@ import {
   RoleBasedBlockVisibilityPolicy,
   type ViewerRole,
 } from '../../domain/curriculum/BlockVisibilityPolicy.ts';
+import type { D1DatabaseBinding } from '../types.ts';
 
 export interface IEdgeBlockGuard {
   requireKnownBlock(
@@ -41,7 +42,7 @@ export interface EdgeBlockD1Row {
 export class EdgeBlockGuard implements IEdgeBlockGuard {
   private readonly policy = new RoleBasedBlockVisibilityPolicy();
 
-  constructor(private readonly db: any) {}
+  constructor(private readonly db: D1DatabaseBinding | null | undefined) {}
 
   public async requireKnownBlock(
     raw: string | null
@@ -64,10 +65,12 @@ export class EdgeBlockGuard implements IEdgeBlockGuard {
     const blockId = parsed.data;
 
     try {
-      const row = (await this.db
-        .prepare('SELECT id, status FROM curriculum_blocks WHERE id = ?')
-        .bind(blockId)
-        .first()) as { id: string; status: BlockLifecycleStatus } | null;
+      const row = this.db
+        ? ((await this.db
+            .prepare('SELECT id, status FROM curriculum_blocks WHERE id = ?')
+            .bind(blockId)
+            .first()) as { id: string; status: BlockLifecycleStatus } | null)
+        : null;
 
       if (!row) {
         // Fallback for bootstrap before D1 migration 0007 executes in local tests
