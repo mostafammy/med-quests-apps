@@ -152,7 +152,7 @@ export class DeterministicClinicalRefereeStrategy {
     const aiGeneratedAnswerKey = !wasAnswerKeyProvided;
 
     // Extract Question Stem & Options
-    const { stemLines, rawChoices, detectedExplanation, draftScope } =
+    const { stemLines, rawChoices, detectedExplanation, detectedConcept, draftScope } =
       TextSegmentationAndChoiceExtractor.extractStemAndChoices(lines);
     const stem = stemLines
       .join(' ')
@@ -185,7 +185,7 @@ export class DeterministicClinicalRefereeStrategy {
     // Dynamic Curriculum Taxonomy Classification & Gap Analysis
     const targetBlockId = (request.targetBlockId || LEGACY_DEFAULT_BLOCK_ID) as string;
     const classification = curriculumClassificationAgent.classify(
-      stem,
+      detectedConcept ? `${detectedConcept} - ${stem}` : stem,
       rawChoices.map((c) => c.text).join(' '),
       detectedExplanation,
       targetBlockId === 'cns'
@@ -211,6 +211,7 @@ export class DeterministicClinicalRefereeStrategy {
 
     // Concept extraction
     const concept =
+      detectedConcept ||
       matchedBankQuestion?.concept ||
       TextSegmentationAndChoiceExtractor.extractConceptTitle(stem, subjectId);
 
