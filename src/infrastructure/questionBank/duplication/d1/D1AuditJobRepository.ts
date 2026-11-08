@@ -15,10 +15,40 @@ import type {
 import { UnionFindClusterer } from '../../../../domain/questionBank/duplication/UnionFindClusterer.ts';
 import { SurvivorSelector } from '../../../../domain/questionBank/duplication/SurvivorSelector.ts';
 
-export class D1AuditJobRepository {
-  private readonly db: any;
+export interface D1AuditDbLike {
+  prepare(sql: string): {
+    bind(...params: unknown[]): {
+      first<T = Record<string, unknown>>(): Promise<T | null>;
+      all<T = Record<string, unknown>>(): Promise<{ results?: T[] }>;
+      run(): Promise<unknown>;
+    };
+  };
+}
 
-  constructor(db: any) {
+interface AuditJobRow {
+  id: string;
+  block_id?: string;
+  status: string;
+  cursor: string;
+  processed: number;
+  total: number;
+  clusters_found: number;
+  started_by: string;
+  started_at: string;
+  finished_at: string | null;
+}
+
+interface AuditPairRow {
+  a_id: string;
+  b_id: string;
+  relation: string;
+  fused_score?: number;
+}
+
+export class D1AuditJobRepository {
+  private readonly db: D1AuditDbLike;
+
+  constructor(db: D1AuditDbLike) {
     this.db = db;
   }
 
@@ -35,7 +65,7 @@ export class D1AuditJobRepository {
     const countRes = await this.db
       .prepare('SELECT COUNT(*) as total FROM question_fingerprints WHERE block_id = ?')
       .bind(blockId)
-      .first();
+      .first<{ total?: number }>();
 
     const total = countRes?.total ?? 0;
 
@@ -68,7 +98,7 @@ export class D1AuditJobRepository {
     const row = await this.db
       .prepare('SELECT * FROM qdd_audit_jobs WHERE id = ?')
       .bind(id)
-      .first();
+      .first<AuditJobRow>();
 
     if (!row) return null;
 
@@ -158,12 +188,12 @@ export class D1AuditJobRepository {
     const pairsRes = await this.db
       .prepare('SELECT a_id, b_id, relation, fused_score FROM qdd_audit_pairs WHERE job_id = ?')
       .bind(jobId)
-      .all();
+      .all<AuditPairRow>();
 
     const pairs = pairsRes.results || [];
     const clusterer = new UnionFindClusterer();
 
-    const edges = pairs.map((p: any) => ({
+    const edges = pairs.map((p: AuditPairRow) => ({
       idA: p.a_id,
       idB: p.b_id,
       relation: (p.relation as Exclude<DuplicateRelation, 'UNIQUE'>) || 'NEAR',
@@ -199,12 +229,12 @@ export class D1AuditJobRepository {
     const pairsRes = await this.db
       .prepare('SELECT a_id, b_id, relation, fused_score FROM qdd_audit_pairs WHERE job_id = ?')
       .bind(jobId)
-      .all();
+      .all<AuditPairRow>();
 
     const pairs = pairsRes.results || [];
     const clusterer = new UnionFindClusterer();
 
-    const edges = pairs.map((p: any) => ({
+    const edges = pairs.map((p: AuditPairRow) => ({
       idA: p.a_id,
       idB: p.b_id,
       relation: (p.relation as Exclude<DuplicateRelation, 'UNIQUE'>) || 'NEAR',
