@@ -231,8 +231,9 @@ export const useAdminAccuracyAuditStore = create<AdminAccuracyAuditStoreState>((
 
       get().loadHistoricalReports();
       return report;
-    } catch (err: any) {
-      if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+    } catch (err: unknown) {
+      const errObj = err as { name?: string; message?: string };
+      if (errObj?.name === 'AbortError' || errObj?.message?.includes('aborted')) {
         set({
           isAuditing: false,
           abortController: null,
@@ -293,8 +294,8 @@ export const useAdminAccuracyAuditStore = create<AdminAccuracyAuditStoreState>((
         success: true,
         message: `Question "${item.concept || item.questionId}" flagged for faculty review. Notes: ${reason}`,
       };
-    } catch (e: any) {
-      return { success: false, message: e.message || 'Failed to flag question.' };
+    } catch (e: unknown) {
+      return { success: false, message: e instanceof Error && e.message ? e.message : 'Failed to flag question.' };
     }
   },
 
