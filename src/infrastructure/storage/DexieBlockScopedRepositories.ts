@@ -38,11 +38,15 @@ export class DexieBlockScopedQuestionRepository implements IBlockScopedRepositor
       if (this.blockId === 'cns') {
         const direct = await db.questions.where('blockId').equals('cns').toArray();
         const legacy = await db.questions.where('blockId').equals('cns-neuroscience').toArray();
-        if (legacy.length > 0) {
-          // Auto-heal legacy alias to canonical 'cns'
-          const migrated = legacy.map((q) => ({ ...q, blockId: 'cns' as BlockId }));
-          await db.questions.bulkPut(migrated);
-          return [...direct, ...migrated];
+        const orphaned = await db.questions.where('blockId').equals('block-02-supratentorial').toArray();
+        if (legacy.length > 0 || orphaned.length > 0) {
+          // Auto-heal legacy alias and orphaned pseudo-blocks to canonical 'cns'
+          const toMigrate = [...legacy, ...orphaned].map((q) => ({ ...q, blockId: 'cns' as BlockId }));
+          await db.questions.bulkPut(toMigrate);
+          if (orphaned.length > 0) {
+            await db.questions.where('blockId').equals('block-02-supratentorial').delete();
+          }
+          return [...direct, ...toMigrate];
         }
         return direct;
       }
@@ -58,7 +62,8 @@ export class DexieBlockScopedQuestionRepository implements IBlockScopedRepositor
       if (this.blockId === 'cns') {
         const c1 = await db.questions.where('blockId').equals('cns').count();
         const c2 = await db.questions.where('blockId').equals('cns-neuroscience').count();
-        return c1 + c2;
+        const c3 = await db.questions.where('blockId').equals('block-02-supratentorial').count();
+        return c1 + c2 + c3;
       }
       return await db.questions.where('blockId').equals(this.blockId).count();
     } catch {
@@ -88,7 +93,7 @@ export class DexieBlockScopedQuestionRepository implements IBlockScopedRepositor
     if (spec.kind === 'high-yield') {
       return db.questions
         .where('[blockId+highYield]')
-        .equals([this.blockId, 1 as any])
+        .equals([this.blockId, 1] as unknown as [string, string])
         .toArray();
     }
 
