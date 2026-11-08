@@ -8,6 +8,8 @@ import type {
   EditorialDecisionCommand,
   QuestionMutationPatch,
 } from '../../../specs/005-global-question-bank-governance/contracts/question-bank-governance-ports.ts';
+
+export type BankFilterCriteria = QuestionCuratorFilterCriteria;
 import { edgeQuestionBankGateway } from '../../infrastructure/questionBank/edgeQuestionBankGateway.ts';
 import { QuestionSpecificationBuilder } from '../../domain/questionBank/questionSpecifications.ts';
 import type { Question } from '../../domain/model/types.ts';
@@ -41,24 +43,24 @@ interface BankGovernanceStoreState {
   submitReviewDecision: (command: EditorialDecisionCommand) => Promise<boolean>;
   createCanonicalQuestions: (
     questions: Question[],
-    actor: { id: string; displayName: string; role: any }
+    actor: { id: string; displayName: string; role: EditorialAuditLogEntry['actorRole'] }
   ) => Promise<boolean>;
   updateCanonicalQuestion: (
     questionId: string,
     patch: QuestionMutationPatch,
     reason: string,
-    actor: { id: string; displayName: string; role: any }
+    actor: { id: string; displayName: string; role: EditorialAuditLogEntry['actorRole'] }
   ) => Promise<boolean>;
   setArchiveStatus: (
     questionId: string,
     archive: boolean,
     reason: string,
-    actor: { id: string; displayName: string; role: any }
+    actor: { id: string; displayName: string; role: EditorialAuditLogEntry['actorRole'] }
   ) => Promise<boolean>;
   deleteCanonicalQuestion: (
     questionId: string,
     reason: string,
-    actor: { id: string; displayName: string; role: any },
+    actor: { id: string; displayName: string; role: EditorialAuditLogEntry['actorRole'] },
     permanent?: boolean
   ) => Promise<boolean>;
 
@@ -168,6 +170,7 @@ export const useBankGovernanceStore = create<BankGovernanceStoreState>((set, get
   createCanonicalQuestions: async (questions, actor) => {
     set({ isActionInProgress: true, error: null });
     try {
+      const targetBlock = (questions[0]?.blockId as BlockId) || get().activeBlockId;
       const res = await edgeQuestionBankGateway.createCanonicalQuestions({
         questions,
         actorId: actor.id,
@@ -175,8 +178,8 @@ export const useBankGovernanceStore = create<BankGovernanceStoreState>((set, get
         actorRole: actor.role,
       });
       if (res.ok) {
-        await get().loadGovernanceData(get().activeBlockId);
-        set({ isActionInProgress: false });
+        await get().loadGovernanceData(targetBlock);
+        set({ isActionInProgress: false, activeBlockId: targetBlock });
         return true;
       } else {
         set({ error: res.error.code, isActionInProgress: false });
@@ -242,7 +245,7 @@ export const useBankGovernanceStore = create<BankGovernanceStoreState>((set, get
     set({ isActionInProgress: true, error: null });
     try {
       const res = await edgeQuestionBankGateway.deleteCanonicalQuestion({
-        questionId: questionId as any,
+        questionId: questionId as GovernedQuestion['id'],
         actorId: actor.id,
         actorDisplayName: actor.displayName,
         actorRole: actor.role,
