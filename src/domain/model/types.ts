@@ -71,6 +71,7 @@ export const ChoiceSchema = z.object({
   rationale: z.string().min(1, 'Rationale required for all choices'),
 });
 export type Choice = z.infer<typeof ChoiceSchema>;
+export type QuestionChoice = Choice;
 
 export const EvidenceSchema = z.object({
   chunkId: z.string(),
@@ -81,7 +82,7 @@ export const EvidenceSchema = z.object({
 });
 export type Evidence = z.infer<typeof EvidenceSchema>;
 
-export const QuestionSchema = z.object({
+export const QuestionObjectSchema = z.object({
   id: z.string(),
   blockId: z.string().min(2, 'blockId must be a valid identifier (min 2 characters)'),
   subjectId: z.string(),
@@ -101,12 +102,29 @@ export const QuestionSchema = z.object({
   evidence: z.array(EvidenceSchema).min(1, 'At least 1 curriculum evidence citation is required'),
   status: z.enum(['active', 'quarantined']).default('active'),
   bankVersion: z.number().default(1),
-}).refine(
+});
+
+export const QuestionSchema = QuestionObjectSchema.refine(
   (data) => data.choices.filter((c) => c.isCorrect).length === 1,
   { message: 'Exactly one choice must be marked as correct (isCorrect: true)' }
 );
 
 export type Question = z.infer<typeof QuestionSchema>;
+
+const IMMUTABLE_QUESTION_IDENTITY_KEYS = new Set(['id', 'blockId', 'status', 'bankVersion']);
+
+export type QuestionEditableField = Exclude<
+  keyof Question,
+  'id' | 'blockId' | 'status' | 'bankVersion'
+>;
+
+/**
+ * Automatically derived from QuestionObjectSchema so adding a field to Question
+ * immediately makes it available for curator patching without Shotgun Surgery.
+ */
+export const PATCHABLE_QUESTION_FIELDS = Object.keys(QuestionObjectSchema.shape).filter(
+  (key): key is QuestionEditableField => !IMMUTABLE_QUESTION_IDENTITY_KEYS.has(key)
+) as readonly QuestionEditableField[];
 
 // ==========================================
 // 4. LEARNER ATTEMPTS & CLASSIFICATION
