@@ -33,7 +33,20 @@ export class SystemPromptBuilder {
     return this;
   }
 
-  withSafeContext(context: SafeAiContext, activeQuestion?: any): this {
+  withSafeContext(
+    context: SafeAiContext,
+    activeQuestion?: {
+      readonly stem?: string;
+      readonly choices?: ReadonlyArray<{ id: string; text: string; isCorrect?: boolean }>;
+      readonly concept?: string;
+      readonly topicId?: string;
+      readonly chapterId?: string;
+      readonly highYield?: boolean;
+      readonly explanation?: string;
+      readonly examTip?: string | null;
+      readonly mnemonic?: string | null;
+    } | null
+  ): this {
     // 1. Resolve question attributes from activeQuestion or context
     const qStem =
       activeQuestion?.stem ||
@@ -64,7 +77,7 @@ export class SystemPromptBuilder {
       (context.kind === 'tutor' ? context.question?.highYield : false);
 
     // 2. Ground Truth Solution Resolution
-    const correctChoiceObj = activeQuestion?.choices?.find((c: any) => c.isCorrect);
+    const correctChoiceObj = activeQuestion?.choices?.find((c) => c.isCorrect);
     const correctChoiceId: string | null =
       correctChoiceObj?.id ||
       (context.kind === 'tutor' && context.disclosure.state === 'revealed'
