@@ -17,6 +17,8 @@ import { questionTelemetryTracker } from '../../domain/ai/telemetry.ts';
 import {
   agentToolRegistry,
   type AgentToolExecutionEnvelope,
+  type AgentToolName,
+  type ToolExecutionQuestionShape,
 } from '../../domain/ai/tools/toolRegistry.ts';
 import type { BlockAiProfile } from '../../domain/curriculum/BlockAiProfileRegistry.ts';
 import {
@@ -29,8 +31,8 @@ import type { LlmMessage } from './providers/openAiCompatibleProvider.ts';
 export interface OrchestratorRequest {
   readonly userMessage: string;
   readonly safeContext: SafeAiContext;
-  readonly activeQuestion: any | null;
-  readonly questionsBank: any[];
+  readonly activeQuestion: ToolExecutionQuestionShape | null;
+  readonly questionsBank: readonly ToolExecutionQuestionShape[];
   readonly historyTurns: readonly { readonly role: 'user' | 'assistant'; readonly text: string }[];
   readonly settings: AiSettings;
   readonly signal: AbortSignal;
@@ -195,7 +197,7 @@ export class AgenticOrchestrator {
       for (const tc of turnToolCalls) {
         if (signal.aborted) break;
 
-        const tool = agentToolRegistry.getTool(tc.name as any);
+        const tool = agentToolRegistry.getTool(tc.name as AgentToolName);
         const isSilent = !tool || tool.visibility === 'silent';
 
         if (isSilent) {
