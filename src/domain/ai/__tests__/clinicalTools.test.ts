@@ -24,7 +24,7 @@ describe('Clinical & Diagnostic Tools Suite (Tools A–F)', () => {
         { id: 'd', text: 'Mitral Stenosis' },
       ],
       correctChoiceId: 'a',
-      difficulty: 'hard',
+      difficulty: 3,
       topicId: 'valvular-heart-disease',
     },
     safeContext: {
