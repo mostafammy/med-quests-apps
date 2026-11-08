@@ -18,8 +18,8 @@ export interface AiEntitlementContext {
 
 const isTestEnv = Boolean(
   (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') ||
-  (import.meta as any).env?.VITEST ||
-  (import.meta as any).env?.MODE === 'test'
+  import.meta.env?.VITEST ||
+  import.meta.env?.MODE === 'test'
 );
 
 export function getOpenRouterKey(settings: AiSettings): string {
@@ -30,7 +30,7 @@ export function getOpenRouterKey(settings: AiSettings): string {
     if (typeof process !== 'undefined' && typeof process.env?.VITE_OPENROUTER_API_KEY === 'string') {
       return process.env.VITE_OPENROUTER_API_KEY.trim();
     }
-    return (import.meta as any).env?.VITE_OPENROUTER_API_KEY?.trim() || '';
+    return import.meta.env?.VITE_OPENROUTER_API_KEY?.trim() || '';
   } catch {
     return '';
   }
@@ -44,7 +44,7 @@ export function getGroqKey(settings: AiSettings): string {
     if (typeof process !== 'undefined' && typeof process.env?.VITE_GROQ_API_KEY === 'string') {
       return process.env.VITE_GROQ_API_KEY.trim();
     }
-    return (import.meta as any).env?.VITE_GROQ_API_KEY?.trim() || '';
+    return import.meta.env?.VITE_GROQ_API_KEY?.trim() || '';
   } catch {
     return '';
   }
@@ -58,7 +58,7 @@ export function getGeminiKey(settings: AiSettings): string {
     if (typeof process !== 'undefined' && typeof process.env?.VITE_GEMINI_API_KEY === 'string') {
       return process.env.VITE_GEMINI_API_KEY.trim();
     }
-    return (import.meta as any).env?.VITE_GEMINI_API_KEY?.trim() || '';
+    return import.meta.env?.VITE_GEMINI_API_KEY?.trim() || '';
   } catch {
     return '';
   }
@@ -165,7 +165,7 @@ export function createCloudProvider(
   settings?: Partial<AiSettings>
 ): AnyCloudProvider | null {
   const effectiveSettings: AiSettings = {
-    engine: (providerId as any) || 'gemini',
+    engine: (providerId as AiSettings['engine']) || 'gemini',
     chatLanguage: 'auto',
     openRouterApiKey: '',
     openRouterModel: 'nvidia/nemotron-3.5-lightning:free',
@@ -182,8 +182,8 @@ export function createCloudProvider(
       try {
         if (typeof process !== 'undefined' && process.env?.VITE_GEMINI_API_KEY) {
           key = process.env.VITE_GEMINI_API_KEY.trim();
-        } else if ((import.meta as any).env?.VITE_GEMINI_API_KEY) {
-          key = (import.meta as any).env.VITE_GEMINI_API_KEY.trim();
+        } else if (import.meta.env?.VITE_GEMINI_API_KEY) {
+          key = import.meta.env.VITE_GEMINI_API_KEY.trim();
         }
       } catch {
         // ignore
@@ -199,8 +199,8 @@ export function createCloudProvider(
       try {
         if (typeof process !== 'undefined' && process.env?.VITE_GROQ_API_KEY) {
           key = process.env.VITE_GROQ_API_KEY.trim();
-        } else if ((import.meta as any).env?.VITE_GROQ_API_KEY) {
-          key = (import.meta as any).env.VITE_GROQ_API_KEY.trim();
+        } else if (import.meta.env?.VITE_GROQ_API_KEY) {
+          key = import.meta.env.VITE_GROQ_API_KEY.trim();
         }
       } catch {
         // ignore
@@ -216,8 +216,8 @@ export function createCloudProvider(
       try {
         if (typeof process !== 'undefined' && process.env?.VITE_OPENROUTER_API_KEY) {
           key = process.env.VITE_OPENROUTER_API_KEY.trim();
-        } else if ((import.meta as any).env?.VITE_OPENROUTER_API_KEY) {
-          key = (import.meta as any).env.VITE_OPENROUTER_API_KEY.trim();
+        } else if (import.meta.env?.VITE_OPENROUTER_API_KEY) {
+          key = import.meta.env.VITE_OPENROUTER_API_KEY.trim();
         }
       } catch {
         // ignore
