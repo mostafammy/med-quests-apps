@@ -95,11 +95,11 @@ self.onmessage = async (event: MessageEvent<QddWorkerInboundMessage>) => {
         break;
       }
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     const errorReply: QddWorkerOutboundMessage = {
       type: 'ERROR',
       payload: {
-        message: err?.message || 'Unknown Web Worker error',
+        message: err instanceof Error && err.message ? err.message : 'Unknown Web Worker error',
       },
     };
     self.postMessage(errorReply);
