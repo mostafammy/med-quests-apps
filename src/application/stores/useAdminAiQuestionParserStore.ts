@@ -4,27 +4,40 @@
  * Manages raw input text, AI model selection, parsing state, pre-approval anti-hallucination inspection,
  * per-question missing answer detection, verification prompt export, and canonical bank commits.
  *
+ * Decomposed via Apple Architecture Standards into specialized domain services:
+ * - ParserExecutionService: LLM parsing orchestration & consensus quorum
+ * - QddVerificationService: Batch duplicate detection & probe normalizers
+ * - BankCommitService: Faculty review queue routing & global bank commits
+ *
  * Restricted to Administrators.
  */
 
 import { create } from 'zustand';
 import type { CloudProviderId } from '../../domain/ai/settings.ts';
-import { QuestionSchema, type ChoiceId, type Question } from '../../domain/model/types.ts';
-import { QuestionParsingAgent, normalizeBlockId } from '../../domain/questionBank/aiQuestionParser/QuestionParsingAgent.ts';
+import type { ChoiceId, Question } from '../../domain/model/types.ts';
 import { CrossModelVerificationPromptBuilder } from '../../domain/questionBank/aiQuestionParser/CrossModelVerificationPromptBuilder.ts';
-import type { ParsedQuestionItem, QuestionStemMode, AgentExecutionTelemetry } from '../../domain/questionBank/aiQuestionParser/types.ts';
-import { multiModelConsensusEngine } from '../../domain/questionBank/aiQuestionParser/MultiModelConsensusEngine.ts';
+import type {
+  ParsedQuestionItem,
+  QuestionStemMode,
+  AgentExecutionTelemetry,
+} from '../../domain/questionBank/aiQuestionParser/types.ts';
 import { curriculumTaxonomyRegistry } from '../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
-import { createClientQddEngine, loadAllClientBankQuestions } from '../../domain/questionBank/duplication/clientCompositionRoot.ts';
-import { edgeQuestionBankGateway } from '../../infrastructure/questionBank/edgeQuestionBankGateway.ts';
-import { db } from '../../infrastructure/storage/db.ts';
-import { useAuthStore } from './useAuthStore.ts';
-import { useBankGovernanceStore } from './useBankGovernanceStore.ts';
-import { useQuestionStore } from './useQuestionStore.ts';
-import { useBlockContextStoreBase } from './useBlockContextStore.ts';
-
+import { TaxonomyDisplayResolver } from '../../domain/taxonomy/TaxonomyDisplayResolver.ts';
 import { LEGACY_DEFAULT_BLOCK_ID, type BlockId } from '../../domain/curriculum/ids.ts';
 import { compositionRoot } from '../composition/clientCompositionRoot.ts';
+import { useBlockContextStoreBase } from './useBlockContextStore.ts';
+import {
+  executeBatchDuplicationAudit,
+} from './aiParser/qddVerificationService.ts';
+import {
+  executeSendToApprovalQueue,
+  executeCommitToGlobalQuestionBank,
+} from './aiParser/bankCommitService.ts';
+import {
+  executeParseRawQuestions,
+  executeSingleQuestionConsensus,
+} from './aiParser/parserExecutionService.ts';
+import { isDuplicateItem, isUniqueItem } from './aiParser/parserSelectionHelper.ts';
 
 interface AdminAiQuestionParserStoreState {
   // Input & Configuration
@@ -78,41 +91,6 @@ interface AdminAiQuestionParserStoreState {
   getBatchVerificationPrompt: () => string;
 }
 
-const parsingAgent = new QuestionParsingAgent();
-
-async function getMergedBankQuestions(): Promise<Question[]> {
-  const storeQuestions = useQuestionStore.getState().questions || [];
-  const govState = useBankGovernanceStore.getState();
-  const govCatalog = govState.catalogQuestions || [];
-  const govQueue = (govState.reviewQueue || []).map((r) => r.question).filter(Boolean);
-  return loadAllClientBankQuestions([...storeQuestions, ...govCatalog, ...govQueue]);
-}
-
-/** Schema-valid copy for QDD: one malformed LLM item must never void the whole batch. */
-function toQddProbe(q: Question, bankIdSet?: Set<string>, idx = 0, blockId: BlockId = LEGACY_DEFAULT_BLOCK_ID): Question {
-  const valid = QuestionSchema.safeParse(q).success ? q : parsingAgent.repairQuestionToSchema(q, blockId);
-  const safeId = bankIdSet?.has(valid.id) ? `${valid.id}-probe-${idx + 1}` : valid.id;
-  return {
-    ...valid,
-    id: safeId,
-    blockId,
-  };
-}
-
-const VERDICT_RANK: Record<string, number> = {
-  EXACT: 5,
-  CONFLICT: 4,
-  NEAR: 3,
-  SIBLING: 2,
-  UNIQUE: 1,
-};
-
-function pickStrongerVerdict(a: any, b: any): any {
-  if (!a) return b;
-  if (!b) return a;
-  return (VERDICT_RANK[b.relation] || 0) >= (VERDICT_RANK[a.relation] || 0) ? b : a;
-}
-
 export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreState>((set, get) => ({
   rawInputText: '',
   selectedProvider: 'gemini',
@@ -137,10 +115,9 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
   isCheckingDuplication: false,
 
   setRawInputText: (rawInputText) => {
-    // Auto-detect target block from pasted structured JSON or content hints
     const cnsMatch =
-      /"(?:blockId|id)"\s*:\s*"q?-(?:cns|cns-neuroscience)/i.test(rawInputText) ||
-      /"blockId"\s*:\s*"(?:cns|cns-neuroscience)"/i.test(rawInputText);
+      /"(?:blockId|id|subjectId)"\s*:\s*"q?-(?:cns|cns-neuroscience|neuro|supratentorial|infratentorial)/i.test(rawInputText) ||
+      /"blockId"\s*:\s*"(?:cns|cns-neuroscience|.*(?:supratentorial|infratentorial|neuro|brain).*)"/i.test(rawInputText);
     const cvsMatch =
       /"(?:blockId|id)"\s*:\s*"q?-(?:cvs)/i.test(rawInputText) ||
       /"blockId"\s*:\s*"(?:cvs|cardiovascular)"/i.test(rawInputText);
@@ -186,22 +163,15 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
   },
 
   runSingleQuestionConsensus: async (index: number) => {
-    const list = [...get().parsedQuestions];
-    const target = list[index];
-    if (!target) return;
-
+    const { parsedQuestions, selectedModelId } = get();
     set({ isVerifyingConsensusIndex: index });
-
     try {
-      const consensus = await multiModelConsensusEngine.verifyConsensus(
-        target.question,
-        get().selectedModelId
+      const updated = await executeSingleQuestionConsensus(
+        parsedQuestions,
+        index,
+        selectedModelId
       );
-      list[index] = {
-        ...target,
-        consensusSummary: consensus,
-      };
-      set({ parsedQuestions: list, isVerifyingConsensusIndex: null });
+      set({ parsedQuestions: updated, isVerifyingConsensusIndex: null });
     } catch {
       set({ isVerifyingConsensusIndex: null });
     }
@@ -212,6 +182,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       rawInputText,
       selectedProvider,
       selectedModelId,
+      targetBlockId,
       targetSubjectId,
       targetChapterId,
       stemMode,
@@ -227,20 +198,17 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
     set({ isParsing: true, error: null, commitFeedback: null, abortController: controller });
 
     try {
-      const bankQuestions = await getMergedBankQuestions();
-      const currentBlockId = get().targetBlockId || LEGACY_DEFAULT_BLOCK_ID;
-
-      const result = await parsingAgent.parseRawQuestions(
+      const currentBlockId = targetBlockId || LEGACY_DEFAULT_BLOCK_ID;
+      const result = await executeParseRawQuestions(
         {
-          rawText: rawInputText,
-          providerId: selectedProvider,
-          modelId: selectedModelId,
+          rawInputText,
+          selectedProvider,
+          selectedModelId,
           targetBlockId: currentBlockId,
+          targetSubjectId,
+          targetChapterId,
           stemMode,
           enableConsensusCheck,
-          existingQuestions: bankQuestions,
-          targetSubjectId: targetSubjectId === 'all' || targetSubjectId === 'auto' ? undefined : targetSubjectId,
-          targetChapterId: targetChapterId === 'all' || targetChapterId === 'auto' ? undefined : targetChapterId,
           onTelemetryUpdate: (agentTelemetry) => set({ agentTelemetry }),
         },
         controller.signal
@@ -255,50 +223,37 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
         return;
       }
 
-      // Automatically synchronize targetBlockId if parsed questions belong to a detected block
-      const detectedBlockId = result.items[0]?.question?.blockId;
-      if (detectedBlockId && detectedBlockId !== currentBlockId) {
-        set({ targetBlockId: detectedBlockId as BlockId });
+      if (result.detectedBlockId && result.detectedBlockId !== currentBlockId) {
+        set({ targetBlockId: result.detectedBlockId });
       }
 
-      // Pre-select ONLY safe non-duplicate questions by default (Stage 06 verdicts are already attached)
-      const safeIds = new Set(
-        result.items
-          .filter((i) => {
-            const rel = i.qddVerdict?.relation;
-            return rel !== 'EXACT' && rel !== 'NEAR' && rel !== 'CONFLICT';
-          })
-          .map((i) => i.tempId)
-      );
       set({
         isParsing: false,
         abortController: null,
         parsedQuestions: [...result.items],
-        selectedTempIds: safeIds,
+        selectedTempIds: result.safeIds,
       });
 
-      // Automatically trigger duplication detection across the batch and bank
       void get().runBatchDuplicationCheck();
-    } catch (err: any) {
-      if (err?.name === 'AbortError') {
+    } catch (err: unknown) {
+      const errObj = err as { name?: string; message?: string };
+      if (errObj?.name === 'AbortError') {
         set({ isParsing: false, abortController: null, error: 'Execution halted by administrator.' });
       } else {
         set({
           isParsing: false,
           abortController: null,
-          error: `Parsing failed: ${err?.message || 'Unknown processing error'}`,
+          error: `Parsing failed: ${errObj?.message || 'Unknown processing error'}`,
         });
       }
     }
   },
 
   runBatchDuplicationCheck: async () => {
-    const { parsedQuestions } = get();
+    const { parsedQuestions, targetBlockId, selectedTempIds } = get();
     if (parsedQuestions.length === 0) return;
 
     const hasAnyVerdict = parsedQuestions.some((q) => Boolean(q.qddVerdict));
-
-    // Only set shimmering checking state if questions don't already have verdicts
     if (!hasAnyVerdict) {
       set({
         isCheckingDuplication: true,
@@ -309,91 +264,24 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       });
     }
 
-    const bankQuestions = await getMergedBankQuestions();
-    const bankIdSet = new Set(bankQuestions.map((q) => q.id));
-    const targetBlockId = get().targetBlockId || LEGACY_DEFAULT_BLOCK_ID;
+    const result = await executeBatchDuplicationAudit(
+      parsedQuestions,
+      targetBlockId || LEGACY_DEFAULT_BLOCK_ID,
+      selectedTempIds
+    );
 
-    let edgeVerdicts: any[] = [];
-    try {
-      const questionsPayload = parsedQuestions.map((q, idx) => toQddProbe(q.question, bankIdSet, idx, targetBlockId));
-      const res = await fetch('/api/qdd/check-batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          questions: questionsPayload,
-          scope: { kind: 'block', blockId: targetBlockId },
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data && Array.isArray(data.verdicts)) {
-          edgeVerdicts = data.verdicts;
-        }
-      }
-    } catch {
-      // Network or offline fallback
-    }
-
-    // Launch prebuilt DuplicationDetectionEngine against merged local + governed bank
-    try {
-      const engine = await createClientQddEngine(bankQuestions);
-      const current = get().parsedQuestions;
-      const questionsPayload = current.map((q, idx) => toQddProbe(q.question, bankIdSet, idx, targetBlockId));
-      const res = await engine.checkBatch(questionsPayload, { kind: 'block', blockId: targetBlockId });
-      if (!res.ok) {
-        console.error('[useAdminAiQuestionParserStore] QDD batch rejected input:', res.error);
-      }
-      const clientVerdicts = res.ok ? res.value : [];
-
-      const updated = current.map((item, idx) => ({
-        ...item,
-        qddVerdict:
-          pickStrongerVerdict(clientVerdicts[idx], edgeVerdicts[idx]) || item.qddVerdict,
-        isCheckingDuplication: false,
-      }));
-
-      // Ensure any newly detected duplicates are unselected to delay/protect bank commits
-      const filteredSelected = new Set(
-        Array.from(get().selectedTempIds).filter((tempId) => {
-          const item = updated.find((p) => p.tempId === tempId);
-          const rel = item?.qddVerdict?.relation;
-          return rel !== 'EXACT' && rel !== 'NEAR' && rel !== 'CONFLICT';
-        })
-      );
-      set({ parsedQuestions: updated, selectedTempIds: filteredSelected, isCheckingDuplication: false });
-    } catch (fallbackErr) {
-      console.error('[useAdminAiQuestionParserStore] Prebuilt QDD check failed:', fallbackErr);
-      const reset = get().parsedQuestions.map((q, idx) => ({
-        ...q,
-        qddVerdict: edgeVerdicts[idx] || q.qddVerdict,
-        isCheckingDuplication: false,
-      }));
-      const filteredSelected = new Set(
-        Array.from(get().selectedTempIds).filter((tempId) => {
-          const item = reset.find((p) => p.tempId === tempId);
-          const rel = item?.qddVerdict?.relation;
-          return rel !== 'EXACT' && rel !== 'NEAR' && rel !== 'CONFLICT';
-        })
-      );
-      set({ parsedQuestions: reset, selectedTempIds: filteredSelected, isCheckingDuplication: false });
-    }
+    set({
+      parsedQuestions: result.updatedQuestions,
+      selectedTempIds: result.filteredSelectedIds,
+      isCheckingDuplication: false,
+    });
   },
 
   saveAllUnique: async () => {
     const { parsedQuestions, commitToGlobalQuestionBank } = get();
 
-    // Unique ONLY if the engine actually returned UNIQUE or SIBLING.
-    // A missing verdict means the check failed — never treat it as a pass.
-    const uniqueItems = parsedQuestions.filter((item) => {
-      const rel = item.qddVerdict?.relation;
-      return rel === 'UNIQUE' || rel === 'SIBLING';
-    });
-
-    const duplicateItems = parsedQuestions.filter((item) => {
-      const rel = item.qddVerdict?.relation;
-      return rel === 'EXACT' || rel === 'NEAR' || rel === 'CONFLICT';
-    });
+    const uniqueItems = parsedQuestions.filter(isUniqueItem);
+    const duplicateItems = parsedQuestions.filter(isDuplicateItem);
 
     if (uniqueItems.length === 0) {
       set({
@@ -406,7 +294,6 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       return false;
     }
 
-    // Select only unique items
     const uniqueIds = new Set(uniqueItems.map((i) => i.tempId));
     set({ selectedTempIds: uniqueIds });
 
@@ -427,120 +314,25 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
   },
 
   sendToApprovalQueue: async (targetTempId?: string) => {
-    const { parsedQuestions, selectedTempIds } = get();
-    const authState = useAuthStore.getState().authState;
-    const actor =
-      authState.status === 'authenticated-active'
-        ? authState.user
-        : { id: 'usr_admin', displayName: 'Curriculum Administrator', role: 'admin' as const };
-
-    let itemsToRoute: ParsedQuestionItem[] = [];
-    if (targetTempId) {
-      const item = parsedQuestions.find((p) => p.tempId === targetTempId);
-      if (item) itemsToRoute = [item];
-    } else {
-      const selectedDuplicates = parsedQuestions.filter(
-        (p) =>
-          selectedTempIds.has(p.tempId) &&
-          (p.qddVerdict?.relation === 'EXACT' ||
-            p.qddVerdict?.relation === 'NEAR' ||
-            p.qddVerdict?.relation === 'CONFLICT')
-      );
-      if (selectedDuplicates.length > 0) {
-        itemsToRoute = selectedDuplicates;
-      } else {
-        itemsToRoute = parsedQuestions.filter(
-          (p) =>
-            p.qddVerdict?.relation === 'EXACT' ||
-            p.qddVerdict?.relation === 'NEAR' ||
-            p.qddVerdict?.relation === 'CONFLICT'
-        );
-      }
-    }
-
-    if (itemsToRoute.length === 0) {
-      set({
-        commitFeedback: {
-          type: 'error',
-          message: 'No duplicate questions found to route for approval.',
-        },
-      });
-      return false;
-    }
-
+    const { parsedQuestions, selectedTempIds, targetBlockId } = get();
     set({ isCommitting: true, commitFeedback: null });
 
-    try {
-      const questionsToSubmit = itemsToRoute.map((item) => {
-        const q = toQddProbe(item.question);
-        const cand = item.qddVerdict?.candidates[0];
-        const collisionNote = cand
-          ? `[QDD Auto-Triage: ${item.qddVerdict?.relation}] Matched against bank question ${cand.matchedQuestionId}`
-          : `[QDD Auto-Triage: ${item.qddVerdict?.relation || 'DUPLICATE'}] Flagged by Prebuilt Duplication Engine`;
-        return {
-          ...q,
-          evidence: [
-            ...(q.evidence || []),
-            {
-              chunkId: `qdd-flag-${Date.now().toString(36)}`,
-              sourceName: 'Duplication Detection Engine',
-              location: 'Pre-Approval Triage',
-              quote: collisionNote,
-              kind: 'text' as const,
-            },
-          ],
-        };
-      });
+    const result = await executeSendToApprovalQueue(
+      parsedQuestions,
+      selectedTempIds,
+      targetBlockId || LEGACY_DEFAULT_BLOCK_ID,
+      targetTempId
+    );
 
-      const res = await edgeQuestionBankGateway.submitQuestionsForGlobalReview({
-        questions: questionsToSubmit,
-        authorId: actor.id,
-        authorDisplayName: actor.displayName,
-        authorRole: actor.role,
-        allowDuplicateStems: true,
-        reviewerNotes: `Flagged duplicate/collision routed from AI Question Ingestion Lab for faculty editorial review.`,
-      });
+    set({
+      isCommitting: false,
+      parsedQuestions: result.remainingQuestions,
+      selectedTempIds: result.remainingSelectedIds,
+      rawInputText: result.remainingQuestions.length === 0 ? '' : get().rawInputText,
+      commitFeedback: result.feedback,
+    });
 
-      if (res.ok) {
-        await useBankGovernanceStore.getState().loadGovernanceData(get().targetBlockId || LEGACY_DEFAULT_BLOCK_ID);
-
-        const routedIds = new Set(itemsToRoute.map((i) => i.tempId));
-        const remaining = parsedQuestions.filter((item) => !routedIds.has(item.tempId));
-        const remainingSelected = new Set(
-          Array.from(get().selectedTempIds).filter((id) => !routedIds.has(id))
-        );
-
-        set({
-          isCommitting: false,
-          parsedQuestions: remaining,
-          selectedTempIds: remainingSelected,
-          rawInputText: remaining.length === 0 ? '' : get().rawInputText,
-          commitFeedback: {
-            type: 'success',
-            message: `Successfully routed ${itemsToRoute.length} duplicate question(s) to the Faculty Approval Queue (Review Tickets created).`,
-          },
-        });
-        return true;
-      } else {
-        set({
-          isCommitting: false,
-          commitFeedback: {
-            type: 'error',
-            message: `Could not route to approval queue: ${res.error.code}`,
-          },
-        });
-        return false;
-      }
-    } catch (err: any) {
-      set({
-        isCommitting: false,
-        commitFeedback: {
-          type: 'error',
-          message: `Routing failed: ${err?.message || 'Unknown processing error'}`,
-        },
-      });
-      return false;
-    }
+    return result.ok;
   },
 
   toggleQuestionSelection: (tempId) => {
@@ -555,7 +347,6 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
 
   selectAll: (select) => {
     if (select) {
-      // By default, select only safe non-duplicate questions
       const uniqueIds = get()
         .parsedQuestions.filter((q) => {
           const rel = q.qddVerdict?.relation;
@@ -582,10 +373,12 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
     if (!target) return;
 
     const currentStem = target.question.stem;
-    const rawStem = target.originalRawStem || target.rawInputExcerpt.split('\n')[0]?.replace(/^[0-9]+[.-]\s*/, '').trim() || '';
+    const rawStem =
+      target.originalRawStem ||
+      target.rawInputExcerpt.split('\n')[0]?.replace(/^[0-9]+[.-]\s*/, '').trim() ||
+      '';
     const vignetteStem = target.enrichedVignetteStem;
 
-    // Toggle between rawStem and vignetteStem
     let nextStem = currentStem;
     if (vignetteStem && currentStem === rawStem) {
       nextStem = vignetteStem;
@@ -631,7 +424,7 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       ...questions[index],
       question: updatedQ,
       selectedCorrectChoiceId: choiceId,
-      aiGeneratedAnswerKey: false, // Explicitly verified by admin
+      aiGeneratedAnswerKey: false,
     };
     set({ parsedQuestions: questions });
   },
@@ -672,11 +465,15 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
       question: updatedQ,
       taxonomyClassification: {
         blockId: targetBlockId,
-        blockName,
+        blockName: blockName || TaxonomyDisplayResolver.humanizeTaxonomySlug(targetBlockId),
         subjectId,
-        subjectName: subjObj?.name || subjectId,
+        subjectName:
+          subjObj?.name ||
+          TaxonomyDisplayResolver.resolveSubjectName(subjectId, undefined, targetBlockId),
         chapterId,
-        chapterName: chapObj?.name || chapterId,
+        chapterName:
+          chapObj?.name ||
+          TaxonomyDisplayResolver.resolveChapterName(chapterId, undefined, targetBlockId),
         confidenceScore: 100,
         rationale: 'Manually verified and assigned by Administrator.',
         isNewDomainSuggested: false,
@@ -771,123 +568,25 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
   },
 
   commitToGlobalQuestionBank: async (selectedOnly = true) => {
-    const { parsedQuestions, selectedTempIds } = get();
-    const authState = useAuthStore.getState().authState;
-
-    if (authState.status !== 'authenticated-active' || authState.user.role !== 'admin') {
-      set({
-        commitFeedback: {
-          type: 'error',
-          message: 'Unauthorized: Platform Administrator privileges required.',
-        },
-      });
-      return false;
-    }
-
-    const itemsToCommit = selectedOnly
-      ? parsedQuestions.filter((item) => selectedTempIds.has(item.tempId))
-      : parsedQuestions;
-
-    if (itemsToCommit.length === 0) {
-      set({
-        commitFeedback: {
-          type: 'error',
-          message: 'No questions selected for commit.',
-        },
-      });
-      return false;
-    }
-
-    const duplicateItems = itemsToCommit.filter((item) => {
-      const rel = item.qddVerdict?.relation;
-      return rel === 'EXACT' || rel === 'NEAR' || rel === 'CONFLICT';
-    });
-
-    if (duplicateItems.length > 0) {
-      set({
-        isCommitting: false,
-        commitFeedback: {
-          type: 'error',
-          message: `Direct commit blocked: ${duplicateItems.length} question(s) already exist in the bank or have collisions. Please send them to the Faculty Approval Queue or deselect them before committing.`,
-        },
-      });
-      return false;
-    }
-
+    const { parsedQuestions, selectedTempIds, targetBlockId } = get();
     set({ isCommitting: true, commitFeedback: null });
 
-    try {
-      const globalActiveBlock = typeof useBlockContextStoreBase !== 'undefined'
-        ? useBlockContextStoreBase.getState().activeBlockId
-        : get().targetBlockId;
-      const rawBlockId =
-        itemsToCommit[0]?.question?.blockId ||
-        get().targetBlockId ||
-        globalActiveBlock ||
-        LEGACY_DEFAULT_BLOCK_ID;
-      const commitBlockId = normalizeBlockId(rawBlockId, globalActiveBlock) as BlockId;
+    const result = await executeCommitToGlobalQuestionBank(
+      parsedQuestions,
+      selectedTempIds,
+      targetBlockId || LEGACY_DEFAULT_BLOCK_ID,
+      selectedOnly
+    );
 
-      const canonicalQuestions = itemsToCommit.map((item) => ({
-        ...item.question,
-        blockId: commitBlockId,
-      }));
-      const { createCanonicalQuestions } = useBankGovernanceStore.getState();
+    set({
+      isCommitting: false,
+      parsedQuestions: result.remainingQuestions,
+      selectedTempIds: result.remainingSelectedIds,
+      rawInputText: result.remainingQuestions.length === 0 ? '' : get().rawInputText,
+      commitFeedback: result.feedback,
+    });
 
-      const success = await createCanonicalQuestions(canonicalQuestions, {
-        id: authState.user.id,
-        displayName: authState.user.displayName,
-        role: authState.user.role,
-      });
-
-      if (success) {
-        // Persist committed canonical questions directly into IndexedDB and refresh question store
-        try {
-          await db.questions.bulkPut(canonicalQuestions);
-          const allCanonical = edgeQuestionBankGateway.getLocalCanonicalBank(commitBlockId);
-          if (allCanonical.length > 0) {
-            await db.questions.bulkPut(allCanonical as unknown as Question[]);
-          }
-        } catch {
-          // Ignore IndexedDB write error in non-browser environment
-        }
-        await useQuestionStore.getState().loadQuestions(commitBlockId);
-
-        // Clear committed items from list
-        const remaining = parsedQuestions.filter(
-          (item) => !itemsToCommit.some((c) => c.tempId === item.tempId)
-        );
-
-        set({
-          isCommitting: false,
-          parsedQuestions: remaining,
-          selectedTempIds: new Set(remaining.map((r) => r.tempId)),
-          rawInputText: remaining.length === 0 ? '' : get().rawInputText,
-          commitFeedback: {
-            type: 'success',
-            message: `Successfully approved & committed ${itemsToCommit.length} canonical questions to the Global Bank!`,
-          },
-        });
-        return true;
-      } else {
-        set({
-          isCommitting: false,
-          commitFeedback: {
-            type: 'error',
-            message: 'Failed to commit questions to Global Question Bank. Check console for logs.',
-          },
-        });
-        return false;
-      }
-    } catch (err: any) {
-      set({
-        isCommitting: false,
-        commitFeedback: {
-          type: 'error',
-          message: err.message || 'Error committing questions to bank.',
-        },
-      });
-      return false;
-    }
+    return result.ok;
   },
 
   getSingleQuestionPrompt: (index: number) => {
