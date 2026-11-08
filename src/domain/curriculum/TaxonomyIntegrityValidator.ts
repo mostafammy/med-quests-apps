@@ -51,9 +51,12 @@ export class TaxonomyIntegrityValidator implements ITaxonomyIntegrityValidator {
   public validateManifest(raw: unknown): ValidationResult<BlockManifest> {
     const parseResult = BlockManifestSchema.safeParse(raw);
     if (!parseResult.success) {
-      const blockId = (raw && typeof raw === 'object' && 'block' in raw && (raw as any).block?.id)
-        ? ((raw as any).block.id as BlockId)
-        : ('' as BlockId);
+      const rawObj = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+      const rawBlock =
+        rawObj && typeof rawObj.block === 'object' && rawObj.block !== null
+          ? (rawObj.block as Record<string, unknown>)
+          : null;
+      const blockId = typeof rawBlock?.id === 'string' ? (rawBlock.id as BlockId) : ('' as BlockId);
 
       const violations: TaxonomyViolation[] = parseResult.error.issues.map((issue) => ({
         invariant: 'TI-1',
