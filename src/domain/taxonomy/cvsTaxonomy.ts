@@ -7,8 +7,11 @@
  */
 
 import type { Taxonomy } from '../model/types.ts';
+import type { BlockManifest } from '../curriculum/schemas.ts';
 import cvsManifest from '../../../content/cvs/manifest.json';
 import { LegacyTaxonomyAdapter } from '../curriculum/LegacyTaxonomyAdapter.ts';
 
-export const CVS_TAXONOMY: Taxonomy = LegacyTaxonomyAdapter.manifestToTaxonomy(cvsManifest as any);
+export const CVS_TAXONOMY: Taxonomy = LegacyTaxonomyAdapter.manifestToTaxonomy(
+  cvsManifest as unknown as BlockManifest
+);
 
