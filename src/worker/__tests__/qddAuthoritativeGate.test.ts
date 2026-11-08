@@ -237,7 +237,7 @@ describe('Authoritative QDD Gate (US1)', () => {
       }),
     });
 
-    const res = await handleQddRoutes(req, { MED_QUESTS_DB: mockDb }, new URL(req.url));
+    const res = await handleQddRoutes(req, { MED_QUESTS_DB: mockDb as any }, new URL(req.url));
     expect(res).not.toBeNull();
     expect(res?.status).toBe(200);
 
