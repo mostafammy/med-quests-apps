@@ -2,23 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
 import { useStatsStore } from '../../../application/stores/useStatsStore.ts';
-import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
-import { 
-  Play, 
-  RotateCcw, 
-  ArrowRight, 
-  Sparkles,
-  AlertTriangle,
-  Award,
-  BookOpen,
-  Zap,
-  Clock,
-  TrendingUp,
-  Flame,
-  CheckCircle2,
-  ChevronDown,
-  Bookmark
-} from 'lucide-react';
 import { ResetBankConfirmationModal } from '../questionBank/ResetBankConfirmationModal.tsx';
 import { useActiveBlock, useActiveTaxonomy, useBlockContextStore } from '../../../application/stores/useBlockContextStore.ts';
 import { BlockSwitcherSheet } from '../../app/navigation/BlockSwitcherSheet.tsx';
@@ -27,11 +10,18 @@ import {
   clearSessionMemento,
   type SavedSessionMemento,
 } from '../../../application/curriculum/SessionLeaveGuard.ts';
+import { ResumeSessionBanner } from './components/ResumeSessionBanner.tsx';
+import { DashboardHeaderHub } from './components/DashboardHeaderHub.tsx';
+import { MasteryKpiCards } from './components/MasteryKpiCards.tsx';
+import { CognitiveTelemetryRingsCockpit } from './components/CognitiveTelemetryRingsCockpit.tsx';
+import { DynamicRecommendationBanner } from './components/DynamicRecommendationBanner.tsx';
+import { QuickLaunchersGrid } from './components/QuickLaunchersGrid.tsx';
+import { SubjectReadinessGrid } from './components/SubjectReadinessGrid.tsx';
+import { ResetStatsConfirmationModal } from './components/ResetStatsConfirmationModal.tsx';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { questions } = useQuestionStore();
-  const { t, isRtl, locale } = useLocaleStore();
   const { block, visibleBlocks } = useActiveBlock();
   const { activeBlockId } = useBlockContextStore();
   const taxonomy = useActiveTaxonomy();
@@ -41,6 +31,7 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     setSavedSession(loadSessionMemento(activeBlockId));
   }, [activeBlockId]);
+
   const stats = useStatsStore();
   const currentStats = typeof window === 'undefined' ? useStatsStore.getState() : stats;
   const { 
@@ -65,10 +56,10 @@ export const Dashboard: React.FC = () => {
   const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
-    refreshStats(questions);
+    refreshStats(questions, activeBlockId);
 
     const handleRevalidate = () => {
-      refreshStats(questions);
+      refreshStats(questions, activeBlockId);
     };
 
     window.addEventListener('focus', handleRevalidate);
@@ -80,7 +71,7 @@ export const Dashboard: React.FC = () => {
       try {
         bc = new BroadcastChannel('medquests_study_telemetry');
         bc.onmessage = () => {
-          refreshStats(questions);
+          refreshStats(questions, activeBlockId);
         };
       } catch {
         // Fallback for non-supporting environments
@@ -95,7 +86,7 @@ export const Dashboard: React.FC = () => {
         bc.close();
       }
     };
-  }, [questions, refreshStats]);
+  }, [questions, refreshStats, activeBlockId]);
 
   const handleResetConfirm = async () => {
     setResetting(true);
@@ -106,697 +97,102 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] py-4 sm:py-8 px-2.5 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 animate-apple-entrance">
-      {/* Resume In-Progress Session Card (User Story 4) */}
+      {/* 1. Resume In-Progress Session Card */}
       {savedSession && (
-        <div className="p-4 sm:p-5 rounded-3xl bg-blue-500/10 dark:bg-blue-950/40 border border-blue-400/30 dark:border-blue-700/40 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-apple-entrance">
-          <div className="flex items-center space-x-3.5 rtl:space-x-reverse">
-            <div className="p-3 bg-blue-600 text-white rounded-2xl flex-shrink-0 shadow-md shadow-blue-500/20">
-              <Bookmark className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-600 text-white">
-                  In-Progress {savedSession.mode.toUpperCase()}
-                </span>
-                <span className="text-xs text-slate-400 dark:text-zinc-500 font-mono">
-                  {Object.keys(savedSession.answers).length} / {savedSession.questionIds.length} Answered
-                </span>
-              </div>
-              <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-zinc-100 mt-0.5">
-                Resume your paused {savedSession.mode} session
-              </h3>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 self-end sm:self-auto">
-            <button
-              onClick={() => {
-                clearSessionMemento(activeBlockId);
-                setSavedSession(null);
-              }}
-              className="px-3.5 py-2 text-xs font-semibold text-slate-500 dark:text-zinc-400 hover:text-rose-600 rounded-xl transition-colors cursor-pointer"
-            >
-              Discard
-            </button>
-            <button
-              onClick={() => {
-                navigate(`/session/${savedSession.sessionId}`, {
-                  state: { savedSession },
-                });
-              }}
-              className="py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer apple-tap"
-            >
-              <span>Resume Session</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
+        <ResumeSessionBanner
+          savedSession={savedSession}
+          onDiscard={() => {
+            clearSessionMemento(activeBlockId);
+            setSavedSession(null);
+          }}
+          onResume={() => {
+            navigate(`/session/${savedSession.sessionId}`, {
+              state: { savedSession },
+            });
+          }}
+        />
       )}
 
-      {/* Top Banner: Rich Glassmorphic Hub Card with Vivid Chromatic Gradients */}
+      {/* 2. Top Banner: Rich Glassmorphic Hub Card */}
       <div className="p-4 sm:p-6 md:p-8 rounded-3xl glass-surface space-y-5 sm:space-y-6 relative overflow-hidden">
-        {/* Subtle Ambient Color Splash */}
         <div className="pointer-events-none absolute -right-16 -top-16 w-80 h-80 bg-gradient-to-br from-blue-500/20 via-indigo-500/15 to-purple-500/10 rounded-full blur-3xl -z-10" />
 
-        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 sm:gap-5">
-          <div className="space-y-1.5 min-w-0">
-            <div className="flex items-center space-x-2 rtl:space-x-reverse">
-              <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-500/15 dark:bg-blue-400/15 px-2.5 py-0.5 rounded-full border border-blue-400/30 backdrop-blur-md">
-                {block?.code || t.dashboard.badgeExamPrep}
-              </span>
-              <span className="text-xs text-slate-300 dark:text-zinc-600">•</span>
-              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center space-x-1.5 rtl:space-x-reverse">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span className="hidden xs:inline sm:inline">{t.dashboard.engineBadge}</span>
-              </span>
-            </div>
-            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-400 dark:via-indigo-300 dark:to-purple-300 bg-clip-text text-transparent flex items-center gap-2">
-              <span>{block ? (locale === 'ar' ? block.name.ar : block.name.en) : t.dashboard.title.replace('{blockName}', taxonomy.block.name)}</span>
-              {visibleBlocks.length >= 2 && (
-                <button
-                  type="button"
-                  onClick={() => setShowMobileBlockSheet(true)}
-                  aria-label="Switch Curriculum Block"
-                  className="inline-flex md:hidden items-center justify-center p-1 rounded-xl text-slate-500 hover:text-slate-700 dark:hover:text-zinc-300 cursor-pointer apple-tap"
-                >
-                  <ChevronDown className="w-5 h-5" />
-                </button>
-              )}
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-xl leading-relaxed">
-              {block ? (locale === 'ar' ? block.description.ar : block.description.en) : t.dashboard.subtitle}
-            </p>
-          </div>
+        <DashboardHeaderHub
+          block={block}
+          defaultBlockName={taxonomy.block.name}
+          visibleBlocksCount={visibleBlocks.length}
+          totalAttempts={totalAttempts}
+          onOpenBlockSheet={() => setShowMobileBlockSheet(true)}
+          onResetBank={() => setShowResetBankModal(true)}
+          onResetStats={() => setShowResetConfirm(true)}
+          onLaunchMockExam={() => navigate('/test/mock')}
+          onLaunchPractice={() => navigate('/test/quick')}
+        />
 
-          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-2.5 w-full xl:w-auto shrink-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowResetBankModal(true)}
-                className="py-2.5 px-3 glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-rose-600 dark:hover:text-rose-400 rounded-2xl text-xs font-bold flex items-center justify-center space-x-1.5 cursor-pointer apple-tap flex-1 sm:flex-none whitespace-nowrap shrink-0 border hover:border-rose-300 dark:hover:border-rose-800 transition-all"
-                title={t.bank.resetToGlobalBtn}
-              >
-                <RotateCcw className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                <span className="hidden sm:inline">{t.bank.resetToGlobalBtn}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowResetConfirm(true)}
-                className="py-2.5 px-3 glass-pill-luxury text-slate-600 dark:text-zinc-400 hover:text-amber-600 dark:hover:text-amber-400 rounded-2xl text-xs font-bold flex items-center justify-center space-x-1.5 cursor-pointer apple-tap flex-1 sm:flex-none whitespace-nowrap shrink-0"
-                title={t.dashboard.resetModalDesc}
-              >
-                <RotateCcw className="w-3.5 h-3.5 shrink-0" />
-                <span>{t.dashboard.resetBtn}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/test/mock')}
-                className="py-2.5 px-4 bg-gradient-to-r from-slate-900 to-indigo-950 dark:from-zinc-800 dark:to-zinc-900 hover:from-slate-800 hover:to-indigo-900 text-white rounded-2xl text-xs sm:text-sm font-bold border border-indigo-500/30 dark:border-indigo-500/20 backdrop-blur-md shadow-md shadow-indigo-950/20 transition-all cursor-pointer flex items-center justify-center space-x-1.5 apple-tap flex-1 sm:flex-none whitespace-nowrap shrink-0"
-              >
-                <Clock className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>{t.dashboard.mockExamBtn}</span>
-              </button>
-            </div>
-            <button
-              onClick={() => navigate('/test/quick')}
-              className="shimmer-active py-2.5 px-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl text-xs sm:text-sm font-extrabold flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/25 transition-all cursor-pointer apple-tap w-full sm:w-auto whitespace-nowrap shrink-0"
-            >
-              <Play className="w-4 h-4 fill-current text-white shrink-0" />
-              <span>{totalAttempts > 0 ? t.dashboard.continuePractice : t.dashboard.startPractice}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 5 Key Metric Cards with Apple-Caliber Distinct Vivid Tinting */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3.5 pt-4 border-t border-slate-200/60 dark:border-zinc-800/60">
-          {/* Overall Mastery - Emerald Tinted Glass */}
-          <div className="p-3.5 sm:p-4 rounded-2xl glass-card-interactive bg-emerald-500/5 dark:bg-emerald-950/20 border-emerald-400/30 dark:border-emerald-700/40 hover:border-emerald-400/60 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-[11px] text-emerald-800 dark:text-emerald-300 font-bold uppercase tracking-wider">{t.dashboard.masteryScore}</span>
-              <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div className="text-xl sm:text-2xl font-black text-emerald-900 dark:text-emerald-200 mt-1">
-              {masteryPercentage}%
-            </div>
-            <div className="text-[10px] sm:text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
-              {totalAttempts > 0 ? `${masteryPercentage}% ${t.dashboard.masterySub}` : t.review.notAttempted}
-            </div>
-          </div>
-
-          {/* Active Bank - Sapphire Blue Tinted Glass */}
-          <div className="p-3.5 sm:p-4 rounded-2xl glass-card-interactive bg-blue-500/5 dark:bg-blue-950/20 border-blue-400/30 dark:border-blue-700/40 hover:border-blue-400/60 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-[11px] text-blue-800 dark:text-blue-300 font-bold uppercase tracking-wider">{t.common.questions}</span>
-              <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div className="text-xl sm:text-2xl font-black text-blue-950 dark:text-blue-100 mt-1">
-              {questions.length} <span className="text-xs font-normal text-slate-400 dark:text-zinc-500">{t.common.questions}</span>
-            </div>
-            <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-semibold mt-1">
-              <span onClick={() => navigate('/studio')} className="cursor-pointer text-blue-600 dark:text-blue-400 hover:underline">
-                {t.nav.studio} →
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowResetBankModal(true)}
-                className="cursor-pointer text-slate-500 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 flex items-center space-x-1 rtl:space-x-reverse transition-colors"
-                title={t.bank.resetToGlobalBtn}
-              >
-                <RotateCcw className="w-2.5 h-2.5 text-rose-500" />
-                <span>{t.bank.resetToGlobalBtn}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Attempts Logged - Royal Indigo Tinted Glass */}
-          <div className="p-3.5 sm:p-4 rounded-2xl glass-card-interactive bg-indigo-500/5 dark:bg-indigo-950/20 border-indigo-400/30 dark:border-indigo-700/40 hover:border-indigo-400/60 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-[11px] text-indigo-800 dark:text-indigo-300 font-bold uppercase tracking-wider">{t.dashboard.overallAccuracy}</span>
-              <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400" />
-            </div>
-            <div className="text-xl sm:text-2xl font-black text-indigo-950 dark:text-indigo-100 mt-1">
-              {totalAttempts}
-            </div>
-            <div className="text-[10px] sm:text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold mt-1">
-              {totalAttempts > 0 ? `${overallAccuracy}% ${t.common.accuracy}` : t.dashboard.accuracySub}
-            </div>
-          </div>
-
-          {/* Weak Areas - Coral Rose Tinted Glass */}
-          <div className="p-3.5 sm:p-4 rounded-2xl glass-card-interactive bg-rose-500/5 dark:bg-rose-950/20 border-rose-400/30 dark:border-rose-700/40 hover:border-rose-400/60 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-[11px] text-rose-800 dark:text-rose-300 font-bold uppercase tracking-wider">{t.dashboard.weakTopics}</span>
-              <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-600 dark:text-rose-400" />
-            </div>
-            <div className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
-              {weakTopicsCount}
-            </div>
-            <div className="text-[10px] sm:text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-1">
-              <span onClick={() => navigate('/review')} className="cursor-pointer hover:underline">
-                {weakTopicsCount > 0 ? `${t.review.badge} →` : t.review.noWeakTitle}
-              </span>
-            </div>
-          </div>
-
-          {/* Due Reviews - Amber Gold Tinted Glass */}
-          <div className="p-3.5 sm:p-4 rounded-2xl glass-card-interactive bg-amber-500/5 dark:bg-amber-950/20 border-amber-400/30 dark:border-amber-700/40 hover:border-amber-400/60 col-span-2 sm:col-span-1 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-[11px] text-amber-800 dark:text-amber-300 font-bold uppercase tracking-wider">{t.dashboard.dueReviews}</span>
-              <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">
-              {dueReviewsCount}
-            </div>
-            <div className="text-[10px] sm:text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-1">
-              <span onClick={() => navigate('/review')} className="cursor-pointer hover:underline">
-                {t.nav.review} →
-              </span>
-            </div>
-          </div>
-        </div>
+        {/* 5 Key Metric Cards */}
+        <MasteryKpiCards
+          masteryPercentage={masteryPercentage}
+          totalAttempts={totalAttempts}
+          questionsCount={questions.length}
+          overallAccuracy={overallAccuracy}
+          weakTopicsCount={weakTopicsCount}
+          dueReviewsCount={dueReviewsCount}
+          onOpenStudio={() => navigate('/studio')}
+          onOpenReview={() => navigate('/review')}
+          onResetBank={() => setShowResetBankModal(true)}
+        />
       </div>
 
-      {/* Apple Fitness-Style Triple Mastery Rings & Live Cognitive Telemetry Cockpit */}
-      <div className="p-5 sm:p-6 md:p-7 rounded-3xl glass-surface border border-white/80 dark:border-zinc-800/80 shadow-sm">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-          {/* Left 5 Cols: Concentric Apple Activity Rings + Legend */}
-          <div className="lg:col-span-5 flex flex-col sm:flex-row items-center gap-5 sm:gap-6">
-            <div className="relative w-36 h-36 shrink-0 flex items-center justify-center">
-              <svg className="w-36 h-36 -rotate-90" viewBox="0 0 140 140">
-                {/* Outer Ring Track (Mastery %) */}
-                <circle
-                  cx="70"
-                  cy="70"
-                  r="58"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="10"
-                  className="text-emerald-500/15 dark:text-emerald-500/20"
-                />
-                <circle
-                  cx="70"
-                  cy="70"
-                  r="58"
-                  fill="none"
-                  stroke="#10b981"
-                  strokeWidth="10"
-                  strokeLinecap="round"
-                  strokeDasharray={2 * Math.PI * 58}
-                  strokeDashoffset={
-                    2 * Math.PI * 58 * (1 - Math.min(100, Math.max(2, masteryPercentage)) / 100)
-                  }
-                  className="transition-all duration-700"
-                />
+      {/* 3. Triple Mastery Rings & Telemetry Cockpit */}
+      <CognitiveTelemetryRingsCockpit
+        masteryPercentage={masteryPercentage}
+        overallAccuracy={overallAccuracy}
+        streakDays={streakDays}
+        todayAttempts={todayAttempts}
+        dailyGoalTarget={dailyGoalTarget}
+        pacingQuadrants={pacingQuadrants}
+        confidenceCalibration={confidenceCalibration}
+        avgPaceSeconds={avgPaceSeconds}
+      />
 
-                {/* Middle Ring Track (Accuracy %) */}
-                <circle
-                  cx="70"
-                  cy="70"
-                  r="44"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="10"
-                  className="text-blue-500/15 dark:text-blue-500/20"
-                />
-                <circle
-                  cx="70"
-                  cy="70"
-                  r="44"
-                  fill="none"
-                  stroke="#3b82f6"
-                  strokeWidth="10"
-                  strokeLinecap="round"
-                  strokeDasharray={2 * Math.PI * 44}
-                  strokeDashoffset={
-                    2 * Math.PI * 44 * (1 - Math.min(100, Math.max(2, overallAccuracy)) / 100)
-                  }
-                  className="transition-all duration-700"
-                />
+      {/* 4. Dynamic Recommendation Banner */}
+      <DynamicRecommendationBanner
+        totalAttempts={totalAttempts}
+        weakTopicsCount={weakTopicsCount}
+        onLaunchPractice={() => navigate('/test/quick')}
+      />
 
-                {/* Inner Ring Track (Daily Goal) */}
-                <circle
-                  cx="70"
-                  cy="70"
-                  r="30"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="10"
-                  className="text-amber-500/15 dark:text-amber-500/20"
-                />
-                <circle
-                  cx="70"
-                  cy="70"
-                  r="30"
-                  fill="none"
-                  stroke="#f59e0b"
-                  strokeWidth="10"
-                  strokeLinecap="round"
-                  strokeDasharray={2 * Math.PI * 30}
-                  strokeDashoffset={
-                    2 *
-                    Math.PI *
-                    30 *
-                    (1 - Math.min(1, Math.max(0.03, todayAttempts / Math.max(1, dailyGoalTarget))))
-                  }
-                  className="transition-all duration-700"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
-                  Streak
-                </span>
-                <span className="text-lg font-black text-slate-900 dark:text-zinc-100 leading-none mt-0.5">
-                  {streakDays}d
-                </span>
-              </div>
-            </div>
+      {/* 5. Main 2-Column Launchers Grid */}
+      <QuickLaunchersGrid
+        onQuickPractice={() => navigate('/test/quick')}
+        onMockExam={() => navigate('/test/mock')}
+        onCurriculum={() => navigate('/curriculum')}
+      />
 
-            <div className="space-y-2.5 flex-1 w-full">
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                  Apple Cognitive Telemetry Rings
-                </span>
-                <h3 className="text-base font-extrabold text-slate-900 dark:text-zinc-100">
-                  Daily Readiness & Pacing Pulse
-                </h3>
-              </div>
+      {/* 6. Exam Readiness Subject Breakdown */}
+      <SubjectReadinessGrid
+        subjects={taxonomy.subjects}
+        chapters={taxonomy.chapters}
+        subjectReadiness={subjectReadiness}
+        questions={questions}
+        onPracticeSubject={(subjectId) => navigate(`/test?subject=${subjectId}`)}
+      />
 
-              <div className="space-y-1.5 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center space-x-2 text-slate-600 dark:text-zinc-300 font-semibold">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    <span>Block Mastery Ring</span>
-                  </span>
-                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                    {masteryPercentage}%
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center space-x-2 text-slate-600 dark:text-zinc-300 font-semibold">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                    <span>Diagnostic Accuracy</span>
-                  </span>
-                  <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
-                    {overallAccuracy}%
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center space-x-2 text-slate-600 dark:text-zinc-300 font-semibold">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                    <span>Daily Study Target</span>
-                  </span>
-                  <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
-                    {todayAttempts} / {dailyGoalTarget} Qs
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+      {/* 7. Confirmation Modal for Resetting Stats */}
+      <ResetStatsConfirmationModal
+        isOpen={showResetConfirm}
+        resetting={resetting}
+        onClose={() => setShowResetConfirm(false)}
+        onConfirm={handleResetConfirm}
+      />
 
-          {/* Right 7 Cols: 4-Quadrant Pacing & Confidence Calibration */}
-          <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 lg:pt-0 border-t lg:border-t-0 lg:border-l border-slate-200/60 dark:border-zinc-800/60 lg:pl-6">
-            <div className="p-3 rounded-2xl bg-emerald-500/8 dark:bg-emerald-950/25 border border-emerald-500/20 space-y-1">
-              <div className="text-[10px] font-extrabold uppercase text-emerald-700 dark:text-emerald-400">
-                Fast & Accurate
-              </div>
-              <div className="text-xl font-black text-emerald-900 dark:text-emerald-200">
-                {pacingQuadrants.fastAccurate}
-              </div>
-              <div className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80">
-                ≤45s Automatic Recall
-              </div>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-blue-500/8 dark:bg-blue-950/25 border border-blue-500/20 space-y-1">
-              <div className="text-[10px] font-extrabold uppercase text-blue-700 dark:text-blue-400">
-                Avg Pacing Speed
-              </div>
-              <div className="text-xl font-black text-blue-900 dark:text-blue-200">
-                {avgPaceSeconds > 0 ? `${avgPaceSeconds}s` : '—'}
-              </div>
-              <div className="text-[10px] text-blue-700/80 dark:text-blue-300/80">
-                {pacingQuadrants.slowAccurate} Deliberate Correct
-              </div>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-amber-500/8 dark:bg-amber-950/25 border border-amber-500/20 space-y-1">
-              <div className="text-[10px] font-extrabold uppercase text-amber-700 dark:text-amber-400">
-                Rushed Mistakes
-              </div>
-              <div className="text-xl font-black text-amber-900 dark:text-amber-200">
-                {pacingQuadrants.fastWrong}
-              </div>
-              <div className="text-[10px] text-amber-700/80 dark:text-amber-300/80">
-                Premature Closure (≤45s)
-              </div>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-rose-500/8 dark:bg-rose-950/25 border border-rose-500/20 space-y-1">
-              <div className="text-[10px] font-extrabold uppercase text-rose-700 dark:text-rose-400">
-                Danger Zone
-              </div>
-              <div className="text-xl font-black text-rose-900 dark:text-rose-200">
-                {confidenceCalibration.sureWrong}
-              </div>
-              <div className="text-[10px] text-rose-700/80 dark:text-rose-300/80">
-                Confident Mistakes • {confidenceCalibration.sureCorrect} Sure✓
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Dynamic Recommendation Banner: Electric Indigo to Cobalt Blue Gradient */}
-      <div className="relative rounded-3xl p-5 sm:p-8 text-white shadow-xl overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 border border-white/20">
-        <div className="absolute right-0 top-0 bottom-0 w-2/5 bg-gradient-to-l from-white/10 to-transparent pointer-events-none" />
-        <div className="absolute -left-10 -bottom-10 w-48 h-48 bg-pink-500/20 rounded-full blur-2xl pointer-events-none" />
-
-        <div className="max-w-2xl space-y-3 sm:space-y-4 relative z-10">
-          <div className="inline-flex items-center space-x-1.5 px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-extrabold tracking-wide uppercase border border-white/30 text-white">
-            <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-            <span>{t.dashboard.quickLaunchTitle}</span>
-          </div>
-
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-white leading-tight">
-            {totalAttempts === 0
-              ? t.dashboard.startPractice
-              : weakTopicsCount > 0
-              ? t.dashboard.weaknessCardTitle
-              : t.dashboard.mockExamCardTitle}
-          </h2>
-
-          <p className="text-xs sm:text-sm text-blue-100 leading-relaxed max-w-xl">
-            {totalAttempts === 0
-              ? t.dashboard.quickLaunchSub
-              : weakTopicsCount > 0
-              ? t.dashboard.weaknessCardDesc
-              : t.dashboard.mockExamCardDesc}
-          </p>
-
-          <div className="pt-2">
-            <button
-              onClick={() => navigate('/test/quick')}
-              className="w-full sm:w-auto py-3 px-6 bg-white text-indigo-700 hover:bg-blue-50 font-extrabold rounded-2xl text-sm flex items-center justify-center space-x-2 shadow-lg transition-all apple-tap cursor-pointer"
-            >
-              <span>{totalAttempts === 0 ? t.dashboard.startPractice : t.dashboard.continuePractice}</span>
-              <ArrowRight className={`w-4 h-4 ${isRtl ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main 2-Column Launchers & Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Mode Action Launchpads */}
-        <div className="md:col-span-2 space-y-4">
-          <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-zinc-400 px-1">
-            {t.dashboard.quickLaunchTitle}
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Quick Practice Card - Vibrant Blue/Indigo Glow */}
-            <div 
-              onClick={() => navigate('/test/quick')}
-              className="p-6 rounded-3xl glass-card-interactive cursor-pointer group space-y-4 bg-gradient-to-b from-blue-500/10 via-white/50 to-white/70 dark:from-blue-950/30 dark:via-zinc-900/60 dark:to-zinc-900/80 border-blue-400/30 dark:border-blue-800/40"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/30 group-hover:scale-110 group-hover:rotate-2 transition-all duration-300">
-                <Zap className="w-6 h-6 fill-white text-white group-hover:scale-110 transition-transform" />
-              </div>
-              <div>
-                <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-lg flex items-center justify-between">
-                  <span>{t.test.quickPractice.title}</span>
-                  <ArrowRight className={`w-4 h-4 text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:translate-x-1.5 transition-all duration-300 ${isRtl ? 'rotate-180' : ''}`} />
-                </h3>
-                <p className="text-xs text-slate-600 dark:text-zinc-400 mt-1 leading-relaxed">
-                  {t.test.quickPractice.subtitle}
-                </p>
-              </div>
-              <div className="flex items-center space-x-2 text-[11px] font-bold text-blue-600 dark:text-blue-400">
-                <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                <span>{t.test.quickPractice.immediateFeedback}</span>
-              </div>
-            </div>
-
-            {/* Mock Exam Card - Vibrant Purple/Indigo Glow */}
-            <div 
-              onClick={() => navigate('/test/mock')}
-              className="p-6 rounded-3xl glass-card-interactive cursor-pointer group space-y-4 bg-gradient-to-b from-purple-500/10 via-white/50 to-white/70 dark:from-purple-950/30 dark:via-zinc-900/60 dark:to-zinc-900/80 border-purple-400/30 dark:border-purple-800/40"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-purple-500/30 group-hover:scale-110 group-hover:rotate-2 transition-all duration-300">
-                <Award className="w-6 h-6 text-amber-300 group-hover:scale-110 transition-transform" />
-              </div>
-              <div>
-                <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-lg flex items-center justify-between">
-                  <span>{t.dashboard.mockExamCardTitle}</span>
-                  <ArrowRight className={`w-4 h-4 text-slate-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 group-hover:translate-x-1.5 transition-all duration-300 ${isRtl ? 'rotate-180' : ''}`} />
-                </h3>
-                <p className="text-xs text-slate-600 dark:text-zinc-400 mt-1 leading-relaxed">
-                  {t.dashboard.mockExamCardDesc}
-                </p>
-              </div>
-              <div className="flex items-center space-x-2 text-[11px] font-bold text-purple-600 dark:text-purple-400">
-                <Clock className="w-3.5 h-3.5" />
-                <span>{t.dashboard.mockExamBadge}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Col: Curriculum & Spaced Repetition Summary */}
-        <div className="space-y-4">
-          <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-zinc-400 px-1">
-            {t.curriculum.badge}
-          </h2>
-
-          <div className="p-6 rounded-3xl glass-surface space-y-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
-                <BookOpen className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900 dark:text-zinc-100 text-sm">{t.dashboard.curriculumCardTitle}</h3>
-                <p className="text-xs text-slate-500 dark:text-zinc-400">{t.curriculum.title}</p>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
-              {t.dashboard.curriculumCardDesc}
-            </p>
-
-            <button
-              onClick={() => navigate('/curriculum')}
-              className="w-full py-2.5 px-4 rounded-2xl glass-card-interactive text-xs font-bold text-slate-800 dark:text-zinc-200 flex items-center justify-between cursor-pointer"
-            >
-              <span>{t.curriculum.title}</span>
-              <ArrowRight className={`w-3.5 h-3.5 text-blue-600 dark:text-blue-400 ${isRtl ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Section: Exam Readiness Subject Cards with Vibrant Subject Identity */}
-      <div className="space-y-4">
-        <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-zinc-400 px-1">
-          {t.dashboard.taxonomyBreakdownTitle}
-        </h2>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {taxonomy.subjects.map((subj, idx) => {
-            const colorThemes = [
-              {
-                dotClass: 'bg-blue-500 shadow-blue-500/50',
-                borderClass: 'border-blue-400/25 dark:border-blue-700/30',
-                badgeClass: 'text-blue-600 dark:text-blue-400 bg-blue-500/10',
-                btnClass: 'text-blue-600 dark:text-blue-400',
-              },
-              {
-                dotClass: 'bg-purple-500 shadow-purple-500/50',
-                borderClass: 'border-purple-400/25 dark:border-purple-700/30',
-                badgeClass: 'text-purple-600 dark:text-purple-400 bg-purple-500/10',
-                btnClass: 'text-purple-600 dark:text-purple-400',
-              },
-              {
-                dotClass: 'bg-emerald-500 shadow-emerald-500/50',
-                borderClass: 'border-emerald-400/25 dark:border-emerald-700/30',
-                badgeClass: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10',
-                btnClass: 'text-emerald-600 dark:text-emerald-400',
-              },
-              {
-                dotClass: 'bg-amber-500 shadow-amber-500/50',
-                borderClass: 'border-amber-400/25 dark:border-amber-700/30',
-                badgeClass: 'text-amber-600 dark:text-amber-400 bg-amber-500/10',
-                btnClass: 'text-amber-600 dark:text-amber-400',
-              },
-              {
-                dotClass: 'bg-rose-500 shadow-rose-500/50',
-                borderClass: 'border-rose-400/25 dark:border-rose-700/30',
-                badgeClass: 'text-rose-600 dark:text-rose-400 bg-rose-500/10',
-                btnClass: 'text-rose-600 dark:text-rose-400',
-              },
-            ];
-            const theme = colorThemes[idx % colorThemes.length];
-            const stat = subjectReadiness[subj.id];
-            const subjQuestions = questions.filter((q) => q.subjectId === subj.id);
-            const totalQs =
-              stat?.totalQuestions || subjQuestions.length;
-            const correctPct =
-              totalQs > 0 ? Math.round(((stat?.correctCount ?? 0) / totalQs) * 100) : 0;
-            const mistakePct =
-              totalQs > 0 ? Math.round(((stat?.incorrectCount ?? 0) / totalQs) * 100) : 0;
-            const chapters = taxonomy.chapters.filter((c) => c.subjectId === subj.id);
-            const chaptersLabel = `${chapters.length} ${locale === 'ar' ? 'فصول' : 'Chapters'}`;
-            const desc = chapters.length > 0
-              ? chapters.map((c) => c.name).join(', ')
-              : subj.name;
-
-            return (
-              <div
-                key={subj.id}
-                className={`p-6 rounded-3xl glass-card-interactive space-y-3 ${theme.borderClass}`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                    <span className={`w-2.5 h-2.5 rounded-full shadow-sm ${theme.dotClass}`} />
-                    <h3 className="font-extrabold text-slate-900 dark:text-zinc-100 text-sm">
-                      {subj.name}
-                    </h3>
-                  </div>
-                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${theme.badgeClass}`}>
-                    {stat && stat.answeredCount > 0
-                      ? `${stat.accuracy}% Acc • ${stat.coveragePercent}% Seen`
-                      : chaptersLabel}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed line-clamp-2">
-                  {desc}
-                </p>
-
-                {/* Live Multi-Segment Mastery Bar (Correct / Mistake / Unseen) */}
-                <div className="space-y-1 pt-1">
-                  <div className="h-2 w-full rounded-full bg-slate-200/70 dark:bg-zinc-800 overflow-hidden flex">
-                    {correctPct > 0 && (
-                      <div
-                        className="h-full bg-emerald-500 transition-all duration-500"
-                        style={{ width: `${correctPct}%` }}
-                        title={`Mastered: ${stat?.correctCount ?? 0}`}
-                      />
-                    )}
-                    {mistakePct > 0 && (
-                      <div
-                        className="h-full bg-rose-500 transition-all duration-500"
-                        style={{ width: `${mistakePct}%` }}
-                        title={`Needs Review: ${stat?.incorrectCount ?? 0}`}
-                      />
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-zinc-500 font-mono">
-                    <span>{stat?.correctCount ?? 0}✓ / {stat?.incorrectCount ?? 0}✗</span>
-                    <span>{stat?.answeredCount ?? 0}/{totalQs} Attempted</span>
-                  </div>
-                </div>
-
-                <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-100 dark:border-zinc-800">
-                  <span className="font-bold text-slate-700 dark:text-zinc-300">
-                    {totalQs} {t.common.questions}
-                  </span>
-                  <button
-                    onClick={() => navigate(`/test?subject=${subj.id}`)}
-                    className={`${theme.btnClass} font-bold hover:underline cursor-pointer flex items-center space-x-1`}
-                  >
-                    <span>
-                      {stat && stat.answeredCount > 0
-                        ? `${t.dashboard.continuePractice} →`
-                        : `${t.dashboard.startPractice} →`}
-                    </span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Confirmation Modal for Resetting Stats */}
-      {showResetConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl rounded-3xl max-w-md w-full p-6 border border-white/80 dark:border-zinc-800 shadow-2xl space-y-5">
-            <div className="w-12 h-12 rounded-2xl bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-zinc-50">{t.dashboard.resetModalTitle}</h3>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                {t.dashboard.resetModalDesc}
-              </p>
-            </div>
-            <div className="flex items-center justify-end space-x-3 pt-2">
-              <button
-                onClick={() => setShowResetConfirm(false)}
-                className="py-2 px-4 rounded-xl text-xs font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer"
-              >
-                {t.dashboard.resetCancelBtn}
-              </button>
-              <button
-                onClick={handleResetConfirm}
-                disabled={resetting}
-                className="py-2 px-4 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer"
-              >
-                {resetting ? t.dashboard.resetting : t.dashboard.resetConfirmBtn}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Global Question Bank Recovery Modal */}
+      {/* 8. Global Question Bank Recovery Modal */}
       <ResetBankConfirmationModal
         isOpen={showResetBankModal}
         onClose={() => setShowResetBankModal(false)}
       />
 
-      {/* Mobile Bottom Sheet Switcher (opened from Dashboard title chip) */}
+      {/* 9. Mobile Bottom Sheet Switcher */}
       <BlockSwitcherSheet
         isOpen={showMobileBlockSheet}
         onClose={() => setShowMobileBlockSheet(false)}
