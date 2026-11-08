@@ -54,7 +54,7 @@ function makeSloppyProvider() {
     modelId: 'gemini-2.5-flash',
     async *streamTurn() {
       yield {
-        type: 'text',
+        type: 'text' as const,
         delta: JSON.stringify({
           items: [
             {
