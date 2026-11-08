@@ -20,15 +20,22 @@ export class CrossModelVerificationPromptBuilder {
     const correctChoice = q.choices.find((c) => c.isCorrect);
     const classification = item.taxonomyClassification;
 
-    const blockName = classification?.blockName || 'Cardiovascular System (CVS) - Block 206';
+    const isCns = q.blockId === 'cns' || classification?.blockId === 'cns';
+    const blockName =
+      classification?.blockName ||
+      (isCns ? 'Central Nervous System (CNS) - Block 207' : 'Cardiovascular System (CVS) - Block 206');
     const subjectName = classification?.subjectName || q.subjectId.toUpperCase();
     const chapterName = classification?.chapterName || q.chapterId;
     const confidence = classification?.confidenceScore !== undefined ? `${classification.confidenceScore}%` : 'High';
     const rationale = classification?.rationale || 'Direct curriculum taxonomy mapping';
 
+    const roleTitle = isCns
+      ? 'Double Board-Certified Neurologist/Neuroanatomist, Medical Education Specialist, and USMLE/NBME Senior Item Reviewer.'
+      : 'Double Board-Certified Cardiologist, Medical Education Specialist, and USMLE/NBME Senior Item Reviewer.';
+
     const lines: string[] = [
       `# Medical Board Examination Item Cross-Validation Request`,
-      `**Role**: Double Board-Certified Cardiologist, Medical Education Specialist, and USMLE/NBME Senior Item Reviewer.`,
+      `**Role**: ${roleTitle}`,
       `**Objective**: Rigorously and independently audit the following clinical question for medical factual accuracy, single-best-answer validity, distractor plausibility, and curriculum grounding. Do NOT assume the provided answer key is correct.`,
       ``,
       `---`,
@@ -82,9 +89,18 @@ export class CrossModelVerificationPromptBuilder {
     items: readonly ParsedQuestionItem[],
     batchTitle = 'MedQuests Global Question Bank Batch Verification'
   ): string {
+    const isBatchCns = items.some(
+      (item) =>
+        item.question.blockId === 'cns' ||
+        item.taxonomyClassification?.blockId === 'cns'
+    );
+    const specialty = isBatchCns
+      ? 'Central Nervous System Specialty'
+      : 'Cardiovascular Specialty';
+
     const lines: string[] = [
       `# ${batchTitle} (${items.length} Items)`,
-      `**Role**: Senior Medical Education & Clinical Curriculum Audit Committee (Cardiovascular Specialty).`,
+      `**Role**: Senior Medical Education & Clinical Curriculum Audit Committee (${specialty}).`,
       `**Instructions**: Audit each of the following ${items.length} multiple-choice items independently. For every item, verify clinical accuracy, key correctness, and curriculum grounding within the specified Block, Subject, and Chapter:`,
       `1. Your independently determined single best answer (A, B, C, or D).`,
       `2. Confirmation whether the draft key is accurate or flawed.`,
@@ -98,7 +114,10 @@ export class CrossModelVerificationPromptBuilder {
       const q = item.question;
       const correctChoice = q.choices.find((c) => c.isCorrect);
       const classification = item.taxonomyClassification;
-      const blockName = classification?.blockName || 'Cardiovascular System (CVS)';
+      const isItemCns = q.blockId === 'cns' || classification?.blockId === 'cns';
+      const blockName =
+        classification?.blockName ||
+        (isItemCns ? 'Central Nervous System (CNS) - Block 207' : 'Cardiovascular System (CVS)');
       const subjectName = classification?.subjectName || q.subjectId;
       const chapterName = classification?.chapterName || q.chapterId;
 
