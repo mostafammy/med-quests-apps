@@ -162,7 +162,15 @@ export class QuestionParsingAgent {
     request.onTelemetryUpdate?.(telemetry);
 
     const firstBlockSnippet = rawBlocks[0] || rawText;
-    const initialClassification = curriculumClassificationAgent.classify(firstBlockSnippet);
+    const activeBlockId = (request.targetBlockId || LEGACY_DEFAULT_BLOCK_ID) as string;
+    const initialClassification = curriculumClassificationAgent.classify(
+      firstBlockSnippet,
+      '',
+      '',
+      activeBlockId === 'cns'
+        ? { id: 'cns', name: 'Central Nervous System', code: 'Block 207', shortName: 'CNS' }
+        : undefined
+    );
     telemetry = QuestionParsingTelemetryAndPipeline.updateTelemetryStep(
       telemetry,
       'taxonomy',
