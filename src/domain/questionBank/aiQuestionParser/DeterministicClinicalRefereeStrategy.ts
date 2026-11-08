@@ -52,6 +52,50 @@ const MEDICAL_KEYWORD_PAIRS: ReadonlyArray<{
   { keywords: ['inferior mi', 'lead ii', 'lead iii', 'avf'], optionKeywords: ['right coronary', 'rca'] },
   { keywords: ['amiodarone', 'pulmonary fibrosis', 'thyroid'], optionKeywords: ['amiodarone', 'potassium channel'] },
   { keywords: ['digoxin', 'xanthopsia', 'na+/k+'], optionKeywords: ['digoxin', 'atpase'] },
+  {
+    keywords: ['projection fibers', 'internal capsule', 'bottleneck'],
+    optionKeywords: ['passing to the cortex from the thalamus', 'internal capsule', 'projection fibers'],
+  },
+  {
+    keywords: ['thalamocortical radiation', 'sensory radiation', 'optic radiation', 'auditory radiation'],
+    optionKeywords: ['posterior ventral nucleus', 'postcentral gyrus', 'areas 3, 1, and 2'],
+  },
+  {
+    keywords: ['descending projection fibers', 'corticofugal'],
+    optionKeywords: ['pyramidal tract', 'cortico-pontine', 'corticothalamic'],
+  },
+  {
+    keywords: ['horizontal section', 'nuclear boundaries', 'internal capsule'],
+    optionKeywords: ['lentiform nucleus', 'caudate nucleus anteriorly and the thalamus posteriorly'],
+  },
+  {
+    keywords: ['anterior limb', 'internal capsule'],
+    optionKeywords: ['frontopontine fibers', 'anterior thalamic radiation'],
+  },
+  {
+    keywords: ['genu of the internal capsule', 'corticobulbar'],
+    optionKeywords: ['corticobulbar', 'corticonuclear', 'facial weakness'],
+  },
+  {
+    keywords: ['corticospinal somatotopically', 'posterior limb of the internal capsule', 'somatotopy'],
+    optionKeywords: ['arm fibers lie anteriorly', 'trunk fibers in the middle', 'leg fibers posteriorly'],
+  },
+  {
+    keywords: ['retrolenticular', 'retrolentiform', 'internal capsule'],
+    optionKeywords: ['optic radiation', 'lateral geniculate body'],
+  },
+  {
+    keywords: ['sublenticular', 'beneath the lentiform nucleus'],
+    optionKeywords: ['auditory radiation', 'medial geniculate body', 'temporopontine'],
+  },
+  {
+    keywords: ['arterial blood supply', 'internal capsule', 'arterial territory'],
+    optionKeywords: ['anterior cerebral artery', 'middle cerebral artery', 'anterior choroidal artery'],
+  },
+  {
+    keywords: ['lenticulostriate', 'charcot', 'cerebral hemorrhage', 'triad'],
+    optionKeywords: ['contralateral hemiplegia', 'contralateral hemianesthesia', 'contralateral lower facial weakness'],
+  },
 ];
 
 /**
@@ -108,7 +152,7 @@ export class DeterministicClinicalRefereeStrategy {
     const aiGeneratedAnswerKey = !wasAnswerKeyProvided;
 
     // Extract Question Stem & Options
-    const { stemLines, rawChoices, detectedExplanation } =
+    const { stemLines, rawChoices, detectedExplanation, draftScope } =
       TextSegmentationAndChoiceExtractor.extractStemAndChoices(lines);
     const stem = stemLines
       .join(' ')
@@ -139,10 +183,14 @@ export class DeterministicClinicalRefereeStrategy {
     );
 
     // Dynamic Curriculum Taxonomy Classification & Gap Analysis
+    const targetBlockId = (request.targetBlockId || LEGACY_DEFAULT_BLOCK_ID) as string;
     const classification = curriculumClassificationAgent.classify(
       stem,
       rawChoices.map((c) => c.text).join(' '),
-      detectedExplanation
+      detectedExplanation,
+      targetBlockId === 'cns'
+        ? { id: 'cns', name: 'Central Nervous System', code: 'Block 207', shortName: 'CNS' }
+        : undefined
     );
 
     const isAutoSubject =
@@ -178,11 +226,11 @@ export class DeterministicClinicalRefereeStrategy {
     // Curriculum evidence synthesis
     const evidenceSource =
       matchedBankQuestion?.evidence?.[0] ||
-      QuestionNormalizer.synthesizeDefaultEvidence(subjectId, concept);
+      QuestionNormalizer.synthesizeDefaultEvidence(subjectId, concept, targetBlockId);
 
     const questionDraft: Question = {
       id: `q-parsed-${Date.now().toString(36)}-${index}`,
-      blockId: request.targetBlockId || LEGACY_DEFAULT_BLOCK_ID,
+      blockId: targetBlockId,
       subjectId,
       chapterId,
       topicId: matchedBankQuestion?.topicId || `${chapterId}/clinical-review`,
@@ -196,7 +244,7 @@ export class DeterministicClinicalRefereeStrategy {
           : `${explanation} Detailed clinical rationale grounds this finding.`,
       examTip:
         matchedBankQuestion?.examTip ||
-        `High-yield board concept: always differentiate ${concept} from alternative cardiovascular presentations.`,
+        `High-yield board concept: always correlate ${concept} with core clinical and anatomical relationships.`,
       mnemonic: matchedBankQuestion?.mnemonic ?? null,
       difficulty: matchedBankQuestion?.difficulty || 2,
       cognitiveLevel:
@@ -217,6 +265,14 @@ export class DeterministicClinicalRefereeStrategy {
       );
     }
 
+    const isReclassified = Boolean(
+      draftScope?.chapter &&
+      (
+        draftScope.chapter.toLowerCase().trim() !== classification.chapterName.toLowerCase().trim() &&
+        draftScope.chapter.toLowerCase().trim() !== classification.chapterId.toLowerCase().trim()
+      )
+    );
+
     return {
       tempId: `item-${index}-${Math.random().toString(36).slice(2, 7)}`,
       rawInputExcerpt: blockText.slice(0, 300),
@@ -229,6 +285,15 @@ export class DeterministicClinicalRefereeStrategy {
       warnings,
       isApproved: false,
       taxonomyClassification: classification,
+      originalDraftTaxonomy: draftScope
+        ? {
+            blockId: draftScope.block,
+            blockName: draftScope.block,
+            subjectName: draftScope.subject,
+            chapterName: draftScope.chapter,
+          }
+        : undefined,
+      isReclassified,
     };
   }
 
