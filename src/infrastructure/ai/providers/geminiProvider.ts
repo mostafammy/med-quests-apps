@@ -24,7 +24,10 @@ export class GeminiProvider {
 
     // Split system prompt vs chat contents
     let systemText = '';
-    const geminiContents: any[] = [];
+    const geminiContents: Array<{
+      role: string;
+      parts: Array<Record<string, unknown>>;
+    }> = [];
 
     for (const msg of messages) {
       if (msg.role === 'system') {
@@ -42,7 +45,7 @@ export class GeminiProvider {
           ],
         });
       } else {
-        const parts: any[] = [];
+        const parts: Array<Record<string, unknown>> = [];
         if (msg.content) {
           parts.push({ text: msg.content });
         }
@@ -70,7 +73,15 @@ export class GeminiProvider {
       }
     }
 
-    const payload: any = {
+    const payload: {
+      contents: typeof geminiContents;
+      generationConfig: {
+        temperature: number;
+        thinkingConfig?: { thinkingBudget: number };
+      };
+      systemInstruction?: { parts: Array<{ text: string }> };
+      tools?: Array<{ functionDeclarations: unknown[] }>;
+    } = {
       contents: geminiContents,
       generationConfig: {
         temperature: 0.2,
@@ -208,7 +219,17 @@ export class GeminiProvider {
           if (!trimmed || trimmed.startsWith(':')) continue;
           if (!trimmed.startsWith('data: ')) continue;
 
-          let json: any;
+          let json: {
+            candidates?: Array<{
+              content?: {
+                parts?: Array<{
+                  thought?: boolean;
+                  text?: string;
+                  functionCall?: { name: string; args?: Record<string, unknown> };
+                }>;
+              };
+            }>;
+          };
           try {
             json = JSON.parse(trimmed.slice(6));
           } catch {
