@@ -1,535 +1,86 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useActiveTaxonomy, useBlockContextStore } from '../../../application/stores/useBlockContextStore.ts';
-import { defaultBlockMementoStore } from '../../../infrastructure/curriculum/LocalStorageBlockMementoStore.ts';
-import { useQuestionStore } from '../../../application/stores/useQuestionStore.ts';
-import { useStatsStore } from '../../../application/stores/useStatsStore.ts';
-import { useLocaleStore } from '../../../application/stores/useLocaleStore.ts';
-import { 
-  Play, 
-  Sparkles, 
-  Award, 
-  Zap, 
-  Clock, 
-  CheckCircle2, 
-  Filter, 
-  Flame, 
-  ChevronRight,
-  ShieldCheck,
-  Compass,
-  RotateCcw,
-  Sliders,
-  Activity,
-  TrendingUp
-} from 'lucide-react';
-import { ResetBankConfirmationModal } from '../questionBank/ResetBankConfirmationModal.tsx';
+/**
+ * TestHub
+ *
+ * Primary testing & practice configuration hub for medical students.
+ * Follows the Single Responsibility Principle: handles page layout and composition,
+ * delegating all state, URL synchronization, and session launch orchestration
+ * to useTestHubCoordinator.
+ */
 
-type TestMode = 'practice' | 'mock' | 'rapid';
-type RepetitionFilter = 'unanswered' | 'all' | 'incorrect';
+import React from 'react';
+import { Sliders, Filter } from 'lucide-react';
+import { ResetBankConfirmationModal } from '../questionBank/ResetBankConfirmationModal.tsx';
+import { TestHubHeader } from './hub/TestHubHeader.tsx';
+import { QuickLaunchPresetsDock } from './hub/QuickLaunchPresetsDock.tsx';
+import { TestModeSegmentedSwitcher } from './hub/TestModeSegmentedSwitcher.tsx';
+import { MockExamBlueprintCard } from './hub/MockExamBlueprintCard.tsx';
+import { CurriculumScopeProgressCard } from './hub/CurriculumScopeProgressCard.tsx';
+import { CurriculumScopeFilterControls } from './hub/CurriculumScopeFilterControls.tsx';
+import { RepetitionFilterStrip } from './hub/RepetitionFilterStrip.tsx';
+import { CategoryTestLauncherStrip } from './hub/CategoryTestLauncherStrip.tsx';
+import { CommandDeckLaunchBar } from './hub/CommandDeckLaunchBar.tsx';
+import { useTestHubCoordinator } from './hub/useTestHubCoordinator.ts';
 
 export const TestHub: React.FC = () => {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { questions } = useQuestionStore();
-  const { 
-    refreshStats, 
-    getScopeCoverage, 
-    answeredQuestionIds, 
-    correctQuestionIds, 
-    mistakeQuestionIds,
-    resetSubjectStats 
-  } = useStatsStore();
-  const { t, isRtl } = useLocaleStore();
-  const taxonomy = useActiveTaxonomy();
-  const { activeBlockId } = useBlockContextStore();
-
-  // Mode & configuration state
-  const [selectedMode, setSelectedMode] = useState<TestMode>('practice');
-  const [repetitionFilter, setRepetitionFilter] = useState<RepetitionFilter>('unanswered');
-  const [selectedSubject, setSelectedSubject] = useState<string>(() => {
-    const subParam = searchParams.get('subject');
-    if (subParam) {
-      const match = taxonomy.subjects.find(
-        (s) => s.id.toLowerCase() === subParam.toLowerCase() || s.name.toLowerCase().includes(subParam.toLowerCase())
-      );
-      if (match) return match.id;
-    }
-    const memento = defaultBlockMementoStore.load(activeBlockId);
-    if (
-      memento?.testHub?.subjectId &&
-      (memento.testHub.subjectId === 'all' || taxonomy.subjects.some((s) => s.id === memento.testHub.subjectId))
-    ) {
-      return memento.testHub.subjectId;
-    }
-    return 'all';
-  });
-  const [selectedChapter, setSelectedChapter] = useState<string>(() => {
-    const memento = defaultBlockMementoStore.load(activeBlockId);
-    if (
-      memento?.testHub?.chapterId &&
-      (memento.testHub.chapterId === 'all' || taxonomy.chapters.some((c) => c.id === memento.testHub.chapterId))
-    ) {
-      return memento.testHub.chapterId;
-    }
-    return 'all';
-  });
-  const [questionCount, setQuestionCount] = useState<number | 'all'>(() => {
-    const memento = defaultBlockMementoStore.load(activeBlockId);
-    return memento?.testHub?.count ?? 20;
-  });
-  const [highYieldOnly, setHighYieldOnly] = useState<boolean>(() => {
-    const memento = defaultBlockMementoStore.load(activeBlockId);
-    return memento?.testHub?.highYieldOnly ?? false;
-  });
-  const [timedSprint, setTimedSprint] = useState<boolean>(false);
-  const [showResetBankModal, setShowResetBankModal] = useState<boolean>(false);
-
-  // Refresh attempts from IndexedDB on mount & question changes
-  useEffect(() => {
-    refreshStats(questions, activeBlockId);
-  }, [questions, refreshStats, activeBlockId]);
-
-  // 1. Sync when curriculum block changes (e.g. user toggles CVS <-> CNS)
-  const prevBlockIdRef = useRef(activeBlockId);
-  useEffect(() => {
-    if (prevBlockIdRef.current !== activeBlockId) {
-      prevBlockIdRef.current = activeBlockId;
-      const memento = defaultBlockMementoStore.load(activeBlockId);
-      if (
-        memento?.testHub?.subjectId &&
-        (memento.testHub.subjectId === 'all' || taxonomy.subjects.some((s) => s.id === memento.testHub.subjectId))
-      ) {
-        setSelectedSubject(memento.testHub.subjectId);
-        setSelectedChapter(
-          memento.testHub.chapterId &&
-          (memento.testHub.chapterId === 'all' || taxonomy.chapters.some((c) => c.id === memento.testHub.chapterId))
-            ? memento.testHub.chapterId
-            : 'all'
-        );
-        setQuestionCount(memento.testHub.count ?? 20);
-        setHighYieldOnly(memento.testHub.highYieldOnly ?? false);
-      } else {
-        setSelectedSubject('all');
-        setSelectedChapter('all');
-      }
-    }
-  }, [activeBlockId, taxonomy.subjects, taxonomy.chapters]);
-
-  // 2. Sync when URL search parameter (?subject=...) changes
-  const subParam = searchParams.get('subject');
-  const prevSubParamRef = useRef(subParam);
-  useEffect(() => {
-    if (subParam && subParam !== prevSubParamRef.current) {
-      prevSubParamRef.current = subParam;
-      const match = taxonomy.subjects.find(
-        (s) => s.id.toLowerCase() === subParam.toLowerCase() || s.name.toLowerCase().includes(subParam.toLowerCase())
-      );
-      if (match) {
-        setSelectedSubject(match.id);
-        setSelectedChapter('all');
-      }
-    }
-  }, [subParam, taxonomy.subjects]);
-
-  // 3. Fallback: Reconcile if selectedSubject or selectedChapter became invalid for active taxonomy
-  useEffect(() => {
-    if (selectedSubject !== 'all' && !taxonomy.subjects.some((s) => s.id === selectedSubject)) {
-      setSelectedSubject('all');
-      setSelectedChapter('all');
-    }
-  }, [selectedSubject, taxonomy.subjects]);
-
-  // 4. Persist user filter choices to block memento
-  useEffect(() => {
-    defaultBlockMementoStore.save({
-      blockId: activeBlockId,
-      testHub: {
-        subjectId: selectedSubject,
-        chapterId: selectedChapter,
-        count: questionCount,
-        highYieldOnly,
-      },
-      reviewTab: null,
-      savedAtIso: new Date().toISOString(),
-    });
-  }, [activeBlockId, selectedSubject, selectedChapter, questionCount, highYieldOnly]);
-
-  // Filter available chapters by selected subject
-  const availableChapters = useMemo(() => {
-    return selectedSubject === 'all'
-      ? taxonomy.chapters
-      : taxonomy.chapters.filter((c) => c.subjectId === selectedSubject);
-  }, [selectedSubject, taxonomy.chapters]);
-
-  // Curriculum scope coverage metrics (total, answered, fresh remaining, correct, incorrect)
-  const scopeCoverage = useMemo(() => {
-    return getScopeCoverage(questions, {
-      subjectId: selectedSubject,
-      chapterId: selectedChapter,
-      highYieldOnly,
-    });
-  }, [questions, selectedSubject, selectedChapter, highYieldOnly, answeredQuestionIds, correctQuestionIds, mistakeQuestionIds, getScopeCoverage]);
-
-  // Dynamic question counts based on filter criteria & repetition scope
-  const matchingQuestionCount = useMemo(() => {
-    if (selectedMode === 'mock') return 50;
-    if (selectedMode === 'rapid') return Math.min(scopeCoverage.total, 15);
-    if (repetitionFilter === 'unanswered') return scopeCoverage.unanswered;
-    if (repetitionFilter === 'incorrect') return scopeCoverage.incorrect;
-    return scopeCoverage.total;
-  }, [selectedMode, repetitionFilter, scopeCoverage]);
-
-  // Effective question count for the active session configuration
-  const effectiveQuestionCount = useMemo(() => {
-    if (questionCount === 'all') {
-      return matchingQuestionCount;
-    }
-    return Math.min(matchingQuestionCount, questionCount);
-  }, [questionCount, matchingQuestionCount]);
-
-  // Dynamic human-readable label for the currently targeted category
-  const selectedCategoryLabel = useMemo(() => {
-    if (selectedChapter !== 'all') {
-      const ch = taxonomy.chapters.find((c) => c.id === selectedChapter);
-      if (ch) return ch.name;
-    }
-    if (selectedSubject !== 'all') {
-      const sub = taxonomy.subjects.find((s) => s.id === selectedSubject);
-      if (sub) return sub.name;
-    }
-    return t.test.allSubjects.replace('{blockName}', taxonomy.block.name);
-  }, [selectedSubject, selectedChapter, taxonomy, t]);
-
-  // Subject statistics for badge counters
-  const subjectCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: questions.length };
-    taxonomy.subjects.forEach((s) => {
-      counts[s.id] = questions.filter((q) => q && q.subjectId === s.id).length;
-    });
-    return counts;
-  }, [questions, taxonomy.subjects]);
-
-  // Master launch handler
-  const handleLaunchSession = (
-    overrideCount?: number | 'all',
-    overrideMode?: TestMode,
-    overrideFilter?: RepetitionFilter
-  ) => {
-    const targetMode = overrideMode || selectedMode;
-    const effectiveCountMode = overrideCount !== undefined ? overrideCount : questionCount;
-    const activeFilter = overrideFilter || repetitionFilter;
-
-    if (targetMode === 'mock') {
-      navigate('/session/mock-exam', {
-        state: {
-          mode: 'mock',
-          subjectId: 'all',
-          chapterId: 'all',
-          questionCount: 50,
-          timeLimitMinutes: 120,
-        },
-      });
-      return;
-    }
-
-    if (targetMode === 'rapid') {
-      navigate('/session/rapid-sprint', {
-        state: {
-          mode: 'rapid',
-          subjectId: selectedSubject,
-          chapterId: selectedChapter,
-          questionCount: Math.min(scopeCoverage.total, 15),
-          timeLimitMinutes: 15,
-          highYieldOnly: true,
-        },
-      });
-      return;
-    }
-
-    // Practice mode
-    let targetPoolIds: string[] | undefined = undefined;
-    let targetPoolCount = scopeCoverage.total;
-
-    if (activeFilter === 'unanswered') {
-      targetPoolIds = scopeCoverage.unansweredIds;
-      targetPoolCount = scopeCoverage.unanswered;
-    } else if (activeFilter === 'incorrect') {
-      targetPoolIds = scopeCoverage.incorrectIds;
-      targetPoolCount = scopeCoverage.incorrect;
-    }
-
-    const count = effectiveCountMode === 'all'
-      ? targetPoolCount
-      : Math.min(targetPoolCount, effectiveCountMode);
-
-    navigate('/session/practice-now', {
-      state: {
-        mode: 'practice',
-        subjectId: selectedSubject,
-        chapterId: selectedChapter,
-        questionCount: count,
-        questionFilter: activeFilter,
-        questionIds: targetPoolIds ? targetPoolIds.slice(0, count) : undefined,
-        highYieldOnly,
-        timeLimitMinutes: timedSprint ? Math.ceil(count * 1.5) : undefined,
-      },
-    });
-  };
-
-  // Keyboard accelerators (Cmd/Ctrl + Enter to launch, 1/2/3 to switch modes)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is inside a select or typing in an input
-      const target = e.target as HTMLElement;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
-        return;
-      }
-
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        e.preventDefault();
-        handleLaunchSession();
-        return;
-      }
-
-      if (!e.metaKey && !e.ctrlKey && !e.altKey) {
-        if (e.key === '1') {
-          setSelectedMode('practice');
-        } else if (e.key === '2') {
-          setSelectedMode('mock');
-        } else if (e.key === '3') {
-          setSelectedMode('rapid');
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedMode, selectedSubject, selectedChapter, questionCount, highYieldOnly, timedSprint, matchingQuestionCount]);
+  const {
+    taxonomy,
+    questions,
+    t,
+    selectedMode,
+    setSelectedMode,
+    repetitionFilter,
+    setRepetitionFilter,
+    selectedSubject,
+    setSelectedSubject,
+    selectedChapter,
+    setSelectedChapter,
+    questionCount,
+    setQuestionCount,
+    highYieldOnly,
+    setHighYieldOnly,
+    timedSprint,
+    setTimedSprint,
+    showResetBankModal,
+    setShowResetBankModal,
+    availableChapters,
+    scopeCoverage,
+    matchingQuestionCount,
+    effectiveQuestionCount,
+    selectedCategoryLabel,
+    subjectCounts,
+    handleLaunchSession,
+    resetSubjectStats,
+  } = useTestHubCoordinator();
 
   return (
     <div className="relative max-w-5xl mx-auto py-4 sm:py-6 px-3 sm:px-6 space-y-4 sm:space-y-5 animate-apple-entrance">
-      
       {/* 1. Sleek Apple Header Banner with Inline Actions */}
-      <div className="glass-surface rounded-2xl sm:rounded-3xl p-4 sm:p-5 relative overflow-hidden shadow-xs border border-slate-200/70 dark:border-zinc-800">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 relative z-10">
-          <div className="space-y-1">
-            <div className="inline-flex items-center space-x-1.5 rtl:space-x-reverse px-2.5 py-0.5 rounded-full bg-blue-500/10 dark:bg-blue-400/15 border border-blue-500/20 dark:border-blue-400/30 text-blue-700 dark:text-blue-300 text-[11px] font-bold tracking-wide">
-              <Compass className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-              <span>{taxonomy.block.name} {taxonomy.block.code} Exam Platform</span>
-            </div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">
-              {t.test.hubTitle.replace('{blockName}', taxonomy.block.name)}
-            </h1>
-            <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-xl font-medium">
-              {t.test.hubSubtitle}
-            </p>
-          </div>
+      <TestHubHeader
+        blockName={taxonomy.block.name}
+        blockCode={taxonomy.block.code || 'BLOCK'}
+        totalQuestions={questions.length}
+        onResetBank={() => setShowResetBankModal(true)}
+      />
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <div className="glass-pill-luxury px-3.5 py-1.5 rounded-xl flex items-center space-x-2 rtl:space-x-reverse border border-slate-200/60 dark:border-zinc-800">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-xs font-black text-slate-800 dark:text-zinc-200">
-                {questions.length} <span className="font-semibold text-slate-500 dark:text-zinc-400">{t.common.questions}</span>
-              </span>
-            </div>
+      {/* 2. Apple Quick-Launch Presets Dock */}
+      <QuickLaunchPresetsDock
+        onLaunchPreset={(count, mode) => {
+          setSelectedMode(mode);
+          handleLaunchSession(count, mode);
+        }}
+      />
 
-            <button
-              type="button"
-              onClick={() => setShowResetBankModal(true)}
-              className="glass-pill-luxury px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 rtl:space-x-reverse text-slate-600 dark:text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200/60 dark:border-zinc-800 hover:border-rose-400/50 dark:hover:border-rose-500/40 hover:bg-rose-500/10 dark:hover:bg-rose-500/15 cursor-pointer apple-tap transition-all duration-200"
-              title={t.bank.resetToGlobalBtn}
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
-              <span className="hidden sm:inline">{t.bank.resetToGlobalBtn}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Apple Quick-Launch Presets Dock (Instant 1-Tap Access with High-Contrast Themed Hovers) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
-        {/* Preset 1: Instant Practice 20 Qs */}
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedMode('practice');
-            handleLaunchSession(20, 'practice');
-          }}
-          className="group text-left p-3.5 sm:p-4 rounded-2xl glass-surface border border-slate-200/80 dark:border-zinc-800/80 hover:border-blue-500/50 dark:hover:border-blue-400/50 hover:bg-white dark:hover:bg-zinc-800/90 hover:shadow-lg hover:shadow-blue-500/5 dark:hover:shadow-blue-500/10 transition-all duration-200 cursor-pointer apple-tap flex items-center justify-between"
-        >
-          <div className="flex items-center space-x-3 rtl:space-x-reverse min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/10 dark:bg-blue-400/15 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:bg-blue-600 dark:group-hover:bg-blue-500 group-hover:text-white transition-colors duration-200 shadow-2xs">
-              <Zap className="w-4 h-4 fill-current" />
-            </div>
-            <div className="truncate">
-              <div className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-                <span>Instant Practice</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-blue-500/10 dark:bg-blue-400/15 text-blue-700 dark:text-blue-300 group-hover:bg-blue-600/15 dark:group-hover:bg-blue-400/25 font-bold transition-colors">20 Qs</span>
-              </div>
-              <div className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">Immediate tutor rationales</div>
-            </div>
-          </div>
-          <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/50 dark:border-zinc-700/50 flex items-center justify-center text-slate-400 dark:text-zinc-400 group-hover:bg-blue-600 dark:group-hover:bg-blue-500 group-hover:border-transparent group-hover:text-white transition-all duration-200 shrink-0 ml-2">
-            <Play className="w-2.5 h-2.5 fill-current ml-0.5" />
-          </div>
-        </button>
-
-        {/* Preset 2: Rapid Sprint 15 Qs */}
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedMode('rapid');
-            handleLaunchSession(15, 'rapid');
-          }}
-          className="group text-left p-3.5 sm:p-4 rounded-2xl glass-surface border border-slate-200/80 dark:border-zinc-800/80 hover:border-amber-500/50 dark:hover:border-amber-400/50 hover:bg-white dark:hover:bg-zinc-800/90 hover:shadow-lg hover:shadow-amber-500/5 dark:hover:shadow-amber-500/10 transition-all duration-200 cursor-pointer apple-tap flex items-center justify-between"
-        >
-          <div className="flex items-center space-x-3 rtl:space-x-reverse min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 dark:bg-amber-400/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 group-hover:bg-amber-500 dark:group-hover:bg-amber-400 group-hover:text-slate-950 transition-colors duration-200 shadow-2xs">
-              <Flame className="w-4 h-4 fill-current" />
-            </div>
-            <div className="truncate">
-              <div className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-                <span>High-Yield Sprint</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-amber-500/10 dark:bg-amber-400/15 text-amber-700 dark:text-amber-300 group-hover:bg-amber-500/20 dark:group-hover:bg-amber-400/25 font-bold transition-colors">15m</span>
-              </div>
-              <div className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">15 top-yield exam concepts</div>
-            </div>
-          </div>
-          <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/50 dark:border-zinc-700/50 flex items-center justify-center text-slate-400 dark:text-zinc-400 group-hover:bg-amber-500 dark:group-hover:bg-amber-400 group-hover:border-transparent group-hover:text-slate-950 transition-all duration-200 shrink-0 ml-2">
-            <Play className="w-2.5 h-2.5 fill-current ml-0.5" />
-          </div>
-        </button>
-
-        {/* Preset 3: Faculty Mock Exam 50 Qs */}
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedMode('mock');
-            handleLaunchSession(50, 'mock');
-          }}
-          className="group text-left p-3.5 sm:p-4 rounded-2xl glass-surface border border-slate-200/80 dark:border-zinc-800/80 hover:border-indigo-500/50 dark:hover:border-indigo-400/50 hover:bg-white dark:hover:bg-zinc-800/90 hover:shadow-lg hover:shadow-indigo-500/5 dark:hover:shadow-indigo-500/10 transition-all duration-200 cursor-pointer apple-tap flex items-center justify-between"
-        >
-          <div className="flex items-center space-x-3 rtl:space-x-reverse min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 dark:bg-indigo-400/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 group-hover:bg-indigo-600 dark:group-hover:bg-indigo-500 group-hover:text-white transition-colors duration-200 shadow-2xs">
-              <Award className="w-4 h-4 fill-current" />
-            </div>
-            <div className="truncate">
-              <div className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-                <span>Faculty Mock</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-indigo-500/10 dark:bg-indigo-400/15 text-indigo-700 dark:text-indigo-300 group-hover:bg-indigo-600/15 dark:group-hover:bg-indigo-400/25 font-bold transition-colors">50 Qs</span>
-              </div>
-              <div className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">120m timed exam simulation</div>
-            </div>
-          </div>
-          <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/50 dark:border-zinc-700/50 flex items-center justify-center text-slate-400 dark:text-zinc-400 group-hover:bg-indigo-600 dark:group-hover:bg-indigo-500 group-hover:border-transparent group-hover:text-white transition-all duration-200 shrink-0 ml-2">
-            <Play className="w-2.5 h-2.5 fill-current ml-0.5" />
-          </div>
-        </button>
-      </div>
-
-      {/* 3. High-Precision Apple Segmented Mode Switcher with Responsive Hover */}
-      <div className="p-1 rounded-2xl bg-slate-200/60 dark:bg-zinc-900/80 border border-slate-300/40 dark:border-zinc-800/80 backdrop-blur-md">
-        <div className="grid grid-cols-3 gap-1">
-          {/* Practice Mode Tab */}
-          <button
-            type="button"
-            onClick={() => setSelectedMode('practice')}
-            className={`py-2 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center space-x-2 rtl:space-x-reverse cursor-pointer apple-tap ${
-              selectedMode === 'practice'
-                ? 'bg-white dark:bg-zinc-800 text-blue-700 dark:text-blue-300 shadow-sm border border-slate-200/80 dark:border-zinc-700 font-black'
-                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/70 dark:hover:bg-zinc-800/60'
-            }`}
-          >
-            <Zap className={`w-3.5 h-3.5 ${selectedMode === 'practice' ? 'text-blue-600 dark:text-blue-400 fill-blue-500/20' : ''}`} />
-            <span>{t.test.practiceMode}</span>
-            <span className="hidden sm:inline text-[10px] opacity-60 font-mono">[1]</span>
-          </button>
-
-          {/* Mock Exam Tab */}
-          <button
-            type="button"
-            onClick={() => setSelectedMode('mock')}
-            className={`py-2 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center space-x-2 rtl:space-x-reverse cursor-pointer apple-tap ${
-              selectedMode === 'mock'
-                ? 'bg-white dark:bg-zinc-800 text-indigo-700 dark:text-indigo-300 shadow-sm border border-slate-200/80 dark:border-zinc-700 font-black'
-                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/70 dark:hover:bg-zinc-800/60'
-            }`}
-          >
-            <Award className={`w-3.5 h-3.5 ${selectedMode === 'mock' ? 'text-indigo-600 dark:text-indigo-400' : ''}`} />
-            <span>{t.test.mockMode}</span>
-            <span className="hidden sm:inline text-[10px] opacity-60 font-mono">[2]</span>
-          </button>
-
-          {/* Rapid High-Yield Tab */}
-          <button
-            type="button"
-            onClick={() => setSelectedMode('rapid')}
-            className={`py-2 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center space-x-2 rtl:space-x-reverse cursor-pointer apple-tap ${
-              selectedMode === 'rapid'
-                ? 'bg-white dark:bg-zinc-800 text-amber-700 dark:text-amber-300 shadow-sm border border-slate-200/80 dark:border-zinc-700 font-black'
-                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/70 dark:hover:bg-zinc-800/60'
-            }`}
-          >
-            <Flame className={`w-3.5 h-3.5 ${selectedMode === 'rapid' ? 'text-amber-500 fill-amber-500/20' : ''}`} />
-            <span>{t.test.rapidMode}</span>
-            <span className="hidden sm:inline text-[10px] opacity-60 font-mono">[3]</span>
-          </button>
-        </div>
-      </div>
+      {/* 3. High-Precision Apple Segmented Mode Switcher */}
+      <TestModeSegmentedSwitcher
+        selectedMode={selectedMode}
+        onSelectMode={(mode) => setSelectedMode(mode)}
+      />
 
       {/* 4. Streamlined Configuration Console */}
       {selectedMode === 'mock' ? (
-        <div className="glass-surface rounded-2xl sm:rounded-3xl p-5 sm:p-6 space-y-4 border border-slate-200/70 dark:border-zinc-800">
-          <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-zinc-800 pb-3">
-            <div>
-              <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
-                Official Exam Simulation Parameters
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">Faculty Block 206 Standardized Blueprint</p>
-            </div>
-            <span className="px-3 py-1 bg-indigo-500/10 dark:bg-indigo-400/15 border border-indigo-400/30 dark:border-indigo-400/40 text-indigo-700 dark:text-indigo-300 text-xs font-bold rounded-full">
-              Timed Simulation
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="glass-surface p-3.5 rounded-xl text-center border border-slate-200/60 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 transition-colors">
-              <div className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase font-black tracking-wider">Volume</div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-1">50 Questions</div>
-              <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">Stratified across CVS subjects</div>
-            </div>
-
-            <div className="glass-surface p-3.5 rounded-xl text-center border border-slate-200/60 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 transition-colors">
-              <div className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase font-black tracking-wider">Duration</div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-1">120 Minutes</div>
-              <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">144s per Question pacing</div>
-            </div>
-
-            <div className="glass-surface p-3.5 rounded-xl text-center border border-slate-200/60 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 transition-colors">
-              <div className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase font-black tracking-wider">Feedback Mode</div>
-              <div className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">Exam Conditions</div>
-              <div className="text-[11px] text-indigo-600/80 dark:text-indigo-400/80 mt-0.5">Explanations deferred to report</div>
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-slate-900/90 dark:bg-black/80 text-slate-200 border border-slate-800 text-xs space-y-1.5">
-            <div className="flex items-center space-x-1.5 rtl:space-x-reverse text-amber-400 font-bold uppercase tracking-wider text-[11px]">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Standardized Exam Rules</span>
-            </div>
-            <ul className="list-disc list-inside space-y-1 text-slate-300 dark:text-zinc-400 text-[11px]">
-              <li>Keyboard answering (`1`–`4`) records choices silently without feedback.</li>
-              <li>Free question navigation matrix and flagging (Press `F`) available throughout.</li>
-              <li>Comprehensive score report & curriculum revision plan appear upon submission.</li>
-            </ul>
-          </div>
-        </div>
+        <MockExamBlueprintCard />
       ) : (
         <div className="glass-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5 border border-slate-200/70 dark:border-zinc-800">
-          {/* Section 2 Header & Scope */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 dark:border-zinc-800 pb-3">
             <div>
               <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
@@ -538,542 +89,91 @@ export const TestHub: React.FC = () => {
               </h2>
               <p className="text-xs text-slate-500 dark:text-zinc-400">{t.test.scopeSubtitle}</p>
             </div>
-            
+
             <div className="glass-pill-luxury px-3 py-1 rounded-xl text-xs font-bold flex items-center space-x-1.5 rtl:space-x-reverse text-blue-700 dark:text-blue-300 self-start sm:self-auto border border-blue-500/20 dark:border-blue-400/30">
               <Filter className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-              <span>{t.test.matchingQuestions}: <strong className="text-slate-900 dark:text-white font-black">{matchingQuestionCount}</strong></span>
+              <span>
+                {t.test.matchingQuestions}:{' '}
+                <strong className="text-slate-900 dark:text-white font-black">{matchingQuestionCount}</strong>
+              </span>
             </div>
           </div>
 
-          {/* Apple Curriculum Continuity & Real-Time Mastery Progress Card */}
-          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-white/95 via-slate-50/80 to-blue-50/40 dark:from-zinc-900/95 dark:via-zinc-900/80 dark:to-blue-950/25 border border-slate-200/90 dark:border-zinc-800 shadow-xs space-y-3.5 relative overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
-              <div className="flex items-center space-x-3 rtl:space-x-reverse min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-blue-600/10 dark:bg-blue-400/15 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20 shadow-2xs">
-                  <Activity className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white tracking-tight">
-                      {selectedCategoryLabel} Bank Continuity
-                    </h3>
-                    {scopeCoverage.unanswered === 0 && scopeCoverage.total > 0 ? (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 uppercase tracking-wider">
-                        100% Mastered 🎉
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30 uppercase tracking-wider">
-                        {scopeCoverage.percentComplete}% Solved
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium">
-                    {scopeCoverage.answered} of {scopeCoverage.total} completed • <strong className="text-blue-600 dark:text-blue-400 font-bold">{scopeCoverage.unanswered} fresh questions remaining</strong>
-                  </p>
-                </div>
-              </div>
+          {/* Curriculum Continuity & Mastery Progress Card */}
+          <CurriculumScopeProgressCard
+            selectedCategoryLabel={selectedCategoryLabel}
+            scopeCoverage={scopeCoverage}
+            selectedSubject={selectedSubject}
+            onResetSubjectStats={() => resetSubjectStats(selectedSubject, questions)}
+            onContinueBank={() => {
+              setRepetitionFilter('unanswered');
+              handleLaunchSession(Math.min(20, scopeCoverage.unanswered), 'practice', 'unanswered');
+            }}
+            onReviewMissed={() => {
+              setRepetitionFilter('incorrect');
+              handleLaunchSession(scopeCoverage.incorrect, 'practice', 'incorrect');
+            }}
+            onRestartCategory={() => {
+              setRepetitionFilter('all');
+              handleLaunchSession('all', 'practice', 'all');
+            }}
+          />
 
-              {/* Accuracy Pill & Subject Reset */}
-              <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-                <div className="glass-pill-luxury px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-zinc-800 flex items-center space-x-1.5 rtl:space-x-reverse text-xs font-bold text-slate-800 dark:text-zinc-200">
-                  <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>{scopeCoverage.accuracy}% {t.common.accuracy}</span>
-                </div>
-                {selectedSubject !== 'all' && scopeCoverage.answered > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => resetSubjectStats(selectedSubject, questions)}
-                    className="glass-pill-luxury px-2.5 py-1.5 rounded-xl text-[11px] font-semibold text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200/80 dark:border-zinc-800 hover:border-rose-400/50 cursor-pointer apple-tap transition-all"
-                    title={t.test.resetSubjectProgressBtn}
-                  >
-                    <RotateCcw className="w-3 h-3 text-slate-400 hover:text-rose-500 inline mr-1" />
-                    <span>{t.test.resetSubjectProgressBtn}</span>
-                  </button>
-                )}
-              </div>
-            </div>
+          {/* Subject & Chapter Filter Controls */}
+          <CurriculumScopeFilterControls
+            subjects={taxonomy.subjects}
+            availableChapters={availableChapters}
+            selectedSubject={selectedSubject}
+            selectedChapter={selectedChapter}
+            subjectCounts={subjectCounts}
+            blockName={taxonomy.block.name}
+            selectedCategoryLabel={selectedCategoryLabel}
+            highYieldOnly={highYieldOnly}
+            timedSprint={timedSprint}
+            isPracticeMode={selectedMode === 'practice'}
+            onSelectSubject={(subId) => {
+              setSelectedSubject(subId);
+              setSelectedChapter('all');
+            }}
+            onSelectChapter={(chapId) => setSelectedChapter(chapId)}
+            onToggleHighYield={() => setHighYieldOnly(!highYieldOnly)}
+            onToggleTimedSprint={() => setTimedSprint(!timedSprint)}
+          />
 
-            {/* Tri-Color Glassmorphic Progress Bar */}
-            <div className="space-y-1.5">
-              <div className="h-2.5 sm:h-3 w-full bg-slate-200/70 dark:bg-zinc-800/80 rounded-full overflow-hidden flex p-0.5 gap-0.5 shadow-inner">
-                {scopeCoverage.correct > 0 && (
-                  <div
-                    className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                    style={{ width: `${(scopeCoverage.correct / (scopeCoverage.total || 1)) * 100}%` }}
-                    title={`${scopeCoverage.correct} Mastered`}
-                  />
-                )}
-                {scopeCoverage.incorrect > 0 && (
-                  <div
-                    className="h-full bg-rose-500 rounded-full transition-all duration-500"
-                    style={{ width: `${(scopeCoverage.incorrect / (scopeCoverage.total || 1)) * 100}%` }}
-                    title={`${scopeCoverage.incorrect} Missed`}
-                  />
-                )}
-                <div
-                  className="h-full bg-blue-500/20 dark:bg-blue-400/20 rounded-full transition-all duration-500"
-                  style={{ width: `${(scopeCoverage.unanswered / (scopeCoverage.total || 1)) * 100}%` }}
-                  title={`${scopeCoverage.unanswered} Fresh Remaining`}
-                />
-              </div>
-
-              {/* Progress Legend Counters */}
-              <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400 font-semibold px-0.5">
-                <div className="flex items-center gap-3">
-                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    {scopeCoverage.correct} Mastered
-                  </span>
-                  <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400">
-                    <span className="w-2 h-2 rounded-full bg-rose-500" />
-                    {scopeCoverage.incorrect} Missed
-                  </span>
-                  <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                    <span className="w-2 h-2 rounded-full bg-blue-500" />
-                    {scopeCoverage.unanswered} Fresh Remaining
-                  </span>
-                </div>
-                <span className="text-slate-400 dark:text-zinc-500 font-mono text-[10px]">
-                  Total: {scopeCoverage.total} Qs
-                </span>
-              </div>
-            </div>
-
-            {/* Quick Hero Continuity Action Bar */}
-            <div className="pt-1 flex flex-wrap items-center gap-2">
-              {scopeCoverage.unanswered > 0 ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRepetitionFilter('unanswered');
-                      handleLaunchSession(Math.min(20, scopeCoverage.unanswered), 'practice', 'unanswered');
-                    }}
-                    className="px-4 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-xs hover:shadow-md hover:shadow-blue-500/25 flex items-center space-x-2 rtl:space-x-reverse cursor-pointer apple-tap transition-all"
-                  >
-                    <Zap className="w-3.5 h-3.5 fill-current" />
-                    <span>{t.test.continueBankCta} ({scopeCoverage.unanswered} Left)</span>
-                  </button>
-
-                  {scopeCoverage.incorrect > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRepetitionFilter('incorrect');
-                        handleLaunchSession(scopeCoverage.incorrect, 'practice', 'incorrect');
-                      }}
-                      className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 flex items-center space-x-1.5 rtl:space-x-reverse cursor-pointer apple-tap transition-all"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>{t.test.reviewMissedCta.replace('{count}', String(scopeCoverage.incorrect))}</span>
-                    </button>
-                  )}
-                </>
-              ) : (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRepetitionFilter('all');
-                      handleLaunchSession('all', 'practice', 'all');
-                    }}
-                    className="px-4 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-xs hover:shadow-md hover:shadow-emerald-500/25 flex items-center space-x-2 rtl:space-x-reverse cursor-pointer apple-tap transition-all"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>{t.test.restartCategoryBtn} ({scopeCoverage.total} Qs)</span>
-                  </button>
-
-                  {scopeCoverage.incorrect > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRepetitionFilter('incorrect');
-                        handleLaunchSession(scopeCoverage.incorrect, 'practice', 'incorrect');
-                      }}
-                      className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 flex items-center space-x-1.5 rtl:space-x-reverse cursor-pointer apple-tap transition-all"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>{t.test.reviewMissedCta.replace('{count}', String(scopeCoverage.incorrect))}</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Subject Discipline Filter Strip with Refined Hover Feedback */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
-                {t.test.filterSubject}
-              </label>
-              <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">{selectedCategoryLabel}</span>
-            </div>
-            
-            <div className="flex flex-wrap gap-1.5 sm:gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedSubject('all');
-                  setSelectedChapter('all');
-                }}
-                className={`group py-1.5 px-3 rounded-xl text-xs font-bold transition-all duration-150 flex items-center space-x-1.5 rtl:space-x-reverse cursor-pointer apple-tap ${
-                  selectedSubject === 'all'
-                    ? 'bg-blue-600 text-white shadow-xs scale-[1.01]'
-                    : 'glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400/50 dark:hover:border-blue-500/40 hover:bg-blue-50/50 dark:hover:bg-blue-950/20'
-                }`}
-              >
-                <span>{t.test.allSubjects.replace('{blockName}', taxonomy.block.name)}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold transition-colors ${
-                  selectedSubject === 'all' 
-                    ? 'bg-blue-700 text-blue-100' 
-                    : 'bg-slate-200/80 dark:bg-zinc-700/80 text-slate-700 dark:text-zinc-300 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 group-hover:text-blue-700 dark:group-hover:text-blue-300'
-                }`}>
-                  {subjectCounts.all}
-                </span>
-              </button>
-
-              {taxonomy.subjects.map((sub) => (
-                <button
-                  key={sub.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedSubject(sub.id);
-                    setSelectedChapter('all');
-                  }}
-                  className={`group py-1.5 px-3 rounded-xl text-xs font-bold transition-all duration-150 flex items-center space-x-1.5 rtl:space-x-reverse cursor-pointer apple-tap ${
-                    selectedSubject === sub.id
-                      ? 'bg-blue-600 text-white shadow-xs scale-[1.01]'
-                      : 'glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400/50 dark:hover:border-blue-500/40 hover:bg-blue-50/50 dark:hover:bg-blue-950/20'
-                  }`}
-                >
-                  <span>{sub.name.replace(/^(CVS|CNS)\s+/, '')}</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold transition-colors ${
-                    selectedSubject === sub.id 
-                      ? 'bg-blue-700 text-blue-100' 
-                      : 'bg-slate-200/80 dark:bg-zinc-700/80 text-slate-700 dark:text-zinc-300 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 group-hover:text-blue-700 dark:group-hover:text-blue-300'
-                  }`}>
-                    {subjectCounts[sub.id] || 0}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Chapter Selector & Toggles Inline Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 items-end">
-            <div className="sm:col-span-2 space-y-1">
-              <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider block">
-                {t.test.filterChapter}
-              </label>
-              <select
-                value={selectedChapter}
-                onChange={(e) => setSelectedChapter(e.target.value)}
-                className="w-full text-xs font-semibold rounded-xl border border-slate-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-800/90 hover:border-slate-300 dark:hover:border-zinc-700 hover:bg-white dark:hover:bg-zinc-800 py-2.5 px-3 focus:ring-2 focus:ring-blue-500 focus:outline-hidden text-slate-900 dark:text-zinc-100 shadow-xs transition-colors duration-200 cursor-pointer"
-              >
-                <option value="all">
-                  {selectedSubject === 'all' ? t.test.allChapters : t.test.filterChapter}
-                </option>
-                {availableChapters.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {selectedMode === 'practice' && (
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setHighYieldOnly(!highYieldOnly)}
-                  className={`flex-1 py-2.5 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center space-x-1.5 rtl:space-x-reverse border transition-all duration-150 cursor-pointer apple-tap ${
-                    highYieldOnly
-                      ? 'bg-amber-500/15 border-amber-400/60 dark:border-amber-500/50 text-amber-900 dark:text-amber-200 shadow-xs hover:bg-amber-500/20 dark:hover:bg-amber-500/25'
-                      : 'glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-amber-700 dark:hover:text-amber-300 hover:border-amber-400/50 dark:hover:border-amber-500/40 hover:bg-amber-50/50 dark:hover:bg-amber-950/20'
-                  }`}
-                  title={t.test.highYieldSub}
-                >
-                  <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />
-                  <span className="truncate">{t.test.highYieldOnly}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTimedSprint(!timedSprint)}
-                  className={`flex-1 py-2.5 px-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center space-x-1.5 rtl:space-x-reverse border transition-all duration-150 cursor-pointer apple-tap ${
-                    timedSprint
-                      ? 'bg-blue-500/15 border-blue-400/60 dark:border-blue-500/50 text-blue-900 dark:text-blue-200 shadow-xs hover:bg-blue-500/20 dark:hover:bg-blue-500/25'
-                      : 'glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-blue-700 dark:hover:text-blue-300 hover:border-blue-400/50 dark:hover:border-blue-500/40 hover:bg-blue-50/50 dark:hover:bg-blue-950/20'
-                  }`}
-                  title={t.test.timedSprintSub}
-                >
-                  <Clock className="w-3 h-3 text-blue-600 dark:text-blue-400 shrink-0" />
-                  <span className="truncate">{t.test.timedSprint}</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Question Repetition & History Scope Strip */}
+          {/* Repetition Filter Strip */}
           {selectedMode === 'practice' && (
-            <div className="space-y-1.5 pt-1">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider block">
-                  {t.test.repetitionFilterTitle}
-                </label>
-                <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">
-                  {repetitionFilter === 'unanswered'
-                    ? t.test.filterUnansweredDesc
-                    : repetitionFilter === 'incorrect'
-                    ? t.test.filterIncorrectOnlyDesc
-                    : t.test.filterAllPoolDesc}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {/* Tab 1: Fresh / Unanswered */}
-                <button
-                  type="button"
-                  onClick={() => setRepetitionFilter('unanswered')}
-                  className={`p-3 rounded-2xl text-left border transition-all duration-150 cursor-pointer apple-tap flex items-center justify-between ${
-                    repetitionFilter === 'unanswered'
-                      ? 'bg-blue-600/10 dark:bg-blue-500/15 border-blue-500/60 text-blue-900 dark:text-blue-100 shadow-xs'
-                      : 'glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400/40'
-                  }`}
-                >
-                  <div className="min-w-0 pr-2">
-                    <div className="text-xs font-black flex items-center gap-1.5">
-                      <span>{t.test.filterUnanswered}</span>
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                        repetitionFilter === 'unanswered'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'
-                      }`}>
-                        {scopeCoverage.unanswered}
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-slate-500 dark:text-zinc-400 truncate mt-0.5">
-                      Zero duplicates guarantee
-                    </div>
-                  </div>
-                  {repetitionFilter === 'unanswered' && (
-                    <CheckCircle2 className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                  )}
-                </button>
-
-                {/* Tab 2: All Questions */}
-                <button
-                  type="button"
-                  onClick={() => setRepetitionFilter('all')}
-                  className={`p-3 rounded-2xl text-left border transition-all duration-150 cursor-pointer apple-tap flex items-center justify-between ${
-                    repetitionFilter === 'all'
-                      ? 'bg-indigo-600/10 dark:bg-indigo-500/15 border-indigo-500/60 text-indigo-900 dark:text-indigo-100 shadow-xs'
-                      : 'glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-400/40'
-                  }`}
-                >
-                  <div className="min-w-0 pr-2">
-                    <div className="text-xs font-black flex items-center gap-1.5">
-                      <span>{t.test.filterAllPool}</span>
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                        repetitionFilter === 'all'
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'
-                      }`}>
-                        {scopeCoverage.total}
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-slate-500 dark:text-zinc-400 truncate mt-0.5">
-                      Full bank rotation
-                    </div>
-                  </div>
-                  {repetitionFilter === 'all' && (
-                    <CheckCircle2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                  )}
-                </button>
-
-                {/* Tab 3: Missed Only */}
-                <button
-                  type="button"
-                  onClick={() => setRepetitionFilter('incorrect')}
-                  disabled={scopeCoverage.incorrect === 0}
-                  className={`p-3 rounded-2xl text-left border transition-all duration-150 cursor-pointer apple-tap flex items-center justify-between disabled:opacity-40 disabled:cursor-not-allowed ${
-                    repetitionFilter === 'incorrect'
-                      ? 'bg-rose-600/10 dark:bg-rose-500/15 border-rose-500/60 text-rose-900 dark:text-rose-100 shadow-xs'
-                      : 'glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-400/40'
-                  }`}
-                >
-                  <div className="min-w-0 pr-2">
-                    <div className="text-xs font-black flex items-center gap-1.5">
-                      <span>{t.test.filterIncorrectOnly}</span>
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                        repetitionFilter === 'incorrect'
-                          ? 'bg-rose-600 text-white'
-                          : 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'
-                      }`}>
-                        {scopeCoverage.incorrect}
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-slate-500 dark:text-zinc-400 truncate mt-0.5">
-                      Targeted remediation
-                    </div>
-                  </div>
-                  {repetitionFilter === 'incorrect' && (
-                    <CheckCircle2 className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
-                  )}
-                </button>
-              </div>
-            </div>
+            <RepetitionFilterStrip
+              repetitionFilter={repetitionFilter}
+              scopeCoverage={scopeCoverage}
+              onSelectFilter={(filter) => setRepetitionFilter(filter)}
+            />
           )}
 
-          {/* Compact Streamlined Category Test Strip */}
-          <div className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-purple-500/10 dark:from-blue-500/15 dark:via-indigo-500/10 dark:to-purple-500/15 border border-blue-500/20 dark:border-blue-400/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors">
-            <div className="flex items-center space-x-2.5 rtl:space-x-reverse min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Sparkles className="w-3.5 h-3.5" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-black text-slate-900 dark:text-white">
-                    {t.test.testAllCategory}
-                  </span>
-                  <span className="text-[10px] px-2 py-0.2 rounded-full font-bold bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/30">
-                    {matchingQuestionCount} {t.common.questions}
-                  </span>
-                  {questionCount === 'all' && (
-                    <span className="text-[9px] px-1.5 py-0.2 rounded-full font-black bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 uppercase tracking-wide">
-                      {t.test.allCategorySelected}
-                    </span>
-                  )}
-                </div>
-                <p className="text-[11px] text-slate-600 dark:text-zinc-400 truncate">
-                  {t.test.testAllCategoryDesc}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0 self-stretch sm:self-auto">
-              <button
-                type="button"
-                onClick={() => {
-                  setQuestionCount((prev) => (prev === 'all' ? 20 : 'all'));
-                }}
-                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 border cursor-pointer apple-tap flex items-center justify-center space-x-1 rtl:space-x-reverse ${
-                  questionCount === 'all'
-                    ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-600 shadow-xs'
-                    : 'bg-white/80 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-300 border-slate-300/80 dark:border-zinc-700 hover:border-blue-400 dark:hover:border-blue-500/60 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-blue-50/60 dark:hover:bg-blue-950/30'
-                }`}
-              >
-                {questionCount === 'all' ? (
-                  <>
-                    <CheckCircle2 className="w-3 h-3 text-white" />
-                    <span>{t.test.allCategorySelected}</span>
-                  </>
-                ) : (
-                  <span>{t.test.selectFullCategory}</span>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleLaunchSession('all')}
-                disabled={matchingQuestionCount === 0}
-                className="flex-1 sm:flex-none px-3.5 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-xs hover:shadow-md hover:shadow-blue-500/20 dark:hover:shadow-blue-500/30 flex items-center justify-center space-x-1.5 rtl:space-x-reverse cursor-pointer apple-tap disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-              >
-                <Play className="w-3 h-3 fill-current" />
-                <span>{t.test.launchFullCategory}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Question Count Selection Strip with Unified Themed Hover */}
-          {selectedMode === 'practice' && (
-            <div className="space-y-1.5 pt-1">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider block">
-                  {t.test.questionCount}
-                </label>
-                <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">
-                  {effectiveQuestionCount} targeted
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                {[10, 20, 30, 50].map((num) => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => setQuestionCount(num)}
-                    className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all duration-150 border cursor-pointer apple-tap ${
-                      questionCount === num
-                        ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-600 shadow-xs font-black'
-                        : 'glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-300 hover:border-blue-400/50 dark:hover:border-blue-500/40 hover:bg-blue-50/50 dark:hover:bg-blue-950/20'
-                    }`}
-                  >
-                    {num} {t.common.questions}
-                  </button>
-                ))}
-                
-                <button
-                  type="button"
-                  onClick={() => setQuestionCount('all')}
-                  className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all duration-150 border cursor-pointer apple-tap flex items-center justify-center space-x-1 rtl:space-x-reverse col-span-2 sm:col-span-1 ${
-                    questionCount === 'all'
-                      ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-600 shadow-xs font-black'
-                      : 'glass-pill-luxury text-slate-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-300 hover:border-blue-400/50 dark:hover:border-blue-500/40 hover:bg-blue-50/50 dark:hover:bg-blue-950/20'
-                  }`}
-                >
-                  <span>{t.test.allCategoryOption} ({matchingQuestionCount})</span>
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Category Test Launcher & Question Count Selector */}
+          <CategoryTestLauncherStrip
+            matchingQuestionCount={matchingQuestionCount}
+            questionCount={questionCount}
+            effectiveQuestionCount={effectiveQuestionCount}
+            isPracticeMode={selectedMode === 'practice'}
+            onToggleSelectAllCategory={() => {
+              setQuestionCount((prev) => (prev === 'all' ? 20 : 'all'));
+            }}
+            onLaunchAllCategory={() => handleLaunchSession('all')}
+            onSelectQuestionCount={(count) => setQuestionCount(count)}
+          />
         </div>
       )}
 
       {/* 5. Apple Command Deck Launch Bar */}
-      <div className="glass-dark-capsule rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 relative overflow-hidden shadow-lg border border-slate-800">
-        <div className="space-y-0.5 relative z-10 min-w-0">
-          <div className="text-[10px] text-slate-400 uppercase font-black tracking-widest flex items-center gap-1.5">
-            <span>{t.test.matchingQuestions}</span>
-            <span className="text-slate-600">•</span>
-            <span className="text-blue-400 font-bold">{selectedCategoryLabel}</span>
-          </div>
-          <div className="text-base sm:text-lg font-black text-white flex items-center space-x-2 truncate">
-            <span>
-              {selectedMode === 'mock' 
-                ? `50 ${t.common.questions} • 120 Mins ${t.test.mockMode}` 
-                : selectedMode === 'rapid' 
-                ? `${Math.min(matchingQuestionCount, 15)} ${t.test.highYieldOnly}` 
-                : questionCount === 'all'
-                ? `${effectiveQuestionCount} ${t.common.questions} (${repetitionFilter === 'unanswered' ? 'Fresh Only • Zero Duplicates' : t.test.fullCategoryBadge}) • ${t.test.practiceMode}`
-                : `${effectiveQuestionCount} ${t.common.questions} (${repetitionFilter === 'unanswered' ? 'Fresh Only • Zero Duplicates' : 'Standard Pool'}) • ${t.test.practiceMode}`}
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 font-normal flex items-center gap-2">
-            <span>Launch: <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] text-slate-300 font-mono font-bold">⌘↵</kbd></span>
-            <span>Answer: <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] text-slate-300 font-mono font-bold">1</kbd>–<kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] text-slate-300 font-mono font-bold">4</kbd></span>
-          </p>
-        </div>
-
-        <button
-          onClick={() => handleLaunchSession()}
-          disabled={matchingQuestionCount === 0}
-          className={`w-full sm:w-auto py-2.5 sm:py-3 px-5 sm:px-7 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-black flex items-center justify-center space-x-2.5 transition-all duration-200 cursor-pointer shadow-md relative z-10 apple-tap ${
-            matchingQuestionCount === 0
-              ? 'bg-slate-800 text-slate-500 cursor-not-allowed shadow-none'
-              : selectedMode === 'mock'
-              ? 'bg-gradient-to-r from-indigo-500 via-indigo-600 to-indigo-700 hover:from-indigo-400 hover:to-indigo-600 text-white shadow-indigo-500/25 hover:shadow-lg hover:shadow-indigo-500/40 dark:hover:shadow-indigo-400/25 hover:brightness-105 active:brightness-95'
-              : selectedMode === 'rapid'
-              ? 'bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-black shadow-amber-500/25 hover:shadow-lg hover:shadow-amber-500/40 dark:hover:shadow-amber-400/25 hover:brightness-105 active:brightness-95'
-              : 'bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/40 dark:hover:shadow-blue-400/25 hover:brightness-105 active:brightness-95'
-          }`}
-        >
-          <Play className="w-3.5 h-3.5 fill-current" />
-          <span>{selectedMode === 'mock' ? t.test.launchMock : selectedMode === 'rapid' ? t.test.launchRapid : t.test.launchPractice}</span>
-          <ChevronRight className={`w-3.5 h-3.5 ${isRtl ? 'rotate-180' : ''}`} />
-        </button>
-      </div>
+      <CommandDeckLaunchBar
+        selectedCategoryLabel={selectedCategoryLabel}
+        matchingQuestionCount={matchingQuestionCount}
+        effectiveQuestionCount={effectiveQuestionCount}
+        selectedMode={selectedMode}
+        questionCount={questionCount}
+        repetitionFilter={repetitionFilter}
+        onLaunch={() => handleLaunchSession()}
+      />
 
       {/* Global Question Bank Recovery Modal */}
       <ResetBankConfirmationModal
