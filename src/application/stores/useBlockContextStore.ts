@@ -13,13 +13,22 @@ import type {
   BlockSwitchOutcome,
   BlockSwitchError,
 } from '../curriculum/SwitchBlockUseCase.ts';
-import { compositionRoot } from '../composition/clientCompositionRoot.ts';
+import { getCompositionRoot } from '../composition/clientCompositionRoot.ts';
 import type { BlockPackDescriptor } from '../../domain/curriculum/BootBlockResolver.ts';
 import { LegacyTaxonomyAdapter } from '../../domain/curriculum/LegacyTaxonomyAdapter.ts';
 import type { Taxonomy } from '../../domain/model/types.ts';
 import type { ViewerRole } from '../../domain/curriculum/BlockVisibilityPolicy.ts';
 import { useAuthStore } from './useAuthStore.ts';
 import { useLocaleStore } from './useLocaleStore.ts';
+
+function safeGetCatalog() {
+  try {
+    const root = typeof getCompositionRoot === 'function' ? getCompositionRoot() : null;
+    return root?.catalog || null;
+  } catch {
+    return null;
+  }
+}
 
 function getViewerRole(): ViewerRole {
   try {
@@ -61,13 +70,12 @@ export const useBlockContextStoreBase = create<BlockContextState>((set, get) => 
   status: 'booting',
   epoch: 0,
   lastError: null,
-  visibleBlocks: (typeof compositionRoot !== 'undefined' && compositionRoot?.catalog)
-    ? compositionRoot.catalog.list(getViewerRole())
-    : [],
+  visibleBlocks: [],
 
   init: async (deepLink: string | null = null) => {
-    const catalog = compositionRoot.catalog;
-    const initialBlockId = compositionRoot.resolveInitialBlock(deepLink);
+    const root = getCompositionRoot();
+    const catalog = root.catalog;
+    const initialBlockId = root.resolveInitialBlock(deepLink);
     const role = getViewerRole();
 
     set({
@@ -77,7 +85,7 @@ export const useBlockContextStoreBase = create<BlockContextState>((set, get) => 
     });
 
     // Subscribe to cross-tab updates
-    compositionRoot.preference.subscribe((newBlockId) => {
+    root.preference.subscribe((newBlockId) => {
       if (newBlockId !== get().activeBlockId) {
         get().switchBlock(newBlockId, 'cross-tab');
       }
@@ -104,13 +112,14 @@ export const useBlockContextStoreBase = create<BlockContextState>((set, get) => 
   switchBlock: async (to: BlockId, reason: BlockSwitchReason = 'user-switcher') => {
     set({ status: 'switching' });
 
-    const outcome = await compositionRoot.switchBlockUseCase.execute(to, reason);
+    const root = getCompositionRoot();
+    const outcome = await root.switchBlockUseCase.execute(to, reason);
 
     if (outcome.kind === 'committed') {
       set({
         activeBlockId: outcome.to,
         status: 'ready',
-        epoch: compositionRoot.switchBlockUseCase.getCurrentEpoch(),
+        epoch: root.switchBlockUseCase.getCurrentEpoch(),
         lastError: null,
       });
     } else if (outcome.kind === 'rolled-back') {
@@ -133,7 +142,7 @@ export const useBlockContextStore = Object.assign(
       const state = useBlockContextStoreBase.getState();
       return selector ? selector(state) : (state as unknown as U);
     }
-    return useBlockContextStoreBase(selector as any);
+    return useBlockContextStoreBase(selector as (state: BlockContextState) => U);
   },
   useBlockContextStoreBase
 ) as typeof useBlockContextStoreBase;
@@ -152,14 +161,13 @@ export function useActiveBlock() {
   const rawVisible = isSsr
     ? useBlockContextStoreBase.getState().visibleBlocks
     : useBlockContextStore((s) => s.visibleBlocks);
+  const catalog = safeGetCatalog();
   const visibleBlocks = (rawVisible && rawVisible.length > 0)
     ? rawVisible
-    : (typeof compositionRoot !== 'undefined' && compositionRoot?.catalog ? compositionRoot.catalog.list(getViewerRole()) : []);
+    : (catalog ? catalog.list(getViewerRole()) : []);
   const switchBlock = useBlockContextStoreBase.getState().switchBlock;
 
-  const pack = (typeof compositionRoot !== 'undefined' && compositionRoot?.catalog)
-    ? compositionRoot.catalog.get(activeBlockId)
-    : null;
+  const pack = catalog ? catalog.get(activeBlockId) : null;
   const manifest: BlockManifest | null = pack ? pack.manifest : null;
 
   return {
@@ -181,12 +189,11 @@ export function useActiveTaxonomy(): Taxonomy {
   const locale = isSsr
     ? useLocaleStore.getState().locale
     : useLocaleStore((s) => s.locale);
+  const catalog = safeGetCatalog();
 
   if (isSsr) {
     if (!manifest) {
-      const cvsPack = (typeof compositionRoot !== 'undefined' && compositionRoot?.catalog)
-        ? compositionRoot.catalog.get('cvs' as BlockId)
-        : null;
+      const cvsPack = catalog ? catalog.get('cvs' as BlockId) : null;
       if (cvsPack) {
         return LegacyTaxonomyAdapter.manifestToTaxonomy(cvsPack.manifest, locale);
       }
@@ -197,13 +204,11 @@ export function useActiveTaxonomy(): Taxonomy {
   // eslint-disable-next-line react-hooks/rules-of-hooks
   return useMemo(() => {
     if (!manifest) {
-      const cvsPack = (typeof compositionRoot !== 'undefined' && compositionRoot?.catalog)
-        ? compositionRoot.catalog.get('cvs' as BlockId)
-        : null;
+      const cvsPack = catalog ? catalog.get('cvs' as BlockId) : null;
       if (cvsPack) {
         return LegacyTaxonomyAdapter.manifestToTaxonomy(cvsPack.manifest, locale);
       }
     }
     return LegacyTaxonomyAdapter.manifestToTaxonomy(manifest!, locale);
-  }, [manifest, locale]);
+  }, [manifest, locale, catalog]);
 }
