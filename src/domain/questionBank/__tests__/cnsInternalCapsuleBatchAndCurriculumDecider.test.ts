@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { QuestionParsingAgent } from '../aiQuestionParser/QuestionParsingAgent.ts';
-import { curriculumClassificationAgent } from '../../taxonomy/CurriculumClassificationAgent.ts';
 import { CurriculumTaxonomyRegistry } from '../../taxonomy/CurriculumTaxonomyRegistry.ts';
 import { CrossModelVerificationPromptBuilder } from '../aiQuestionParser/CrossModelVerificationPromptBuilder.ts';
 import { DirectJsonQuestionStrategy } from '../aiQuestionParser/DirectJsonQuestionStrategy.ts';
+import type { BlockId } from '../../curriculum/ids.ts';
 
 const RAW_12_ITEM_CNS_BATCH = `
 ## Question 1 of 12 [Concept: Definition and Trajectory of Projection Fibers]
@@ -169,7 +169,7 @@ describe('CNS Internal Capsule Ingestion & Curriculum Decider Verification', () 
       rawText: RAW_12_ITEM_CNS_BATCH,
       providerId: 'gemini',
       modelId: 'gemini-2.5-flash',
-      targetBlockId: 'cns',
+      targetBlockId: 'cns' as BlockId,
       targetSubjectId: 'auto',
       targetChapterId: 'auto',
     });
@@ -203,7 +203,7 @@ describe('CNS Internal Capsule Ingestion & Curriculum Decider Verification', () 
       rawText: RAW_12_ITEM_CNS_BATCH,
       providerId: 'gemini',
       modelId: 'gemini-2.5-flash',
-      targetBlockId: 'cns',
+      targetBlockId: 'cns' as BlockId,
     });
 
     const batchPrompt = CrossModelVerificationPromptBuilder.buildBatchQuestionsPrompt(result.items);
@@ -251,7 +251,9 @@ describe('CNS Internal Capsule Ingestion & Curriculum Decider Verification', () 
       ],
       {
         rawText: '',
-        targetBlockId: 'cns',
+        providerId: 'gemini',
+        modelId: 'gemini-2.5-flash',
+        targetBlockId: 'cns' as BlockId,
       },
       'cns',
       Date.now()
