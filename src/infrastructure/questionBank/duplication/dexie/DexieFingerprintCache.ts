@@ -13,6 +13,8 @@ import type {
   AnswerKeyHash,
   CanonicalItemHash,
   CanonicalStemHash,
+  EmbeddingModelId,
+  NormalizerVersion,
   QuestionFingerprint,
 } from '../../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
 
@@ -142,14 +144,14 @@ export class DexieFingerprintCache {
       questionId: record.questionId,
       blockId: record.blockId,
       chapterId: record.chapterId,
-      normalizerVersion: record.normalizerVersion as any,
+      normalizerVersion: record.normalizerVersion as NormalizerVersion,
       stemHash: record.stemHash as CanonicalStemHash,
       itemHash: record.itemHash as CanonicalItemHash,
       answerKeyHash: record.answerKeyHash as AnswerKeyHash,
       minhash: minhashArr,
       lshBands: record.lshBands,
       discriminators: record.discriminators,
-      embeddingModel: record.embeddingModel as any,
+      embeddingModel: (record.embeddingModel as EmbeddingModelId) || null,
       embeddedAt: record.embeddedAt,
       contentVersion: record.contentVersion,
     };
