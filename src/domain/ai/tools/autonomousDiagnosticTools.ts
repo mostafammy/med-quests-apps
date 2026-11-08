@@ -123,8 +123,9 @@ export class InspectTelemetryTool implements IAgentTool<InspectTelemetryArgs, St
     const snap = questionTelemetryTracker.getSnapshot();
     const timeSpent = questionTelemetryTracker.getTimeSpentSeconds();
 
-    const topicAcc = ctx.safeContext?.signals?.topicAccuracy ?? 0.7;
-    const streak = ctx.safeContext?.signals?.dangerZoneCountOnTopic ?? 0;
+    const safeCtx = ctx.safeContext as { signals?: { topicAccuracy?: number; dangerZoneCountOnTopic?: number } } | undefined;
+    const topicAcc = safeCtx?.signals?.topicAccuracy ?? 0.7;
+    const streak = safeCtx?.signals?.dangerZoneCountOnTopic ?? 0;
 
     return {
       kind: 'student_telemetry',
