@@ -9,7 +9,16 @@ import type {
   IAgentTool,
   ToolExecutionContext,
   AgentToolResultPayload,
+  ToolExecutionQuestionShape,
 } from './toolTypes.ts';
+
+export type {
+  AgentToolName,
+  IAgentTool,
+  ToolExecutionContext,
+  AgentToolResultPayload,
+  ToolExecutionQuestionShape,
+};
 import {
   AnalyzeVignetteTool,
   InspectTelemetryTool,
@@ -128,7 +137,8 @@ export class AgentToolRegistry {
     }
 
     // Policy gate check
-    if (ctx.safeContext.kind === 'proctor') {
+    const safeContext = ctx.safeContext as SafeAiContext | undefined;
+    if (safeContext?.kind === 'proctor') {
       return {
         callId,
         toolName: tool.name,
