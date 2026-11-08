@@ -3,87 +3,37 @@ import {
   X,
   Shield,
   Sliders,
-  AlertTriangle,
-  Lock,
-  Unlock,
-  CheckCircle,
   History,
   Users,
   BarChart3,
   Sparkles,
   Globe,
-  Cpu,
-  Search,
   Activity,
-  Ban,
-  GraduationCap,
-  CheckCircle2,
-  Laptop,
-  Smartphone,
   ExternalLink,
   Trash2,
   BookOpen,
   Zap,
-  Copy,
-  Check,
-  Server,
   UploadCloud,
 } from 'lucide-react';
 import { QuestionBankGovernancePanel } from '../admin/QuestionBankGovernancePanel.tsx';
 import { AdminAccuracyAuditCenter } from '../admin/accuracyAudit/AdminAccuracyAuditCenter.tsx';
 import { AdminAiQuestionParserLab } from '../admin/aiQuestionParser/AdminAiQuestionParserLab.tsx';
 import { LiveEdgeObservabilityPortal } from '../admin/observability/LiveEdgeObservabilityPortal.tsx';
+import { AdminNetworkTelemetryTab } from '../admin/governanceTabs/AdminNetworkTelemetryTab.tsx';
+import { AdminCohortAnalyticsTab } from '../admin/governanceTabs/AdminCohortAnalyticsTab.tsx';
+import { AdminUserDirectoryTab } from '../admin/governanceTabs/AdminUserDirectoryTab.tsx';
+import { AdminSecurityAuditTrailTab } from '../admin/governanceTabs/AdminSecurityAuditTrailTab.tsx';
 import {
   useAuthStore,
   type GovernanceViewTab,
 } from '../../../application/stores/useAuthStore.ts';
-import type { UserRole, FeatureFlagKey, PerformanceOverrideMode } from '../../../domain/auth/types.ts';
-import { ROLE_ENTITLEMENT_POLICIES } from '../../../domain/auth/entitlements.ts';
+import type { UserRole } from '../../../domain/auth/types.ts';
 import {
   computePlatformAnalytics,
   filterManagedUsers,
   type AiFeatureFilterMode,
   type RestrictionFilterMode,
 } from '../../../domain/auth/governanceAnalytics.ts';
-
-function getCountryFlag(code?: string | null): string {
-  if (!code || code === 'DEV') return '🌐';
-  const c = code.toUpperCase();
-  if (c.length !== 2) return '🌐';
-  const codePoints = [...c].map((char) => 127397 + char.charCodeAt(0));
-  return String.fromCodePoint(...codePoints);
-}
-
-const FEATURE_FLAG_META: ReadonlyArray<{
-  readonly key: FeatureFlagKey;
-  readonly title: string;
-  readonly description: string;
-}> = [
-  {
-    key: 'ai_cloud_streaming_quota',
-    title: 'Cloud AI Co-Pilot Streaming',
-    description:
-      'Activates high-speed Groq/Gemini cloud reasoning. Turn OFF to exclude this user and restrict to local offline tutor.',
-  },
-  {
-    key: 'question_studio_author',
-    title: 'Question Studio Authoring (/studio)',
-    description:
-      'Grants access to author, edit, and verify clinical vignettes in the faculty Question Studio.',
-  },
-  {
-    key: 'multi_block_unlock',
-    title: 'Multi-Block Curriculum Access',
-    description:
-      'Unlocks early access to upcoming organ system blocks alongside Cardiovascular (CVS).',
-  },
-  {
-    key: 'cloud_sync_backup',
-    title: 'Cloud CRDT Progress Synchronization',
-    description:
-      'Enables cross-device background synchronization of attempts, SM-2 cards, and notes.',
-  },
-];
 
 export const AdminGovernanceDrawer: React.FC = () => {
   const {
@@ -110,14 +60,9 @@ export const AdminGovernanceDrawer: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
   const [restrictionFilter, setRestrictionFilter] = useState<RestrictionFilterMode>('all');
   const [aiFeatureFilter, setAiFeatureFilter] = useState<AiFeatureFilterMode>('all');
-  const [blockReasonInput, setBlockReasonInput] = useState('');
-  const [selectedSessionIdx, setSelectedSessionIdx] = useState(0);
   const [copiedIp, setCopiedIp] = useState<string | null>(null);
 
-  const analytics = useMemo(
-    () => computePlatformAnalytics(managedUsers),
-    [managedUsers]
-  );
+  const analytics = useMemo(() => computePlatformAnalytics(managedUsers), [managedUsers]);
 
   const filteredUsers = useMemo(
     () =>
@@ -154,6 +99,14 @@ export const AdminGovernanceDrawer: React.FC = () => {
     const set = new Set<string>();
     for (const s of allSessionsWithUser) {
       if (s.edgeNetwork?.colo) set.add(s.edgeNetwork.colo);
+    }
+    return Array.from(set);
+  }, [allSessionsWithUser]);
+
+  const distinctGpus = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of allSessionsWithUser) {
+      if (s.device.gpuRenderer) set.add(s.device.gpuRenderer);
     }
     return Array.from(set);
   }, [allSessionsWithUser]);
@@ -212,12 +165,28 @@ export const AdminGovernanceDrawer: React.FC = () => {
               className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-zinc-900 hover:bg-black dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 py-2.5 px-4 font-semibold text-xs shadow-sm cursor-pointer transition-all apple-tap"
             >
               <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                />
               </svg>
-              <span>{isAuthenticatedNonAdmin ? 'Switch to Administrator Account' : 'Sign in with Google'}</span>
+              <span>
+                {isAuthenticatedNonAdmin
+                  ? 'Switch to Administrator Account'
+                  : 'Sign in with Google'}
+              </span>
             </button>
           </div>
 
@@ -237,45 +206,6 @@ export const AdminGovernanceDrawer: React.FC = () => {
     managedUsers.find((u) => u.profile.id === selectedManagedUserId) ??
     filteredUsers[0] ??
     managedUsers[0];
-
-  const targetUser = selectedRecord?.profile;
-  const targetEntitlements = selectedRecord?.entitlements;
-  const targetStats = selectedRecord?.studyTelemetry;
-  const isTargetBlocked = targetUser?.restriction.status === 'blocked';
-  const isTargetSuspended = targetUser?.restriction.status === 'suspended';
-
-  const handleRoleChange = async (newRole: UserRole) => {
-    if (!targetUser) return;
-    await updateUserRole(targetUser.id, newRole);
-  };
-
-  const handleToggleFeature = async (flag: FeatureFlagKey) => {
-    if (!targetUser || !targetEntitlements) return;
-    const currentVal = Boolean(targetEntitlements[flag]);
-    await updateUserRole(targetUser.id, targetUser.role, { [flag]: !currentVal });
-  };
-
-  const handleEnforceRestriction = async (status: 'active' | 'blocked' | 'suspended') => {
-    if (!targetUser) return;
-    const defaultReason =
-      status === 'blocked'
-        ? 'Administrative security ban: policy violation / credential sharing.'
-        : status === 'suspended'
-        ? 'Temporary 24h security hold: anomalous multi-region session activity.'
-        : null;
-    const untilIso =
-      status === 'suspended'
-        ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-        : null;
-
-    await setUserRestriction(
-      targetUser.id,
-      status,
-      blockReasonInput.trim() || defaultReason,
-      untilIso
-    );
-    setBlockReasonInput('');
-  };
 
   return (
     <div
@@ -427,1189 +357,76 @@ export const AdminGovernanceDrawer: React.FC = () => {
 
         {/* Body Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-          {/* ========================================================= */}
-          {/* TAB PREMIER: LIVE CLOUDFLARE EDGE & COHORT OBSERVABILITY   */}
-          {/* ========================================================= */}
-          {activeGovernanceTab === 'cloud-observability' && (
-            <LiveEdgeObservabilityPortal />
-          )}
+          {activeGovernanceTab === 'cloud-observability' && <LiveEdgeObservabilityPortal />}
 
-          {/* ========================================================= */}
-          {/* TAB 0: LIVE EDGE NETWORK, IPS & SECURITY FORENSICS         */}
-          {/* ========================================================= */}
           {activeGovernanceTab === 'network-telemetry' && (
-            <div className="space-y-6">
-              {/* Top 4 Global KPI Cards */}
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-2xl border border-zinc-200/80 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <div className="flex items-center justify-between text-xs font-semibold text-zinc-500">
-                    <span>Edge Public IPs</span>
-                    <Globe className="h-4 w-4 text-blue-500" />
-                  </div>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-2xl font-bold font-heading text-blue-600 dark:text-blue-400">
-                      {distinctIps.length}
-                    </span>
-                    <span className="text-[10px] font-semibold text-emerald-600">Active</span>
-                  </div>
-                  <p className="text-[10px] text-zinc-400 mt-0.5">Cloudflare Anycast</p>
-                </div>
-
-                <div className="rounded-2xl border border-zinc-200/80 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <div className="flex items-center justify-between text-xs font-semibold text-zinc-500">
-                    <span>Edge Colocations</span>
-                    <Server className="h-4 w-4 text-amber-500" />
-                  </div>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-2xl font-bold font-heading text-amber-600 dark:text-amber-400">
-                      {distinctColos.length}
-                    </span>
-                    <span className="text-[10px] font-semibold text-amber-500">PoPs</span>
-                  </div>
-                  <p className="text-[10px] text-zinc-400 mt-0.5">{distinctColos.join(' • ')}</p>
-                </div>
-
-                <div className="rounded-2xl border border-zinc-200/80 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <div className="flex items-center justify-between text-xs font-semibold text-zinc-500">
-                    <span>Hardware Tier</span>
-                    <Cpu className="h-4 w-4 text-indigo-500" />
-                  </div>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-2xl font-bold font-heading text-indigo-600 dark:text-indigo-400">
-                      {allSessionsWithUser.filter((s) => s.device.marketTier === 'flagship-luxury').length}
-                    </span>
-                    <span className="text-[10px] font-semibold text-indigo-500">Flagship</span>
-                  </div>
-                  <p className="text-[10px] text-zinc-400 mt-0.5">Apple Silicon / Adreno</p>
-                </div>
-
-                <div className="rounded-2xl border border-zinc-200/80 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <div className="flex items-center justify-between text-xs font-semibold text-zinc-500">
-                    <span>Zero-Trust TLS</span>
-                    <Shield className="h-4 w-4 text-emerald-500" />
-                  </div>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-2xl font-bold font-heading text-emerald-600 dark:text-emerald-400">
-                      HTTP/3
-                    </span>
-                    <span className="text-[10px] font-semibold text-emerald-500">TLSv1.3</span>
-                  </div>
-                  <p className="text-[10px] text-zinc-400 mt-0.5">JA4 Fingerprints active</p>
-                </div>
-              </div>
-
-              {/* Edge IP & Sessions Table */}
-              <div className="rounded-2xl border border-zinc-200/80 bg-white dark:border-zinc-800 dark:bg-zinc-900 shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between">
-                  <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                      Live Connecting Public IP Addresses & Edge Nodes
-                    </h4>
-                    <p className="text-[11px] text-zinc-400">
-                      Every connecting scholar's IPv4/IPv6 address, geolocation, ISP, and hardware telemetry
-                    </p>
-                  </div>
-                  {copiedIp && (
-                    <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
-                      <Check className="h-3 w-3" /> Copied {copiedIp}
-                    </span>
-                  )}
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-zinc-50 dark:bg-zinc-850/60 text-zinc-500 uppercase text-[10px] font-bold">
-                      <tr>
-                        <th className="py-2.5 px-3">IP Address</th>
-                        <th className="py-2.5 px-3">Location & Flag</th>
-                        <th className="py-2.5 px-3">Colo & ISP</th>
-                        <th className="py-2.5 px-3">Scholar & Role</th>
-                        <th className="py-2.5 px-3">Device & Silicon</th>
-                        <th className="py-2.5 px-3">Study Stats</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800">
-                      {allSessionsWithUser.map((sess) => (
-                        <tr key={sess.sessionId} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-850/40">
-                          <td className="py-2.5 px-3 font-mono font-bold text-zinc-900 dark:text-zinc-100">
-                            <div className="flex items-center gap-1.5">
-                              <span>{sess.edgeNetwork.ipAddress}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleCopyIp(sess.edgeNetwork.ipAddress)}
-                                className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer"
-                                title="Copy IP"
-                              >
-                                {copiedIp === sess.edgeNetwork.ipAddress ? (
-                                  <Check className="h-3 w-3 text-emerald-500" />
-                                ) : (
-                                  <Copy className="h-3 w-3" />
-                                )}
-                              </button>
-                            </div>
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <div className="flex items-center gap-1 text-[11px]">
-                              <span>{getCountryFlag(sess.edgeNetwork.countryCode)}</span>
-                              <span>{sess.edgeNetwork.city || 'Edge Node'}, {sess.edgeNetwork.countryCode}</span>
-                            </div>
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <span className="rounded bg-amber-500/10 font-mono text-[10px] font-bold text-amber-700 dark:text-amber-300 px-1.5 py-0.2 mr-1">
-                              {sess.edgeNetwork.colo}
-                            </span>
-                            <span className="text-[10px] text-zinc-400 truncate">
-                              {sess.edgeNetwork.ispOrganization || 'Edge'}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <div className="font-semibold text-zinc-900 dark:text-zinc-100">{sess.user.displayName}</div>
-                            <div className="text-[10px] text-zinc-400 truncate max-w-[120px]">{sess.user.email}</div>
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <div className="font-medium text-zinc-800 dark:text-zinc-200">{sess.device.deviceName}</div>
-                            <div className="text-[10px] text-indigo-500 font-mono truncate max-w-[130px]">
-                              {sess.device.gpuRenderer || 'WebGL'}
-                            </div>
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <div className="font-bold text-zinc-800 dark:text-zinc-200">
-                              {sess.userRecord.studyTelemetry.totalAttempts} Qs • {sess.userRecord.studyTelemetry.overallAccuracy}%
-                            </div>
-                            <div className="text-[10px] text-zinc-400">
-                              {sess.userRecord.studyTelemetry.masteryPercentage}% CVS Mastery
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            <AdminNetworkTelemetryTab
+              allSessionsWithUser={allSessionsWithUser}
+              distinctIps={distinctIps}
+              distinctColos={distinctColos}
+              distinctGpus={distinctGpus}
+              copiedIp={copiedIp}
+              onCopyIp={handleCopyIp}
+            />
           )}
 
-          {/* ========================================================= */}
-          {/* TAB 1: CURRICULUM QUESTION BANK & REVIEW QUEUE            */}
-          {/* ========================================================= */}
           {activeGovernanceTab === 'question-bank' && (
             <div className="py-2">
               <QuestionBankGovernancePanel />
             </div>
           )}
 
-          {/* ========================================================= */}
-          {/* TAB: ACCURACY AUDIT LAB                                   */}
-          {/* ========================================================= */}
           {activeGovernanceTab === 'accuracy-audit' && (
             <div className="py-2">
               <AdminAccuracyAuditCenter />
             </div>
           )}
 
-          {/* ========================================================= */}
-          {/* TAB: AI QUESTION INGESTION & ANTI-HALLUCINATION LAB       */}
-          {/* ========================================================= */}
           {activeGovernanceTab === 'ai-question-parser' && (
             <div className="py-2">
               <AdminAiQuestionParserLab />
             </div>
           )}
 
-          {/* ========================================================= */}
-          {/* TAB 1: GLOBAL COHORT & TELEMETRY ANALYTICS DASHBOARD      */}
-          {/* ========================================================= */}
           {activeGovernanceTab === 'cohort-analytics' && (
-            <div className="space-y-6">
-              {/* Top 4 Global KPI Cards */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-2xl border border-zinc-200/80 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <div className="flex items-center justify-between text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                    <span>Total Platform Scholars</span>
-                    <Users className="h-4 w-4 text-blue-500" />
-                  </div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-100">
-                      {analytics.totalUsers}
-                    </span>
-                    <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                      {analytics.activeUsersCount} active • {analytics.blockedOrSuspendedCount} restricted
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] text-zinc-400">
-                    {analytics.totalActiveSessions} live edge device sessions
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-zinc-200/80 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <div className="flex items-center justify-between text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                    <span>Global Study Telemetry</span>
-                    <Activity className="h-4 w-4 text-emerald-500" />
-                  </div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-100">
-                      {analytics.globalTotalAttempts.toLocaleString()}
-                    </span>
-                    <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">
-                      attempts
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] text-zinc-400">
-                    {analytics.globalAverageAccuracy}% Mean Accuracy • {analytics.globalAverageMastery}% Mastery
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-zinc-200/80 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <div className="flex items-center justify-between text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                    <span>Cloud AI Entitlements</span>
-                    <Sparkles className="h-4 w-4 text-indigo-500" />
-                  </div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-100">
-                      {analytics.aiCloudEnabledUsersCount}
-                    </span>
-                    <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
-                      enabled ({analytics.aiCloudExcludedUsersCount} excluded)
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] text-zinc-400">
-                    {analytics.totalDailyAiRequestsUsed} / {analytics.totalDailyAiRequestsCapacity} daily AI calls used
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-zinc-200/80 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <div className="flex items-center justify-between text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                    <span>Edge KV Cache Speed</span>
-                    <Globe className="h-4 w-4 text-amber-500" />
-                  </div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-100">
-                      {analytics.globalAvgEdgeLatencyMs}ms
-                    </span>
-                    <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                      {analytics.globalKvHitRatePercent}% KV Hit
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] text-zinc-400">
-                    HTTP/3 + TLSv1.3 zero-blocking verification
-                  </p>
-                </div>
-              </div>
-
-              {/* Security Anomaly Radar Banner */}
-              <div className="flex flex-col justify-between gap-4 rounded-2xl border border-red-500/25 bg-red-500/5 p-4 sm:flex-row sm:items-center dark:border-red-500/30 dark:bg-red-950/20">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
-                    <AlertTriangle className="h-4 w-4" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider">
-                      Edge Security & Account-Sharing Anomaly Radar
-                    </h3>
-                  </div>
-                  <p className="text-xs text-zinc-600 dark:text-zinc-300">
-                    Detected{' '}
-                    <span className="font-bold text-red-600 dark:text-red-400">
-                      {analytics.anomalousUsersCount} user(s)
-                    </span>{' '}
-                    with security flags: Impossible Travel ({analytics.anomalyBreakdown.impossible_travel_geo_shift}), Excessive Concurrent Devices ({analytics.anomalyBreakdown.excessive_concurrent_devices}), High Threat IP ({analytics.anomalyBreakdown.high_threat_ip_score}).
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRestrictionFilter('anomalous');
-                      setGovernanceTab('user-directory');
-                    }}
-                    className="rounded-xl border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 cursor-pointer dark:border-red-800 dark:bg-zinc-900 dark:text-red-300"
-                  >
-                    Inspect Flagged Users
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void quarantineAnomalousAccounts()}
-                    className="rounded-xl bg-red-600 px-3.5 py-2 text-xs font-semibold text-white shadow hover:bg-red-700 cursor-pointer"
-                  >
-                    Quarantine Flagged Accounts
-                  </button>
-                </div>
-              </div>
-
-              {/* University Cohort Performance Table */}
-              <div className="rounded-2xl border border-zinc-200/80 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <GraduationCap className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                      University Cohort Performance & AI Adoption
-                    </h3>
-                  </div>
-                  <span className="text-[11px] text-zinc-400">
-                    Aggregated from collected study attempts & mastery cards
-                  </span>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-zinc-200/70 text-[11px] uppercase text-zinc-400 dark:border-zinc-800">
-                        <th className="pb-2 font-semibold">Medical Institution</th>
-                        <th className="pb-2 font-semibold">Scholars</th>
-                        <th className="pb-2 font-semibold">Total Attempts</th>
-                        <th className="pb-2 font-semibold">Mean Accuracy</th>
-                        <th className="pb-2 font-semibold">Block Mastery</th>
-                        <th className="pb-2 font-semibold">Cloud AI Active</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-200/50 dark:divide-zinc-800/60">
-                      {analytics.universityCohorts.map((cohort) => (
-                        <tr key={cohort.universityName} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30">
-                          <td className="py-2.5 font-medium text-zinc-900 dark:text-zinc-100">
-                            {cohort.universityName}
-                          </td>
-                          <td className="py-2.5 text-zinc-600 dark:text-zinc-400">
-                            {cohort.scholarsCount}
-                          </td>
-                          <td className="py-2.5 font-mono text-zinc-700 dark:text-zinc-300">
-                            {cohort.totalAttempts.toLocaleString()}
-                          </td>
-                          <td className="py-2.5">
-                            <span className="rounded-full bg-blue-500/10 px-2 py-0.5 font-semibold text-blue-700 dark:text-blue-300">
-                              {cohort.avgAccuracy}%
-                            </span>
-                          </td>
-                          <td className="py-2.5">
-                            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-700 dark:text-emerald-300">
-                              {cohort.avgMastery}%
-                            </span>
-                          </td>
-                          <td className="py-2.5 text-zinc-600 dark:text-zinc-400">
-                            {cohort.aiEnabledCount} / {cohort.scholarsCount} scholars
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Two-Column Breakdown: Edge Colocations & Client Hardware Tiers */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {/* Cloudflare Edge PoP Distribution */}
-                <div className="rounded-2xl border border-zinc-200/80 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Globe className="h-4 w-4 text-amber-500" />
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                      Cloudflare Edge Data Centers (request.cf)
-                    </h4>
-                  </div>
-                  <div className="space-y-2.5">
-                    {analytics.coloDistribution.map((c) => (
-                      <div
-                        key={c.colo}
-                        className="flex items-center justify-between rounded-xl border border-zinc-200/60 bg-zinc-50/70 px-3 py-2 text-xs dark:border-zinc-800 dark:bg-zinc-800/40"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="rounded-lg bg-amber-500/15 px-2 py-0.5 font-mono text-[11px] font-bold text-amber-700 dark:text-amber-300">
-                            {c.colo}
-                          </span>
-                          <span className="font-medium text-zinc-800 dark:text-zinc-200">
-                            {c.city ?? c.countryCode} ({c.countryCode})
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 text-[11px] text-zinc-500 dark:text-zinc-400">
-                          <span>{c.activeSessionsCount} sess</span>
-                          <span className="font-mono text-emerald-600 dark:text-emerald-400">
-                            {c.avgLatencyMs}ms
-                          </span>
-                          <span>{c.kvHitRatioPercent}% KV hit</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Adaptive Hardware Compositor Tiers & Roles */}
-                <div className="rounded-2xl border border-zinc-200/80 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Cpu className="h-4 w-4 text-indigo-500" />
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                      Client Hardware Tiers & Role Distribution
-                    </h4>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between rounded-xl border border-zinc-200/60 bg-zinc-50/70 px-3 py-2 text-xs dark:border-zinc-800 dark:bg-zinc-800/40">
-                      <span className="font-medium">Ultra Tier (120Hz ProMotion Spring)</span>
-                      <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                        {analytics.tierBreakdown.ultra} devices
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-xl border border-zinc-200/60 bg-zinc-50/70 px-3 py-2 text-xs dark:border-zinc-800 dark:bg-zinc-800/40">
-                      <span className="font-medium">Balanced Tier (60fps GPU Compositor)</span>
-                      <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
-                        {analytics.tierBreakdown.balanced} devices
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-xl border border-zinc-200/60 bg-zinc-50/70 px-3 py-2 text-xs dark:border-zinc-800 dark:bg-zinc-800/40">
-                      <span className="font-medium">Low-Spec Saver (Zero-Blur &lt;16ms Input)</span>
-                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                        {analytics.tierBreakdown['low-spec']} devices
-                      </span>
-                    </div>
-                    <div className="pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 grid grid-cols-2 gap-1.5 text-[11px]">
-                      <div className="rounded-lg bg-amber-500/10 px-2.5 py-1 flex items-center justify-between">
-                        <span className="font-semibold text-amber-800 dark:text-amber-300">Flagship / Luxury</span>
-                        <span className="font-mono font-bold text-amber-700 dark:text-amber-300">
-                          {analytics.marketTierBreakdown['flagship-luxury']}
-                        </span>
-                      </div>
-                      <div className="rounded-lg bg-indigo-500/10 px-2.5 py-1 flex items-center justify-between">
-                        <span className="font-semibold text-indigo-800 dark:text-indigo-300">Upper Mid-Range</span>
-                        <span className="font-mono font-bold text-indigo-700 dark:text-indigo-300">
-                          {analytics.marketTierBreakdown['upper-midrange']}
-                        </span>
-                      </div>
-                      <div className="rounded-lg bg-blue-500/10 px-2.5 py-1 flex items-center justify-between">
-                        <span className="font-semibold text-blue-800 dark:text-blue-300">Mid-Range</span>
-                        <span className="font-mono font-bold text-blue-700 dark:text-blue-300">
-                          {analytics.marketTierBreakdown['mid-range']}
-                        </span>
-                      </div>
-                      <div className="rounded-lg bg-emerald-500/10 px-2.5 py-1 flex items-center justify-between">
-                        <span className="font-semibold text-emerald-800 dark:text-emerald-300">Economical</span>
-                        <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300">
-                          {analytics.marketTierBreakdown.economical}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="pt-1 flex flex-wrap gap-1.5">
-                      {(['student-free', 'student-pro', 'faculty-reviewer', 'admin'] as UserRole[]).map(
-                        (r) => (
-                          <span
-                            key={r}
-                            className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                          >
-                            {ROLE_ENTITLEMENT_POLICIES[r].label}: {analytics.roleBreakdown[r]}
-                          </span>
-                        )
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <AdminCohortAnalyticsTab
+              analytics={analytics}
+              allSessionsWithUser={allSessionsWithUser}
+              distinctIps={distinctIps}
+              copiedIp={copiedIp}
+              onCopyIp={handleCopyIp}
+              onSetGovernanceTab={setGovernanceTab}
+              onSetRestrictionFilter={setRestrictionFilter}
+              onQuarantineAnomalousAccounts={() => void quarantineAnomalousAccounts()}
+            />
           )}
 
-          {/* ========================================================= */}
-          {/* TAB 2: USER DIRECTORY, PER-USER AI TOGGLES & BAN CONSOLE   */}
-          {/* ========================================================= */}
           {activeGovernanceTab === 'user-directory' && (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-              {/* Left Column: Searchable & Filterable User Directory (5 cols) */}
-              <div className="space-y-3 lg:col-span-5">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search name, email, university, colo..."
-                    className="w-full rounded-xl border border-zinc-200/80 bg-white/80 pl-9 pr-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-amber-500/40 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-100"
-                  />
-                </div>
-
-                {/* Filter Pills */}
-                <div className="flex flex-wrap gap-1.5">
-                  {(
-                    [
-                      { label: 'All Users', mode: 'all' },
-                      { label: 'AI Active', mode: 'ai-enabled' },
-                      { label: 'AI Excluded', mode: 'ai-excluded' },
-                    ] as const
-                  ).map((pill) => (
-                    <button
-                      key={pill.mode}
-                      type="button"
-                      onClick={() => setAiFeatureFilter(pill.mode)}
-                      className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer ${
-                        aiFeatureFilter === pill.mode
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-zinc-200/60 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400'
-                      }`}
-                    >
-                      {pill.label}
-                    </button>
-                  ))}
-
-                  {(
-                    [
-                      { label: 'Restricted / Banned', mode: 'restricted' },
-                      { label: 'Anomalous', mode: 'anomalous' },
-                    ] as const
-                  ).map((pill) => (
-                    <button
-                      key={pill.mode}
-                      type="button"
-                      onClick={() =>
-                        setRestrictionFilter(
-                          restrictionFilter === pill.mode ? 'all' : pill.mode
-                        )
-                      }
-                      className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer ${
-                        restrictionFilter === pill.mode
-                          ? 'bg-red-600 text-white'
-                          : 'bg-zinc-200/60 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400'
-                      }`}
-                    >
-                      {pill.label}
-                    </button>
-                  ))}
-
-                  {(['all', 'student-free', 'student-pro', 'faculty-reviewer'] as const).map(
-                    (r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => setRoleFilter(r)}
-                        className={`rounded-lg px-2 py-1 text-[10px] font-medium transition-colors cursor-pointer ${
-                          roleFilter === r
-                            ? 'bg-amber-500/20 text-amber-800 border border-amber-500/40 dark:text-amber-300'
-                            : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800/50 dark:text-zinc-400'
-                        }`}
-                      >
-                        {r === 'all' ? 'Any Role' : r}
-                      </button>
-                    )
-                  )}
-                </div>
-
-                {/* User Cards List */}
-                <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
-                  {filteredUsers.map((item) => {
-                    const isSelected = item.profile.id === targetUser?.id;
-                    const isRestricted = item.profile.restriction.status !== 'active';
-                    const hasAnomaly = item.activeSessions.some(
-                      (s) => s.anomalyFlags.length > 0
-                    );
-                    const hasAi = item.entitlements.ai_cloud_streaming_quota;
-
-                    return (
-                      <button
-                        key={item.profile.id}
-                        type="button"
-                        onClick={() => selectManagedUser(item.profile.id)}
-                        className={`w-full rounded-2xl border p-3 text-left transition-all cursor-pointer ${
-                          isSelected
-                            ? 'border-amber-500 bg-amber-500/10 shadow-sm dark:border-amber-500/80 dark:bg-amber-500/10'
-                            : 'border-zinc-200/70 bg-white/50 hover:bg-white/80 dark:border-zinc-800 dark:bg-zinc-900/50 dark:hover:bg-zinc-800/60'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="truncate font-heading text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                                {item.profile.displayName}
-                              </span>
-                              {isRestricted && (
-                                <span className="rounded-full bg-red-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-red-700 dark:text-red-300">
-                                  {item.profile.restriction.status}
-                                </span>
-                              )}
-                              {hasAnomaly && !isRestricted && (
-                                <span className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-700 dark:text-amber-300">
-                                  Anomaly
-                                </span>
-                              )}
-                            </div>
-                            <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
-                              {item.profile.email}
-                            </p>
-                            <p className="truncate text-[10px] text-zinc-400">
-                              {item.profile.universityName}
-                            </p>
-                          </div>
-                          <span className="shrink-0 rounded-full bg-zinc-200/80 px-2 py-0.5 text-[10px] font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                            {ROLE_ENTITLEMENT_POLICIES[item.profile.role].label}
-                          </span>
-                        </div>
-
-                        <div className="mt-2 flex items-center justify-between border-t border-zinc-200/50 pt-2 text-[10px] text-zinc-500 dark:border-zinc-800/60 dark:text-zinc-400">
-                          <span>
-                            {item.studyTelemetry.totalAttempts} Qs • {item.studyTelemetry.overallAccuracy}% acc
-                          </span>
-                          <span
-                            className={`font-semibold ${
-                              hasAi
-                                ? 'text-indigo-600 dark:text-indigo-400'
-                                : 'text-zinc-400 line-through'
-                            }`}
-                          >
-                            {hasAi ? 'Cloud AI Active' : 'AI Excluded'}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Right Column: Selected User Inspector, AI Toggles & Ban Controls (7 cols) */}
-              {targetUser && targetEntitlements && targetStats && (
-                <div className="space-y-5 lg:col-span-7">
-                  {/* Target User Header & Collected Study Telemetry */}
-                  <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-600 text-base font-bold text-white shadow">
-                          {targetUser.displayName.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-heading text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                              {targetUser.displayName}
-                            </h3>
-                            <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700 dark:text-amber-300">
-                              {targetUser.role}
-                            </span>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                                targetUser.restriction.status === 'active'
-                                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                                  : 'bg-red-500/20 text-red-700 dark:text-red-300'
-                              }`}
-                            >
-                              {targetUser.restriction.status}
-                            </span>
-                          </div>
-                          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                            {targetUser.email}
-                            {targetUser.phoneNumber ? ` • 📞 ${targetUser.phoneNumber}` : ''} •{' '}
-                            {targetUser.universityName} (Year {targetUser.academicYear})
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* User's Collected Study & AI Usage Metrics */}
-                    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                      <div className="rounded-xl bg-white/80 p-2.5 dark:bg-zinc-800/60">
-                        <span className="text-[10px] uppercase text-zinc-400">Attempts</span>
-                        <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                          {targetStats.totalAttempts}
-                        </p>
-                      </div>
-                      <div className="rounded-xl bg-white/80 p-2.5 dark:bg-zinc-800/60">
-                        <span className="text-[10px] uppercase text-zinc-400">Accuracy</span>
-                        <p className="text-sm font-bold text-blue-600 dark:text-blue-400">
-                          {targetStats.overallAccuracy}%
-                        </p>
-                      </div>
-                      <div className="rounded-xl bg-white/80 p-2.5 dark:bg-zinc-800/60">
-                        <span className="text-[10px] uppercase text-zinc-400">CVS Mastery</span>
-                        <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                          {targetStats.masteryPercentage}%
-                        </p>
-                      </div>
-                      <div className="rounded-xl bg-white/80 p-2.5 dark:bg-zinc-800/60">
-                        <span className="text-[10px] uppercase text-zinc-400">Avg Pace</span>
-                        <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                          {targetStats.avgPaceSeconds ? `${targetStats.avgPaceSeconds}s/Q` : '—'}
-                        </p>
-                      </div>
-                      <div className="rounded-xl bg-white/80 p-2.5 dark:bg-zinc-800/60">
-                        <span className="text-[10px] uppercase text-zinc-400">Weak / Due</span>
-                        <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
-                          {targetStats.weakTopicsCount}W / {targetStats.dueReviewsCount}D
-                        </p>
-                      </div>
-                      <div className="rounded-xl bg-white/80 p-2.5 dark:bg-zinc-800/60">
-                        <span className="text-[10px] uppercase text-zinc-400">Daily Cloud AI</span>
-                        <p className="text-sm font-bold text-purple-600 dark:text-purple-400">
-                          {targetStats.dailyAiRequestsUsed} / {selectedRecord.dailyAiRequestsLimit}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Role Assignment Matrix */}
-                  <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                      1. Assigned Role Tier
-                    </h4>
-                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      {(
-                        ['student-free', 'student-pro', 'faculty-reviewer', 'admin'] as UserRole[]
-                      ).map((r) => {
-                        const pol = ROLE_ENTITLEMENT_POLICIES[r];
-                        const isSelected = targetUser.role === r;
-                        return (
-                          <button
-                            key={r}
-                            type="button"
-                            onClick={() => void handleRoleChange(r)}
-                            className={`rounded-xl border p-2.5 text-left transition-all cursor-pointer ${
-                              isSelected
-                                ? 'border-amber-500 bg-amber-500/10 text-amber-900 dark:text-amber-200'
-                                : 'border-zinc-200/70 bg-white/40 hover:bg-white/70 dark:border-zinc-800 dark:bg-zinc-800/40'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-semibold">{pol.label}</span>
-                              {isSelected && (
-                                <CheckCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                              )}
-                            </div>
-                            <p className="mt-0.5 text-[10px] text-zinc-400">
-                              Max {pol.maxConcurrentDevices} dev • {pol.dailyCloudAiRequestsLimit} AI/d
-                            </p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Per-User Feature Activation & Exclusion (AI & Platform Features) */}
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                        2. Per-User Feature Activation & Exclusion Overrides
-                      </h4>
-                      <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
-                        Overrides Role Defaults Instantly
-                      </span>
-                    </div>
-                    <div className="mt-2 space-y-2">
-                      {FEATURE_FLAG_META.map((item) => {
-                        const enabled = Boolean(targetEntitlements[item.key]);
-                        const isOverridden =
-                          item.key in (targetUser.customFeatureOverrides ?? {});
-                        return (
-                          <div
-                            key={item.key}
-                            className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200/70 bg-white/50 p-3 text-xs dark:border-zinc-800/70 dark:bg-zinc-800/40"
-                          >
-                            <div className="space-y-0.5">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                                  {item.title}
-                                </span>
-                                <span className="font-mono text-[10px] text-zinc-400">
-                                  ({item.key})
-                                </span>
-                                {isOverridden && (
-                                  <span className="rounded bg-indigo-500/15 px-1.5 py-0.2 text-[9px] font-bold uppercase text-indigo-600 dark:text-indigo-300">
-                                    Custom Override
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                                {item.description}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={enabled}
-                              aria-label={`Toggle ${item.title} for ${targetUser.displayName}`}
-                              onClick={() => void handleToggleFeature(item.key)}
-                              className={`flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors cursor-pointer ${
-                                enabled ? 'bg-amber-500' : 'bg-zinc-300 dark:bg-zinc-700'
-                              }`}
-                            >
-                              <div
-                                className={`h-5 w-5 rounded-full bg-white shadow-md transform transition-transform ${
-                                  enabled ? 'translate-x-5' : 'translate-x-0'
-                                }`}
-                              />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Multi-Level Account Ban / Suspension & Instant KV Eviction */}
-                  <div className="rounded-2xl border border-red-500/25 bg-red-500/5 p-4 dark:border-red-500/30 dark:bg-red-950/20">
-                    <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
-                      <Ban className="h-4 w-4" />
-                      <h4 className="text-xs font-bold uppercase tracking-wider">
-                        3. Platform Access Enforcement (Suspend or Ban Account)
-                      </h4>
-                    </div>
-                    <p className="mt-1 text-xs text-red-800/80 dark:text-red-300/80">
-                      Blocking or suspending immediately purges all active session tokens from Cloudflare Workers KV (`usr_guard:{targetUser.id}`) and returns `403 ACCOUNT_BLOCKED`.
-                    </p>
-
-                    {targetUser.restriction.status !== 'active' && (
-                      <div className="mt-2 rounded-xl border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-900 dark:text-red-200">
-                        <strong>Current Restriction ({targetUser.restriction.status.toUpperCase()}):</strong>{' '}
-                        {targetUser.restriction.blockedReason || 'Administrative hold'}
-                      </div>
-                    )}
-
-                    <input
-                      type="text"
-                      value={blockReasonInput}
-                      onChange={(e) => setBlockReasonInput(e.target.value)}
-                      placeholder="Enforcement reason (e.g., Credential sharing across CAI & FRA colos)"
-                      className="mt-3 w-full rounded-xl border border-red-300 bg-white/90 px-3 py-2 text-xs text-zinc-900 shadow-xs focus:outline-none dark:border-red-900 dark:bg-zinc-900 dark:text-zinc-100"
-                    />
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {(isTargetBlocked || isTargetSuspended) && (
-                        <button
-                          type="button"
-                          onClick={() => void handleEnforceRestriction('active')}
-                          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow hover:bg-emerald-700 cursor-pointer"
-                        >
-                          <Unlock className="h-3.5 w-3.5" />
-                          <span>Unblock / Restore Access</span>
-                        </button>
-                      )}
-
-                      {!isTargetSuspended && (
-                        <button
-                          type="button"
-                          onClick={() => void handleEnforceRestriction('suspended')}
-                          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-semibold text-white shadow hover:bg-amber-700 cursor-pointer"
-                        >
-                          <AlertTriangle className="h-3.5 w-3.5" />
-                          <span>Suspend (24h Hold)</span>
-                        </button>
-                      )}
-
-                      {!isTargetBlocked && (
-                        <button
-                          type="button"
-                          onClick={() => void handleEnforceRestriction('blocked')}
-                          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-3 py-2 text-xs font-semibold text-white shadow hover:bg-red-700 cursor-pointer"
-                        >
-                          <Lock className="h-3.5 w-3.5" />
-                          <span>Ban / Block Account Immediately</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 4. Hardware Telemetry, Client Signals & Edge Security Forensics */}
-                  {(() => {
-                    const currentActiveSession =
-                      selectedRecord.activeSessions[selectedSessionIdx] ??
-                      selectedRecord.activeSessions[0];
-                    const hwProfile =
-                      currentActiveSession?.hardwareProfile ?? authState.clientProfile;
-                    const devProfile = currentActiveSession?.device;
-                    const edgeNet = currentActiveSession?.edgeNetwork;
-
-                    return (
-                      <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60 space-y-4">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <Cpu className="h-4 w-4 text-indigo-500" />
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
-                              4. Linked Device Intelligence, Market Tier & Edge Forensics (
-                              {selectedRecord.activeSessions.length} Device
-                              {selectedRecord.activeSessions.length === 1 ? '' : 's'})
-                            </h4>
-                          </div>
-                          <span className="rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-indigo-700 dark:text-indigo-300">
-                            Cloudflare D1 & KV Linked
-                          </span>
-                        </div>
-
-                        {/* Multi-Device Selector Tabs */}
-                        {selectedRecord.activeSessions.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 border-b border-zinc-200/60 pb-3 dark:border-zinc-800/60">
-                            {selectedRecord.activeSessions.map((session, idx) => (
-                              <button
-                                key={session.sessionId}
-                                type="button"
-                                onClick={() => setSelectedSessionIdx(idx)}
-                                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                                  selectedSessionIdx === idx
-                                    ? 'bg-indigo-600 text-white shadow-xs'
-                                    : 'bg-white/80 text-zinc-600 hover:bg-white dark:bg-zinc-800/60 dark:text-zinc-400'
-                                }`}
-                              >
-                                {session.device.deviceCategory === 'desktop' ? (
-                                  <Laptop className="h-3.5 w-3.5" />
-                                ) : (
-                                  <Smartphone className="h-3.5 w-3.5" />
-                                )}
-                                <span>
-                                  {session.device.deviceName ||
-                                    `${session.device.osName} • ${session.device.browserName}`}
-                                </span>
-                                {session.device.marketTierLabel && (
-                                  <span
-                                    className={`rounded-full px-1.5 py-0.2 text-[9px] font-bold uppercase ${
-                                      selectedSessionIdx === idx
-                                        ? 'bg-white/20 text-white'
-                                        : 'bg-zinc-200/70 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'
-                                    }`}
-                                  >
-                                    {session.device.marketTierLabel}
-                                  </span>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Highlighted Device Name & Economic / Luxury Market Tier Card */}
-                        {devProfile && (
-                          <div className="rounded-xl border border-indigo-500/25 bg-gradient-to-r from-indigo-500/10 via-blue-500/5 to-transparent p-3.5 dark:border-indigo-500/30">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100">
-                                    {devProfile.deviceName ||
-                                      `${devProfile.osName} • ${devProfile.browserName}`}
-                                  </span>
-                                  {devProfile.deviceModelCode && (
-                                    <span className="rounded bg-zinc-200/80 dark:bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] font-bold text-zinc-700 dark:text-zinc-300">
-                                      Model: {devProfile.deviceModelCode}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-                                  {devProfile.deviceBrand ? `${devProfile.deviceBrand} • ` : ''}
-                                  {devProfile.osName}
-                                  {devProfile.osVersion ? ` ${devProfile.osVersion}` : ''} •{' '}
-                                  {devProfile.browserName}
-                                  {devProfile.browserVersion ? ` ${devProfile.browserVersion}` : ''}{' '}
-                                  ({devProfile.browserEngine})
-                                </p>
-                              </div>
-
-                              <div className="flex flex-col items-end gap-1">
-                                <span
-                                  className={`rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider ${
-                                    devProfile.marketTier === 'flagship-luxury'
-                                      ? 'border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300'
-                                      : devProfile.marketTier === 'upper-midrange'
-                                      ? 'border-indigo-500/40 bg-indigo-500/15 text-indigo-700 dark:text-indigo-300'
-                                      : devProfile.marketTier === 'economical'
-                                      ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                                      : 'border-blue-500/40 bg-blue-500/15 text-blue-700 dark:text-blue-300'
-                                  }`}
-                                >
-                                  {devProfile.marketTierLabel || 'Mid-Range Mainstream'}
-                                </span>
-                                {devProfile.estimatedPriceSegment && (
-                                  <span className="font-mono text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">
-                                    {devProfile.estimatedPriceSegment}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Hardware Signals Grid */}
-                        <div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                            Client Silicon, Memory & Display Metrics
-                          </span>
-                          <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
-                            <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
-                              <span className="text-[10px] text-zinc-400">Silicon / GPU Renderer</span>
-                              <p
-                                className="mt-0.5 text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate"
-                                title={devProfile?.gpuRenderer || hwProfile.gpuRenderer || 'Standard GPU'}
-                              >
-                                {devProfile?.gpuRenderer || hwProfile.gpuRenderer || 'Standard Integrated GPU'}
-                              </p>
-                            </div>
-                            <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
-                              <span className="text-[10px] text-zinc-400">Logical CPU Cores</span>
-                              <p className="mt-0.5 text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                                {hwProfile.logicalCpuCores} Cores
-                              </p>
-                            </div>
-                            <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
-                              <span className="text-[10px] text-zinc-400">Device Memory Tier</span>
-                              <p className="mt-0.5 text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                                {hwProfile.deviceMemoryGb !== null
-                                  ? `${hwProfile.deviceMemoryGb} GB RAM`
-                                  : 'Apple Unified Memory'}
-                              </p>
-                            </div>
-                            <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
-                              <span className="text-[10px] text-zinc-400">Screen & Pixel Ratio</span>
-                              <p className="mt-0.5 text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                                {hwProfile.screenResolution.width}×{hwProfile.screenResolution.height} ({hwProfile.devicePixelRatio}x)
-                              </p>
-                            </div>
-                            <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
-                              <span className="text-[10px] text-zinc-400">Effective Network</span>
-                              <p className="mt-0.5 text-xs font-bold uppercase text-zinc-900 dark:text-zinc-100">
-                                {hwProfile.effectiveNetworkType}
-                              </p>
-                            </div>
-                            <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
-                              <span className="text-[10px] text-zinc-400">Client Timezone</span>
-                              <p className="mt-0.5 text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
-                                {hwProfile.clientTimezone}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Edge Network Forensics */}
-                        {edgeNet && (
-                          <div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                              Cloudflare Edge Network & Security Telemetry
-                            </span>
-                            <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-                              <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
-                                <span className="text-[10px] text-zinc-400">Connecting IP</span>
-                                <div className="mt-0.5 flex items-center justify-between">
-                                  <p className="font-mono text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                                    {edgeNet.ipAddress}
-                                  </p>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopyIp(edgeNet.ipAddress)}
-                                    className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
-                                    title="Copy IP"
-                                  >
-                                    {copiedIp === edgeNet.ipAddress ? (
-                                      <Check className="h-3 w-3 text-emerald-500" />
-                                    ) : (
-                                      <Copy className="h-3 w-3" />
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
-                                <span className="text-[10px] text-zinc-400">Edge Colo</span>
-                                <p className="mt-0.5 font-mono text-xs font-bold text-amber-600 dark:text-amber-400">
-                                  {edgeNet.colo} ({edgeNet.city || edgeNet.countryCode})
-                                </p>
-                              </div>
-                              <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
-                                <span className="text-[10px] text-zinc-400">ISP / ASN</span>
-                                <p className="mt-0.5 text-xs font-medium text-zinc-900 dark:text-zinc-100 truncate">
-                                  {edgeNet.ispOrganization || 'Telecom'} (AS{edgeNet.asn ?? 'N/A'})
-                                </p>
-                              </div>
-                              <div className="rounded-xl border border-zinc-200/60 bg-white/70 p-2.5 dark:border-zinc-800/60 dark:bg-zinc-800/50">
-                                <span className="text-[10px] text-zinc-400">Protocol & TLS</span>
-                                <p className="mt-0.5 font-mono text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                                  {edgeNet.httpProtocol} • {edgeNet.tlsVersion}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Admin Adaptive Compositor Override Diagnostics */}
-                        <div className="border-t border-zinc-200/60 pt-3 dark:border-zinc-800/60">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                              Adaptive Compositor Simulator (Admin Testing)
-                            </span>
-                            <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
-                              Active: {performanceOverride.toUpperCase()} ({hwProfile.activeTier})
-                            </span>
-                          </div>
-                          <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-                            Test and audit how the UI fluidly adapts across 120fps physics, 60fps GPU, and zero-blur low-spec modes.
-                          </p>
-                          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                            {(['auto', 'ultra', 'balanced', 'low-spec'] as PerformanceOverrideMode[]).map((mode) => (
-                              <button
-                                key={mode}
-                                type="button"
-                                onClick={() => setPerformanceOverride(mode)}
-                                className={`rounded-xl border p-2 text-left transition-all cursor-pointer ${
-                                  performanceOverride === mode
-                                    ? 'border-blue-500 bg-blue-500/10 text-blue-900 dark:text-blue-200'
-                                    : 'border-zinc-200/70 bg-white/60 hover:bg-white dark:border-zinc-800 dark:bg-zinc-800/40'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-bold uppercase">{mode}</span>
-                                  {performanceOverride === mode && (
-                                    <CheckCircle2 className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                                  )}
-                                </div>
-                                <p className="mt-0.5 text-[9px] text-zinc-400">
-                                  {mode === 'auto'
-                                    ? 'Dynamic'
-                                    : mode === 'ultra'
-                                    ? '120fps Physics'
-                                    : mode === 'balanced'
-                                    ? '60fps GPU'
-                                    : 'Zero-blur Saver'}
-                                </p>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
+            <AdminUserDirectoryTab
+              managedUsers={managedUsers}
+              filteredUsers={filteredUsers}
+              selectedRecord={selectedRecord}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              roleFilter={roleFilter}
+              onRoleFilterChange={setRoleFilter}
+              restrictionFilter={restrictionFilter}
+              onRestrictionFilterChange={setRestrictionFilter}
+              aiFeatureFilter={aiFeatureFilter}
+              onAiFeatureFilterChange={setAiFeatureFilter}
+              onSelectManagedUser={selectManagedUser}
+              onUpdateUserRole={updateUserRole}
+              onSetUserRestriction={setUserRestriction}
+              copiedIp={copiedIp}
+              onCopyIp={handleCopyIp}
+              performanceOverride={performanceOverride}
+              onSetPerformanceOverride={setPerformanceOverride}
+              fallbackHardwareProfile={authState.clientProfile}
+            />
           )}
 
-          {/* ========================================================= */}
-          {/* TAB 3: IMMUTABLE SECURITY & GOVERNANCE AUDIT LOG          */}
-          {/* ========================================================= */}
           {activeGovernanceTab === 'audit-trail' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  <History className="h-4 w-4 text-amber-500" />
-                  <span>Immutable Edge Governance & KV Eviction Audit Stream</span>
-                </div>
-                <span className="text-[11px] font-mono text-zinc-400">
-                  D1 Table: security_audit_log
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                {auditLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    className="flex flex-col justify-between gap-2 rounded-2xl border border-zinc-200/70 bg-white/60 p-3.5 text-xs sm:flex-row sm:items-center dark:border-zinc-800 dark:bg-zinc-900/60"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`rounded-md px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${
-                            log.action.includes('BLOCKED') || log.action.includes('QUARANTINED')
-                              ? 'bg-red-500/15 text-red-700 dark:text-red-300'
-                              : log.action.includes('FEATURE')
-                              ? 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300'
-                              : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
-                          }`}
-                        >
-                          {log.action}
-                        </span>
-                        <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                          {log.targetDisplayName}
-                        </span>
-                        <span className="text-[11px] text-zinc-400">
-                          by {log.actorDisplayName}
-                        </span>
-                      </div>
-                      <p className="text-xs text-zinc-600 dark:text-zinc-300">{log.summary}</p>
-                    </div>
-                    <div className="flex items-center gap-3 self-end font-mono text-[11px] text-zinc-400 sm:self-center shrink-0">
-                      <span>Colo: {log.edgeColo}</span>
-                      <span className="text-emerald-600 dark:text-emerald-400">
-                        {log.latencyMs}ms
-                      </span>
-                      <span>{log.createdAt.slice(0, 19).replace('T', ' ')}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <AdminSecurityAuditTrailTab auditLogs={auditLogs} />
           )}
         </div>
       </div>
