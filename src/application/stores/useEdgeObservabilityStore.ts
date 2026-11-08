@@ -76,7 +76,7 @@ const facade = new EdgeObservabilityFacade();
 
 const isTestEnv = Boolean(
   (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') ||
-    (import.meta as any).env?.VITEST
+    import.meta.env?.VITEST
 );
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, isTestEnv ? 0 : ms));
