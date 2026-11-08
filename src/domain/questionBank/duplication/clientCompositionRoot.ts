@@ -16,6 +16,8 @@ import { edgeQuestionBankGateway } from '../../../infrastructure/questionBank/ed
 import { db } from '../../../infrastructure/storage/db.ts';
 import defaultCvsBank from '../../../../content/cvs/dist/bank.v1.json';
 import type { Question } from '../../model/types.ts';
+import type { BlockId } from '../../curriculum/ids.ts';
+import { normalizeBlockId } from '../QuestionNormalizer.ts';
 import type { IDuplicationDetectionEngine } from '../../../../specs/009-question-duplication-detection-engine/contracts/duplication-detection-ports.ts';
 
 /**
@@ -25,6 +27,13 @@ import type { IDuplicationDetectionEngine } from '../../../../specs/009-question
 export function normalizeBankQuestionForQdd(q: Question): Question {
   const stem = (q.stem || '').trim();
   const choiceA = (q.choices?.[0]?.text || '').trim();
+  const rawBlock = q.blockId || 'cvs';
+  const qBlockId = (normalizeBlockId(rawBlock, undefined, {
+    id: q.id,
+    subjectId: q.subjectId,
+    stem: q.stem,
+  }) || 'cvs') as BlockId;
+
   if (
     /^Clinical scenario regarding /i.test(stem) &&
     choiceA.length >= 20 &&
@@ -45,14 +54,14 @@ export function normalizeBankQuestionForQdd(q: Question): Question {
     }
     return {
       ...q,
-      blockId: 'cvs',
+      blockId: qBlockId,
       stem: cleanedStem,
       choices,
     };
   }
   return {
     ...q,
-    blockId: 'cvs',
+    blockId: qBlockId,
   };
 }
 
@@ -75,10 +84,25 @@ export async function loadAllClientBankQuestions(
   }
 
   try {
-    const localCanonical = edgeQuestionBankGateway.getLocalCanonicalBank('cvs');
-    if (Array.isArray(localCanonical)) {
-      for (const q of localCanonical) {
-        if (q?.id && (q as any).editorialStatus !== 'archived' && q.status !== 'quarantined') {
+    const cvsCanonical = edgeQuestionBankGateway.getLocalCanonicalBank('cvs');
+    if (Array.isArray(cvsCanonical)) {
+      for (const q of cvsCanonical) {
+        const editorialStatus = (q as Question & { editorialStatus?: string }).editorialStatus;
+        if (q?.id && editorialStatus !== 'archived' && q.status !== 'quarantined') {
+          byId.set(q.id, q);
+        }
+      }
+    }
+  } catch {
+    // Ignore storage read error
+  }
+
+  try {
+    const cnsCanonical = edgeQuestionBankGateway.getLocalCanonicalBank('cns');
+    if (Array.isArray(cnsCanonical)) {
+      for (const q of cnsCanonical) {
+        const editorialStatus = (q as Question & { editorialStatus?: string }).editorialStatus;
+        if (q?.id && editorialStatus !== 'archived' && q.status !== 'quarantined') {
           byId.set(q.id, q);
         }
       }
@@ -129,7 +153,7 @@ export async function createClientQddEngine(
 
       await repo.upsert({
         questionId: q.id,
-        blockId: 'cvs',
+        blockId: (q.blockId as BlockId) || 'cvs',
         chapterId: q.chapterId,
         normalizerVersion: c.normalizerVersion,
         stemHash: c.stemHash,
