@@ -235,3 +235,5 @@ export interface IBatchQuestionQualityRule {
     questions: readonly Question[]
   ): Result<ChoiceDistributionMetrics, ChoiceEntropyDomainError>;
 }
+
+export type PresentedChoiceViewModel = SpatialPresentedChoice;
