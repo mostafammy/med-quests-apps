@@ -69,8 +69,8 @@ export class WorkersAiEmbeddingProvider implements IEmbeddingProvider {
       }
 
       return { ok: true, value: results };
-    } catch (err: any) {
-      const message = err?.message || String(err);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       if (message.includes('timeout') || message.includes('aborted')) {
         return { ok: false, error: 'STAGE_TIMEOUT' };
       }
