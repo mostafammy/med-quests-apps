@@ -116,9 +116,11 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
 
   setRawInputText: (rawInputText) => {
     const cnsMatch =
+      /\b(?:Block\s*:\s*CNS|CNS\s+Anatomy|Neuroanatomy)\b/i.test(rawInputText) ||
       /"(?:blockId|id|subjectId)"\s*:\s*"q?-(?:cns|cns-neuroscience|neuro|supratentorial|infratentorial)/i.test(rawInputText) ||
       /"blockId"\s*:\s*"(?:cns|cns-neuroscience|.*(?:supratentorial|infratentorial|neuro|brain).*)"/i.test(rawInputText);
     const cvsMatch =
+      /\b(?:Block\s*:\s*CVS|Cardiovascular)\b/i.test(rawInputText) ||
       /"(?:blockId|id)"\s*:\s*"q?-(?:cvs)/i.test(rawInputText) ||
       /"blockId"\s*:\s*"(?:cvs|cardiovascular)"/i.test(rawInputText);
 
@@ -491,10 +493,13 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
     const classification = item.taxonomyClassification;
     if (!classification) return;
 
+    const itemBlockId = item.question.blockId || get().targetBlockId || 'cvs';
+
     if (type === 'subject' && classification.newSubjectProposal) {
       const regSubject = curriculumTaxonomyRegistry.registerSubject({
         id: classification.newSubjectProposal.id,
         name: classification.newSubjectProposal.name,
+        blockId: itemBlockId,
       });
 
       if (classification.newChapterProposal) {
@@ -502,11 +507,13 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
           id: classification.newChapterProposal.id,
           subjectId: regSubject.id,
           name: classification.newChapterProposal.name,
+          blockId: itemBlockId,
         });
       }
 
       const updatedQ: Question = {
         ...item.question,
+        blockId: itemBlockId,
         subjectId: regSubject.id,
         chapterId: classification.newChapterProposal?.id || item.question.chapterId,
         topicId: `${classification.newChapterProposal?.id || item.question.chapterId}/core-concepts`,
@@ -531,10 +538,12 @@ export const useAdminAiQuestionParserStore = create<AdminAiQuestionParserStoreSt
         id: classification.newChapterProposal.id,
         subjectId: classification.newChapterProposal.subjectId,
         name: classification.newChapterProposal.name,
+        blockId: itemBlockId,
       });
 
       const updatedQ: Question = {
         ...item.question,
+        blockId: itemBlockId,
         chapterId: regChapter.id,
         topicId: `${regChapter.id}/core-concepts`,
       };
