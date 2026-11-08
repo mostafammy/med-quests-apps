@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import type { ParsedQuestionItem } from '../../../../domain/questionBank/aiQuestionParser/types.ts';
 import { DuplicateBadge } from '../../qdd/DuplicateBadge.tsx';
+import { TaxonomyDisplayResolver } from '../../../../domain/taxonomy/TaxonomyDisplayResolver.ts';
 
 interface StagingMasterRailProps {
   readonly questions: ParsedQuestionItem[];
@@ -51,9 +52,23 @@ export const StagingMasterRail: React.FC<StagingMasterRailProps> = ({
       // Search query check
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
+        const displaySubject = TaxonomyDisplayResolver.resolveSubjectName(
+          item.question.subjectId,
+          item.taxonomyClassification?.subjectName,
+          item.question.blockId
+        );
+        const displayChapter = TaxonomyDisplayResolver.resolveChapterName(
+          item.question.chapterId,
+          item.taxonomyClassification?.chapterName,
+          item.question.blockId
+        );
         const stemMatches = item.question.stem.toLowerCase().includes(query);
-        const subjectMatches = item.question.subjectId.toLowerCase().includes(query);
-        const chapterMatches = (item.taxonomyClassification?.chapterName || item.question.chapterId).toLowerCase().includes(query);
+        const subjectMatches =
+          item.question.subjectId.toLowerCase().includes(query) ||
+          displaySubject.toLowerCase().includes(query);
+        const chapterMatches =
+          item.question.chapterId.toLowerCase().includes(query) ||
+          displayChapter.toLowerCase().includes(query);
         const choicesMatch = item.question.choices.some((c) => c.text.toLowerCase().includes(query));
         return stemMatches || subjectMatches || chapterMatches || choicesMatch;
       }
@@ -142,10 +157,20 @@ export const StagingMasterRail: React.FC<StagingMasterRailProps> = ({
           filteredQuestions.map(({ item, originalIndex }) => {
             const isSelected = selectedIndex === originalIndex;
             const isChecked = selectedTempIds.has(item.tempId);
-            const subjectMeta = subjectMetaMap[item.question.subjectId] || {
-              icon: '📚',
-              badgeColor: 'bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-500/25',
-            };
+            const subjectMeta = TaxonomyDisplayResolver.resolveSubjectMeta(
+              item.question.subjectId,
+              subjectMetaMap
+            );
+            const displaySubjectName = TaxonomyDisplayResolver.resolveSubjectName(
+              item.question.subjectId,
+              item.taxonomyClassification?.subjectName,
+              item.question.blockId
+            );
+            const displayChapterName = TaxonomyDisplayResolver.resolveChapterName(
+              item.question.chapterId,
+              item.taxonomyClassification?.chapterName,
+              item.question.blockId
+            );
 
             return (
               <div
@@ -184,7 +209,7 @@ export const StagingMasterRail: React.FC<StagingMasterRailProps> = ({
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold border ${subjectMeta.badgeColor}`}
                     >
                       <span>{subjectMeta.icon}</span>
-                      <span className="capitalize">{item.question.subjectId}</span>
+                      <span className="truncate max-w-[95px]">{displaySubjectName}</span>
                     </span>
                   </div>
 
@@ -231,8 +256,8 @@ export const StagingMasterRail: React.FC<StagingMasterRailProps> = ({
                   </div>
 
                   {/* Chapter name snippet */}
-                  <span className="text-zinc-400 truncate max-w-[110px]" title={item.taxonomyClassification?.chapterName || item.question.chapterId}>
-                    {item.taxonomyClassification?.chapterName || item.question.chapterId}
+                  <span className="text-zinc-400 truncate max-w-[110px]" title={displayChapterName}>
+                    {displayChapterName}
                   </span>
                 </div>
               </div>
