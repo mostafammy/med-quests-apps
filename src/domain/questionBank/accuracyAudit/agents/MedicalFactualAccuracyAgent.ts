@@ -27,8 +27,8 @@ export class MedicalFactualAccuracyAgent implements IAccuracyEvaluationAgent {
   public async evaluate(question: Question, signal?: AbortSignal): Promise<AgentCritique> {
     const isTestEnv = Boolean(
       (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') ||
-      (import.meta as any).env?.VITEST ||
-      (import.meta as any).env?.MODE === 'test'
+      import.meta.env?.VITEST ||
+      import.meta.env?.MODE === 'test'
     );
 
     // Attempt Live Cloud LLM Evaluation if configured and credentials available (non-test env)
