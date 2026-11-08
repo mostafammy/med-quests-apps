@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { ParsedQuestionItem } from '../../../../domain/questionBank/aiQuestionParser/types.ts';
 import type { ChoiceId } from '../../../../domain/model/types.ts';
+import type { BlockId } from '../../../../domain/curriculum/ids.ts';
 import { curriculumTaxonomyRegistry } from '../../../../domain/taxonomy/CurriculumTaxonomyRegistry.ts';
 import { TaxonomyDisplayResolver } from '../../../../domain/taxonomy/TaxonomyDisplayResolver.ts';
 import { compositionRoot } from '../../../../application/composition/clientCompositionRoot.ts';
@@ -134,7 +135,7 @@ export const StagingDetailCanvas: React.FC<StagingDetailCanvasProps> = ({
     }
   };
 
-  const blockPack = compositionRoot.catalog.get(item.question.blockId);
+  const blockPack = compositionRoot.catalog.get(item.question.blockId as BlockId);
   const currentSubjects = blockPack
     ? blockPack.manifest.subjects.map((s) => ({
         id: s.id,
