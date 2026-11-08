@@ -155,6 +155,7 @@ export const ClientCapabilityProfileSchema = z.object({
   detectedCpuArch: z.string().nullable().optional(),
 });
 export type ClientCapabilityProfile = z.infer<typeof ClientCapabilityProfileSchema>;
+export type ClientHardwareProfile = ClientCapabilityProfile;
 
 // ==========================================
 // 6. ACCOUNT STATUS & ACTIVE SESSIONS
@@ -184,6 +185,7 @@ export const UserProfileSchema = z.object({
   lastActiveAt: z.string(),
 });
 export type UserProfile = z.infer<typeof UserProfileSchema>;
+export type AuthUser = UserProfile;
 
 export const SecurityAnomalyFlagSchema = z.enum([
   'impossible_travel_geo_shift',
@@ -242,3 +244,10 @@ export type AuthState =
       readonly edgeNetwork: EdgeNetworkTelemetry;
       readonly clientProfile: ClientCapabilityProfile;
     };
+
+export type {
+  ManagedUserRecord,
+  GovernanceAuditEntry,
+  SecurityAuditLogEntry,
+  PlatformAnalyticsSummary,
+} from './governanceAnalytics.ts';
