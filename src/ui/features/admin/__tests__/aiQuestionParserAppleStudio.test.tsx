@@ -135,6 +135,7 @@ describe('Apple-Grade AI Question Ingestion & Spatial Staging Studio', () => {
       <FloatingBatchCommandBar
         totalCount={1}
         selectedCount={1}
+        uniqueCount={1}
         isCommitting={false}
         isCheckingDuplication={false}
         copiedBatchPrompt={false}
@@ -148,9 +149,31 @@ describe('Apple-Grade AI Question Ingestion & Spatial Staging Studio', () => {
     const cleanHtml = html.replace(/<!--.*?-->/g, '');
     expect(cleanHtml).toContain('1 of 1 Selected');
     expect(cleanHtml).toContain('Copy Batch Prompt');
-    expect(cleanHtml).toContain('Save all unique');
+    expect(cleanHtml).toContain('Save all unique (1)');
+    expect(cleanHtml).toContain('Unique (1)');
     expect(cleanHtml).toContain('Approve &amp; Commit (1) to Bank');
     expect(cleanHtml).toContain('glass-dark-capsule');
+  });
+
+  it('disables Save all unique when uniqueCount is 0', () => {
+    const html = renderToString(
+      <FloatingBatchCommandBar
+        totalCount={3}
+        selectedCount={3}
+        uniqueCount={0}
+        isCommitting={false}
+        isCheckingDuplication={false}
+        copiedBatchPrompt={false}
+        onToggleSelectAll={() => {}}
+        onCopyBatchPrompt={() => {}}
+        onSaveAllUnique={() => {}}
+        onCommitToBank={() => {}}
+      />
+    );
+
+    const cleanHtml = html.replace(/<!--.*?-->/g, '');
+    expect(cleanHtml).toContain('Save all unique (0)');
+    expect(cleanHtml).toContain('disabled');
   });
 
   it('renders StagingMasterRail displaying compact question cards with micro badges', () => {
@@ -171,7 +194,7 @@ describe('Apple-Grade AI Question Ingestion & Spatial Staging Studio', () => {
     expect(cleanHtml).toContain('1 of 1');
     expect(cleanHtml).toContain('Prior infection with GAS');
     expect(cleanHtml).toContain('AI Key');
-    expect(cleanHtml).toContain('microbiology');
+    expect(cleanHtml.toLowerCase()).toContain('microbiology');
     expect(cleanHtml).toContain('Rheumatic Fever (L1)');
   });
 
