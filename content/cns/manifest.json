@@ -114,6 +114,16 @@
       "sourceIds": ["SRC-CNS-ANA-01"]
     },
     {
+      "id": "cns-ana-white-matter-internal-capsule",
+      "subjectId": "anatomy",
+      "name": {
+        "en": "Cerebral White Matter & Internal Capsule",
+        "ar": "المادة البيضاء للمخ والمحفظة الغائرة"
+      },
+      "order": 6,
+      "sourceIds": ["SRC-CNS-ANA-01"]
+    },
+    {
       "id": "cns-phy-excitable-synaptic",
       "subjectId": "physiology",
       "name": {
@@ -368,6 +378,33 @@
         "ar": "دائرة ويليس والتصريف الوريدي الدماغي"
       },
       "order": 2
+    },
+    {
+      "id": "cns-ana-white-matter-internal-capsule/projection-fibers-radiations",
+      "chapterId": "cns-ana-white-matter-internal-capsule",
+      "name": {
+        "en": "Projection Fibers, Thalamocortical Radiations & Corticofugal Tracts",
+        "ar": "الألياف الإسقاطية، الإشعاعات المهادية والسبل القشرية النازلة"
+      },
+      "order": 1
+    },
+    {
+      "id": "cns-ana-white-matter-internal-capsule/internal-capsule-anatomy-somatotopy",
+      "chapterId": "cns-ana-white-matter-internal-capsule",
+      "name": {
+        "en": "Internal Capsule Boundaries, Limbs & Corticospinal Somatotopy",
+        "ar": "حدود المحفظة الغائرة، أجزاؤها والتنظيم الجسدي الحركي"
+      },
+      "order": 2
+    },
+    {
+      "id": "cns-ana-white-matter-internal-capsule/capsular-vascular-supply-stroke",
+      "chapterId": "cns-ana-white-matter-internal-capsule",
+      "name": {
+        "en": "Internal Capsule Blood Supply & Lenticulostriate Stroke Syndromes",
+        "ar": "التروية الشريانية للمحفظة ومتلازمات السكتة الدماغية المحفظية"
+      },
+      "order": 3
     },
     {
       "id": "cns-phy-excitable-synaptic/resting-membrane-potential-and-action-potential",
