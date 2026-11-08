@@ -82,4 +82,17 @@ export class ClientCompositionRoot {
   }
 }
 
-export const compositionRoot = ClientCompositionRoot.getInstance();
+export function getCompositionRoot(): ClientCompositionRoot {
+  return ClientCompositionRoot.getInstance();
+}
+
+let _compositionRootInstance: ClientCompositionRoot | null = null;
+
+export const compositionRoot: ClientCompositionRoot = new Proxy({} as ClientCompositionRoot, {
+  get(_target, prop) {
+    if (!_compositionRootInstance) {
+      _compositionRootInstance = ClientCompositionRoot.getInstance();
+    }
+    return (_compositionRootInstance as any)[prop];
+  },
+});
