@@ -6,6 +6,7 @@ export interface ExtractedBlockStructure {
   readonly stemLines: string[];
   readonly rawChoices: Array<{ id: string; text: string }>;
   readonly detectedExplanation: string;
+  readonly detectedConcept?: string;
   readonly draftScope?: {
     readonly block?: string;
     readonly subject?: string;
@@ -22,6 +23,26 @@ export class TextSegmentationAndChoiceExtractor {
    * Splits multi-question raw text using regex patterns for item delimiters.
    */
   public static segmentRawTextIntoBlocks(rawText: string): string[] {
+    // 1. Explicit Markdown Question headers: "## Question 1 of 18", "### Item 1:", "## Question 1:" (optionally preceded by ---)
+    const markdownQuestionSplit = rawText
+      .split(/(?:\r?\n|^)(?=(?:(?:---|___|\*{3,})\s*(?:\r?\n)+)?\s*#{1,6}\s*(?:Question|Item|Q)\s*\d+)/i)
+      .map((b) => b.trim())
+      .filter((b) => /^(?:(?:---|___|\*{3,})\s*)?#{1,6}\s*(?:Question|Item|Q)\s*\d+/i.test(b));
+
+    if (markdownQuestionSplit.length > 1) {
+      return markdownQuestionSplit;
+    }
+
+    // 2. Standard Question/Item delimiter: "Question 1:", "Item 2 -", "Q3."
+    const questionHeaderSplit = rawText
+      .split(/(?:\r?\n|^)(?=(?:(?:---|___|\*{3,})\s*(?:\r?\n)+\s*)?(?:Question|Item|Q)\s*\d+(?:\s+of\s+\d+)?[:.)\s-])/i)
+      .map((b) => b.trim())
+      .filter((b) => /(?:Question|Item|Q)\s*\d+/i.test(b));
+
+    if (questionHeaderSplit.length > 1) {
+      return questionHeaderSplit;
+    }
+
     const splitRegex = /(?:\r?\n|^)(?=(?:(?:Question|Item|Q)\s*\d+[:.]?|\d+\s*[.)]))/i;
     const initialSplit = rawText.split(splitRegex).map((b) => b.trim()).filter(Boolean);
 
@@ -112,6 +133,7 @@ export class TextSegmentationAndChoiceExtractor {
     const stemLines: string[] = [];
     const rawChoices: Array<{ id: string; text: string }> = [];
     let detectedExplanation = '';
+    let detectedConcept: string | undefined;
     let draftScope: { block?: string; subject?: string; chapter?: string } | undefined;
 
     const explanationRegex =
@@ -234,6 +256,16 @@ export class TextSegmentationAndChoiceExtractor {
           continue;
         }
 
+        // Capture concept if present in header (e.g. [Concept: ...] or **Concept**:)
+        const bracketConceptMatch = line.match(/\[Concept\s*:\s*([^\]]+)\]/i);
+        if (bracketConceptMatch) {
+          detectedConcept = bracketConceptMatch[1].trim();
+        }
+        const colonConceptMatch = line.match(/^\*{0,2}Concept\*{0,2}\s*:\s*(.*)$/i);
+        if (colonConceptMatch) {
+          detectedConcept = colonConceptMatch[1].trim();
+        }
+
         // Ignore metadata and header lines when before choices
         const isHeaderOrMeta =
           /^(?:---|\*{3,}|_{3,}|#{1,6}\s*(?:Question|Item|Q)\s*\d+)/i.test(line.trim()) ||
@@ -277,7 +309,7 @@ export class TextSegmentationAndChoiceExtractor {
       });
     }
 
-    return { stemLines, rawChoices, detectedExplanation, draftScope };
+    return { stemLines, rawChoices, detectedExplanation, detectedConcept, draftScope };
   }
 
   /**
