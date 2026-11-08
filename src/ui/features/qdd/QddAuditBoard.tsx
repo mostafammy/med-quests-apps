@@ -86,7 +86,7 @@ export const QddAuditBoard: React.FC<QddAuditBoardProps> = ({
         if (currentJob) {
           const clustersRes: Response = await fetch(`/api/admin/qdd/audits/${currentJob.id}/clusters`);
           if (clustersRes.ok) {
-            const data: any = await clustersRes.json();
+            const data = (await clustersRes.json()) as { clusters?: readonly DuplicateCluster[] };
             setClusters(data.clusters || []);
           }
         }
@@ -126,7 +126,7 @@ export const QddAuditBoard: React.FC<QddAuditBoardProps> = ({
         blockId,
         (progress) => {
           setActiveJob({
-            id: `audit-local-${blockId}` as any,
+            id: `audit-local-${blockId}` as AuditJob['id'],
             scope: { kind: 'block', blockId },
             status: progress.phase === 'completed' ? 'completed' : 'running',
             cursor: String(progress.processed),
@@ -148,11 +148,11 @@ export const QddAuditBoard: React.FC<QddAuditBoardProps> = ({
         type: 'success',
         message: `Audit completed successfully. Scanned ${result.job.total} questions, identified ${result.clusters.length} duplicate cluster${result.clusters.length === 1 ? '' : 's'}.`,
       });
-    } catch (localErr: any) {
+    } catch (localErr: unknown) {
       setIsRunning(false);
       setFeedback({
         type: 'error',
-        message: localErr?.message || 'Audit execution interrupted',
+        message: localErr instanceof Error && localErr.message ? localErr.message : 'Audit execution interrupted',
       });
     }
   };
@@ -217,10 +217,10 @@ export const QddAuditBoard: React.FC<QddAuditBoardProps> = ({
         type: 'success',
         message: `Successfully applied resolution (${action}) to ${duplicateId}${remoteOk ? '' : ' (Local Bank)'}.`,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setFeedback({
         type: 'error',
-        message: `Failed to resolve: ${err?.message || String(err)}`,
+        message: `Failed to resolve: ${err instanceof Error && err.message ? err.message : String(err)}`,
       });
     } finally {
       setIsResolving(false);
