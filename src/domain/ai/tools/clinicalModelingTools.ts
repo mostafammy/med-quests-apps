@@ -180,8 +180,8 @@ export class SimulatePeerCohortTool implements IAgentTool<PeerCohortArgs, PeerCo
 
   async execute(_args: PeerCohortArgs, ctx: ToolExecutionContext): Promise<PeerCohortDifficultyResult> {
     const q = ctx.activeQuestion;
-    const isHard = q?.difficulty === 'hard';
-    const isMedium = q?.difficulty === 'medium';
+    const isHard = q?.difficulty === 3 || (q?.difficulty as unknown) === 'hard';
+    const isMedium = q?.difficulty === 2 || (q?.difficulty as unknown) === 'medium';
 
     const overallAccuracyPct = isHard ? 44 : isMedium ? 62 : 81;
     const difficultyLabel = isHard
@@ -195,7 +195,7 @@ export class SimulatePeerCohortTool implements IAgentTool<PeerCohortArgs, PeerCo
     const correctId = q?.correctChoiceId ?? 'a';
 
     const choiceDistributionPct: Record<string, number> = {};
-    const remainingChoices = choices.filter((c: any) => c.id !== correctId);
+    const remainingChoices = choices.filter((c) => c.id !== correctId);
     const topTrapChoice = remainingChoices[0]?.id ?? 'b';
 
     choiceDistributionPct[correctId] = overallAccuracyPct;
@@ -216,7 +216,7 @@ export class SimulatePeerCohortTool implements IAgentTool<PeerCohortArgs, PeerCo
       overallAccuracyPct,
       difficultyLabel,
       choiceDistributionPct: choiceDistributionPct as Record<ChoiceId, number>,
-      topTrapChoiceId: topTrapChoice,
+      topTrapChoiceId: topTrapChoice as ChoiceId,
       topTrapPercentage: topTrapPct,
       peerTrapExplanation: `Option ${topTrapChoice.toUpperCase()} is the primary board trap: students frequently confuse this pathology's hemodynamic maneuver response with aortic outflow murmurs.`,
     };
