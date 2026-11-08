@@ -346,9 +346,12 @@ export default defineConfig({
     port: 3000,
     open: true,
     proxy: {
-      '/api/ai': {
+      '/api': {
         target: 'https://med-quests-apps.mostafa-yaser-developer.workers.dev',
         changeOrigin: true,
+        headers: {
+          origin: 'https://med-quests-apps.mostafa-yaser-developer.workers.dev',
+        },
       },
     },
   },
