@@ -5,14 +5,12 @@ import type {
   FeatureFlagKey,
   PerformanceOverrideMode,
 } from '../../domain/auth/types.ts';
-import { resolveFeatureEntitlements } from '../../domain/auth/entitlements.ts';
 import type {
   ManagedUserRecord,
   SecurityAuditLogEntry,
 } from '../../domain/auth/governanceAnalytics.ts';
 import { edgeAuthGateway } from '../../infrastructure/auth/edgeAuthGateway.ts';
 import { googleOAuthClient } from '../../infrastructure/auth/googleOAuthClient.ts';
-import { appleOAuthClient } from '../../infrastructure/auth/appleOAuthClient.ts';
 import {
   probeClientCapabilities,
   probeClientCapabilitiesAsync,
@@ -20,17 +18,17 @@ import {
 } from '../../infrastructure/auth/clientCapabilityProbe.ts';
 import type { ProgressSyncSummary } from '../../../specs/003-edge-auth-adaptive-telemetry/contracts/auth-telemetry-ports.ts';
 import { analytics } from '../../infrastructure/analytics/medQuestsAnalyticsFacade.ts';
-
-function syncAnalyticsIdentity(state: AuthState): void {
-  if (state.status === 'authenticated-active') {
-    analytics.identifyAuthenticatedUser({
-      userId: state.user.id,
-      role: state.user.role,
-      universityCohort: state.user.universityName ?? undefined,
-      accountStatus: 'active',
-    });
-  }
-}
+import {
+  syncAnalyticsIdentity,
+  executeGoogleSignIn,
+  executeAppleSignIn,
+} from './auth/oauthSignInService.ts';
+import {
+  executeAdminUpdateUserRole,
+  executeAdminSetUserRestriction,
+  executeQuarantineAnomalousAccounts,
+  executePurgeDemoData,
+} from './auth/authGovernanceService.ts';
 
 export type AuthModalTab = 'sign-in' | 'security-devices' | 'hardware-tier';
 export type GovernanceViewTab =
@@ -116,11 +114,9 @@ const useAuthStoreBase = create<AuthStoreState>((set, get) => ({
   notificationToast: null,
 
   init: () => {
-    // 1. Probe hardware capabilities and bind data-perf-tier to document element
     const profile = probeClientCapabilities(get().performanceOverride);
     const unbind = bindAdaptiveCompositorAttributes(profile);
 
-    // 2. Non-blocking background revalidation & OAuth redirect hash consumption
     if (typeof window !== 'undefined') {
       void googleOAuthClient.loadScript().catch(() => {});
 
@@ -314,150 +310,37 @@ const useAuthStoreBase = create<AuthStoreState>((set, get) => ({
   },
 
   signInWithGoogle: async (testEmail?: string) => {
-    try {
-      const isHeadlessTest =
-        typeof window === 'undefined' ||
-        (typeof navigator !== 'undefined' && /jsdom|HappyDOM/i.test(navigator.userAgent || '')) ||
-        Boolean(typeof process !== 'undefined' && process.env?.NODE_ENV === 'test');
-
-      let googleAuth: { claims: { email: string; name: string; picture?: string; sub: string }; idToken: string };
-
-      if (isHeadlessTest && testEmail) {
-        // STRICTLY for headless test suite execution (Vitest / Node.js)
-        const isOwner = testEmail.toLowerCase().includes('mostafa.yaser.developer');
-        googleAuth = {
-          idToken: `test_token_${Date.now()}`,
-          claims: {
-            sub: isOwner ? 'usr_owner_mostafa' : `sub_${Date.now()}`,
-            email: testEmail,
-            name: isOwner ? 'Mostafa Yaser (Platform Owner)' : 'Medical Scholar',
-            picture: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80',
-          },
-        };
-      } else {
-        // PRODUCTION & BROWSER: ALWAYS invoke real Google Identity Services OAuth
-        googleAuth = await googleOAuthClient.signIn();
-      }
-
-      const clientProfile = await probeClientCapabilitiesAsync(get().performanceOverride);
-      const email = isHeadlessTest && testEmail ? testEmail : googleAuth.claims.email;
-
-      const result = await edgeAuthGateway.signIn({
-        email,
-        displayName: googleAuth.claims.name,
-        avatarUrl: googleAuth.claims.picture,
-        idToken: googleAuth.idToken,
-        claims: googleAuth.claims as unknown as Record<string, unknown>,
-        provider: 'google',
-        clientProfile,
-      });
-
-      if (result.ok) {
-        const managedUsers = edgeAuthGateway.getManagedUsers();
-        syncAnalyticsIdentity(result.value.state);
-        set({
-          authState: result.value.state,
-          syncSummary: result.value.syncSummary,
-          managedUsers,
-          selectedManagedUserId: result.value.state.user.id,
-          isModalOpen: false,
-          notificationToast: {
-            type: 'success',
-            message: `Signed in with Google as ${result.value.state.user.displayName}! Study history merged.`,
-          },
-        });
-        return true;
-      } else {
-        const errorMessage =
-          'message' in result.error
-            ? result.error.message
-            : result.error.code === 'ACCOUNT_BLOCKED'
-            ? `Account blocked: ${result.error.restriction.blockedReason || 'Administrative restriction'}`
-            : 'Google authentication failed';
-
-        set({
-          notificationToast: {
-            type: 'error',
-            message: errorMessage,
-          },
-        });
-        return false;
-      }
-    } catch (err) {
+    const res = await executeGoogleSignIn(testEmail, get().performanceOverride);
+    if (res.ok && res.state) {
       set({
-        notificationToast: {
-          type: 'error',
-          message: err instanceof Error ? err.message : 'Google authentication encountered an unexpected error',
-        },
+        authState: res.state,
+        syncSummary: res.syncSummary ?? null,
+        managedUsers: res.managedUsers ?? get().managedUsers,
+        selectedManagedUserId: res.state.user.id,
+        isModalOpen: false,
+        notificationToast: res.toast,
       });
-      return false;
+      return true;
     }
+    set({ notificationToast: res.toast });
+    return false;
   },
 
   signInWithApple: async (testEmail?: string) => {
-    try {
-      const isHeadlessTest =
-        typeof window === 'undefined' ||
-        (typeof navigator !== 'undefined' && /jsdom|HappyDOM/i.test(navigator.userAgent || '')) ||
-        Boolean(typeof process !== 'undefined' && process.env?.NODE_ENV === 'test');
-      const appleAuth = await appleOAuthClient.signIn();
-      const clientProfile = probeClientCapabilities(get().performanceOverride);
-
-      const resolvedDisplayName = appleAuth.user?.name
-        ? `${appleAuth.user.name.firstName || ''} ${appleAuth.user.name.lastName || ''}`.trim()
-        : undefined;
-
-      const email = isHeadlessTest && testEmail ? testEmail : appleAuth.claims.email;
-
-      const result = await edgeAuthGateway.signIn({
-        email,
-        displayName: resolvedDisplayName || undefined,
-        idToken: appleAuth.idToken,
-        claims: appleAuth.claims as unknown as Record<string, unknown>,
-        provider: 'apple',
-        clientProfile,
-      });
-
-      if (result.ok) {
-        const managedUsers = edgeAuthGateway.getManagedUsers();
-        syncAnalyticsIdentity(result.value.state);
-        set({
-          authState: result.value.state,
-          syncSummary: result.value.syncSummary,
-          managedUsers,
-          selectedManagedUserId: result.value.state.user.id,
-          isModalOpen: false,
-          notificationToast: {
-            type: 'success',
-            message: `Signed in with Apple as ${result.value.state.user.displayName}! Study history merged.`,
-          },
-        });
-        return true;
-      } else {
-        const errorMessage =
-          'message' in result.error
-            ? result.error.message
-            : result.error.code === 'ACCOUNT_BLOCKED'
-            ? `Account blocked: ${result.error.restriction.blockedReason || 'Administrative restriction'}`
-            : 'Apple ID authentication failed';
-
-        set({
-          notificationToast: {
-            type: 'error',
-            message: errorMessage,
-          },
-        });
-        return false;
-      }
-    } catch (err) {
+    const res = await executeAppleSignIn(testEmail, get().performanceOverride);
+    if (res.ok && res.state) {
       set({
-        notificationToast: {
-          type: 'error',
-          message: err instanceof Error ? err.message : 'Apple ID sign-in encountered an unexpected error',
-        },
+        authState: res.state,
+        syncSummary: res.syncSummary ?? null,
+        managedUsers: res.managedUsers ?? get().managedUsers,
+        selectedManagedUserId: res.state.user.id,
+        isModalOpen: false,
+        notificationToast: res.toast,
       });
-      return false;
+      return true;
     }
+    set({ notificationToast: res.toast });
+    return false;
   },
 
   elevateToPlatformOwner: async () => {
@@ -595,59 +478,17 @@ const useAuthStoreBase = create<AuthStoreState>((set, get) => ({
     newRole: UserRole,
     customOverrides = {}
   ) => {
-    const current = get().authState;
-    const actorName =
-      current.status === 'authenticated-active' ? current.user.displayName : 'Platform Admin';
-
-    const updatedRecord = edgeAuthGateway.updateManagedUserRoleAndFeatures({
+    const res = executeAdminUpdateUserRole(
+      get().authState,
       targetUserId,
       newRole,
-      customFeatureOverrides: customOverrides,
-      actorDisplayName: actorName,
-    });
-
-    const managedUsers = [...edgeAuthGateway.getManagedUsers()];
-    const auditLogs = [...edgeAuthGateway.getAuditLogs()];
-
-    if (current.status === 'authenticated-active' && current.user.id === targetUserId) {
-      const updatedUser = updatedRecord
-        ? updatedRecord.profile
-        : {
-            ...current.user,
-            role: newRole,
-            customFeatureOverrides: {
-              ...current.user.customFeatureOverrides,
-              ...customOverrides,
-            },
-          };
-      const updatedEntitlements = resolveFeatureEntitlements(
-        newRole,
-        updatedUser.customFeatureOverrides
-      );
-
-      set({
-        authState: {
-          ...current,
-          user: updatedUser,
-          entitlements: updatedEntitlements,
-        },
-        managedUsers,
-        auditLogs,
-        notificationToast: {
-          type: 'success',
-          message: `Updated ${updatedUser.displayName} (${newRole}). Workers KV synchronized.`,
-        },
-      });
-      return;
-    }
-
+      customOverrides
+    );
     set({
-      managedUsers,
-      auditLogs,
-      notificationToast: {
-        type: 'success',
-        message: `Updated ${updatedRecord?.profile.displayName ?? targetUserId} (${newRole}). Edge KV cache invalidated.`,
-      },
+      ...(res.updatedAuthState ? { authState: res.updatedAuthState } : {}),
+      managedUsers: res.managedUsers,
+      auditLogs: res.auditLogs,
+      notificationToast: res.toast,
     });
   },
 
@@ -657,116 +498,38 @@ const useAuthStoreBase = create<AuthStoreState>((set, get) => ({
     reason = null,
     blockedUntil = null
   ) => {
-    const current = get().authState;
-    const actorName =
-      current.status === 'authenticated-active' ? current.user.displayName : 'Platform Admin';
-
-    const updatedRecord = edgeAuthGateway.setManagedUserRestriction({
+    const res = executeAdminSetUserRestriction(
+      get().authState,
       targetUserId,
       status,
       reason,
-      blockedUntil,
-      actorDisplayName: actorName,
-    });
-
-    const managedUsers = [...edgeAuthGateway.getManagedUsers()];
-    const auditLogs = [...edgeAuthGateway.getAuditLogs()];
-
-    if (current.status === 'authenticated-active' && current.user.id === targetUserId) {
-      const nowIso = new Date().toISOString();
-      const restriction = updatedRecord?.profile.restriction ?? {
-        status,
-        blockedReason: reason,
-        blockedUntil,
-        blockedByUserId: 'usr_admin',
-        updatedAt: nowIso,
-      };
-
-      if (status === 'blocked') {
-        set({
-          authState: {
-            status: 'account-blocked',
-            user: { ...current.user, restriction },
-            restriction,
-            edgeNetwork: current.currentSession.edgeNetwork,
-            clientProfile: current.clientProfile,
-          },
-          managedUsers,
-          auditLogs,
-          isGovernanceDrawerOpen: false,
-          isModalOpen: false,
-          notificationToast: {
-            type: 'error',
-            message: 'Account restricted. Edge KV guard enforced globally.',
-          },
-        });
-      } else {
-        set({
-          authState: {
-            ...current,
-            user: { ...current.user, restriction },
-          },
-          managedUsers,
-          auditLogs,
-          notificationToast: {
-            type: 'success',
-            message: 'Account restriction cleared.',
-          },
-        });
-      }
-      return;
-    }
-
+      blockedUntil
+    );
     set({
-      managedUsers,
-      auditLogs,
-      notificationToast: {
-        type: status === 'active' ? 'success' : 'error',
-        message:
-          status === 'active'
-            ? `Unblocked ${updatedRecord?.profile.displayName ?? targetUserId}. Access restored.`
-            : `Enforced ${status.toUpperCase()} on ${updatedRecord?.profile.displayName ?? targetUserId}. All active KV sessions evicted.`,
-      },
+      ...(res.updatedAuthState ? { authState: res.updatedAuthState } : {}),
+      managedUsers: res.managedUsers,
+      auditLogs: res.auditLogs,
+      notificationToast: res.toast,
+      ...(status === 'blocked' ? { isGovernanceDrawerOpen: false, isModalOpen: false } : {}),
     });
   },
 
   quarantineAnomalousAccounts: async () => {
-    const current = get().authState;
-    const actorName =
-      current.status === 'authenticated-active' ? current.user.displayName : 'Platform Admin';
-    const count = edgeAuthGateway.quarantineAnomalousAccounts(actorName);
-    const managedUsers = [...edgeAuthGateway.getManagedUsers()];
-    const auditLogs = [...edgeAuthGateway.getAuditLogs()];
-
+    const res = executeQuarantineAnomalousAccounts(get().authState);
     set({
-      managedUsers,
-      auditLogs,
-      notificationToast: {
-        type: count > 0 ? 'info' : 'success',
-        message:
-          count > 0
-            ? `Quarantined ${count} account(s) flagged with security anomalies.`
-            : 'No active unquarantined security anomalies detected.',
-      },
+      managedUsers: res.managedUsers,
+      auditLogs: res.auditLogs,
+      notificationToast: res.toast,
     });
   },
 
   purgeDemoData: async () => {
-    const { purgedUsersCount } = edgeAuthGateway.purgeDemoData();
-    const managedUsers = [...edgeAuthGateway.getManagedUsers()];
-    const auditLogs = [...edgeAuthGateway.getAuditLogs()];
-
+    const res = executePurgeDemoData();
     set({
-      managedUsers,
-      auditLogs,
-      selectedManagedUserId: managedUsers[0]?.profile.id ?? null,
-      notificationToast: {
-        type: 'success',
-        message:
-          purgedUsersCount > 0
-            ? `Purged ${purgedUsersCount} demo account(s). Directory clean for production.`
-            : 'Directory is already clean for production.',
-      },
+      managedUsers: res.managedUsers,
+      auditLogs: res.auditLogs,
+      selectedManagedUserId: res.selectedManagedUserId,
+      notificationToast: res.toast,
     });
   },
 }));
@@ -779,8 +542,7 @@ export const useAuthStore = Object.assign(
       const state = useAuthStoreBase.getState();
       return selector ? selector(state) : (state as unknown as U);
     }
-    return useAuthStoreBase(selector as any);
+    return useAuthStoreBase(selector as (state: AuthStoreState) => U);
   },
   useAuthStoreBase
 ) as typeof useAuthStoreBase;
-
