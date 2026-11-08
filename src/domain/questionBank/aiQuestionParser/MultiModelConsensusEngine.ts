@@ -18,6 +18,7 @@ import type {
   ModelAnswerVerdict,
   ConsensusVerdict,
 } from './types.ts';
+import type { AiCopilotSettings } from '../../ai/settings.ts';
 import { createCloudProvider } from '../../../infrastructure/ai/engineRegistry.ts';
 
 export interface IMultiModelConsensusEngine {
@@ -74,8 +75,8 @@ export class MultiModelConsensusEngine implements IMultiModelConsensusEngine {
   ): Promise<MultiModelConsensusSummary> {
     const isTestEnv = Boolean(
       (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') ||
-      (import.meta as any).env?.VITEST ||
-      (import.meta as any).env?.MODE === 'test'
+      import.meta.env?.VITEST ||
+      import.meta.env?.MODE === 'test'
     );
 
     // Filter ensemble or prioritize preferred model
@@ -95,7 +96,7 @@ export class MultiModelConsensusEngine implements IMultiModelConsensusEngine {
       }
 
       try {
-        let userSettings: any = undefined;
+        let userSettings: AiCopilotSettings | undefined = undefined;
         try {
           const { useAiSettingsStore } = await import('../../../application/stores/useAiSettingsStore.ts');
           userSettings = useAiSettingsStore.getState()?.settings;
@@ -158,9 +159,10 @@ export class MultiModelConsensusEngine implements IMultiModelConsensusEngine {
           latencyMs: duration,
           status: 'success',
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
         const duration = Math.round(performance.now() - startTime);
-        const isTimeout = err?.name === 'AbortError';
+        const isTimeout = err instanceof Error && err.name === 'AbortError';
+        const errorMessage = err instanceof Error ? err.message : undefined;
 
         // STRICT PRODUCTION INTEGRITY: If an external model times out or errors,
         // record the truthful error rather than synthesizing a fraudulent vote.
@@ -172,10 +174,10 @@ export class MultiModelConsensusEngine implements IMultiModelConsensusEngine {
           confidenceScore: 0,
           clinicalRationale: isTimeout
             ? 'Inference call timed out after 10 seconds.'
-            : (err?.message || 'Model API error'),
+            : (errorMessage || 'Model API error'),
           latencyMs: duration,
           status: isTimeout ? 'timeout' : 'error',
-          errorMessage: isTimeout ? 'API call timed out after 10s' : (err?.message || 'Inference error'),
+          errorMessage: isTimeout ? 'API call timed out after 10s' : (errorMessage || 'Inference error'),
         };
       }
     });
