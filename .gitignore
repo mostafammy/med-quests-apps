@@ -26,3 +26,6 @@ scratch/
 .eslintcache
 /CVS/
 *.tsbuildinfo
+
+# Local HTTP captures (may contain cookies/tokens)
+*.har
