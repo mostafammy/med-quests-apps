@@ -179,7 +179,7 @@ export class SwitchBlockUseCase implements ISwitchBlockUseCase {
         durationMs,
         cold: false,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       // If superseded, don't rollback
       if (epoch !== this.currentEpoch) {
         return { kind: 'superseded', byEpoch: this.currentEpoch };
@@ -198,7 +198,7 @@ export class SwitchBlockUseCase implements ISwitchBlockUseCase {
         error: {
           code: 'hydration-failed',
           blockId: to,
-          cause: err.message || 'Unknown hydration error',
+          cause: err instanceof Error && err.message ? err.message : 'Unknown hydration error',
         },
       };
     }
