@@ -22,7 +22,7 @@ export async function withTimeout<T>(
     parentSignal.addEventListener('abort', onParentAbort, { once: true });
   }
 
-  let timer: any = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
   const timeoutPromise = new Promise<Result<T, QddDegradationReason>>((resolve) => {
     timer = setTimeout(() => {
       controller.abort();
