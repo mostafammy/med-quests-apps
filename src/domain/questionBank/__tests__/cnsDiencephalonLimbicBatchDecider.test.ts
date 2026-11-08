@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { QuestionParsingAgent } from '../aiQuestionParser/QuestionParsingAgent.ts';
-import { CurriculumTaxonomyRegistry } from '../../taxonomy/CurriculumTaxonomyRegistry.ts';
 import { CrossModelVerificationPromptBuilder } from '../aiQuestionParser/CrossModelVerificationPromptBuilder.ts';
+import type { BlockId } from '../../curriculum/ids.ts';
 
 const RAW_18_ITEM_DIENCEPHALON_LIMBIC_BATCH = `
 # MedQuests Global Question Bank Batch Verification (18 Items)
@@ -254,7 +254,7 @@ describe('CNS Diencephalon & Limbic System 18-Item Batch Decider & Audit', () =>
       rawText: RAW_18_ITEM_DIENCEPHALON_LIMBIC_BATCH,
       providerId: 'gemini',
       modelId: 'gemini-2.5-flash',
-      targetBlockId: 'cns',
+      targetBlockId: 'cns' as BlockId,
     });
 
     expect(result.items.length).toBe(18);
@@ -288,7 +288,7 @@ describe('CNS Diencephalon & Limbic System 18-Item Batch Decider & Audit', () =>
       rawText: RAW_18_ITEM_DIENCEPHALON_LIMBIC_BATCH,
       providerId: 'gemini',
       modelId: 'gemini-2.5-flash',
-      targetBlockId: 'cns',
+      targetBlockId: 'cns' as BlockId,
     });
 
     const batchPrompt = CrossModelVerificationPromptBuilder.buildBatchQuestionsPrompt(result.items);
@@ -305,7 +305,9 @@ describe('CNS Diencephalon & Limbic System 18-Item Batch Decider & Audit', () =>
     const agent = new QuestionParsingAgent();
     const result = await agent.parseRawQuestions({
       rawText: RAW_18_ITEM_DIENCEPHALON_LIMBIC_BATCH,
-      targetBlockId: 'cns',
+      providerId: 'gemini',
+      modelId: 'gemini-2.5-flash',
+      targetBlockId: 'cns' as BlockId,
     });
 
     expect(result.items[0].question.concept).toBe(
