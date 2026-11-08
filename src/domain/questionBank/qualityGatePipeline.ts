@@ -130,7 +130,10 @@ export class NoHardcodedChoiceLetterReferenceRule implements IQuestionQualityRul
         code: 'SCHEMA_VALIDATION_FAILED',
         itemIndex: index,
         fieldPath: 'fieldPath' in v ? v.fieldPath : 'stem',
-        message: 'message' in v ? (v as any).message : 'Validation failed',
+        message:
+          'message' in v && typeof (v as { message?: unknown }).message === 'string'
+            ? (v as { message: string }).message
+            : 'Validation failed',
       });
     }
     return ok(undefined);
