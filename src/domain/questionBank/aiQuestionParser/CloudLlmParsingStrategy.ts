@@ -26,7 +26,36 @@ export class CloudLlmParsingStrategy {
     request: RawQuestionParseRequest,
     isVignetteMode: boolean
   ): string {
-    return `You are an elite Medical Examination Specialist and USMLE/Cardiovascular Board Faculty Member.
+    const rawTargetBlock = (request.targetBlockId || LEGACY_DEFAULT_BLOCK_ID).toLowerCase();
+    const isCns =
+      rawTargetBlock === 'cns' ||
+      /cns|neuro|brain|supratentorial|cortex|capsule/i.test(request.rawText.slice(0, 300));
+
+    const specialty = isCns
+      ? 'Medical Examination Specialist and USMLE/Central Nervous System Board Faculty Member'
+      : 'Medical Examination Specialist and USMLE/Cardiovascular Board Faculty Member';
+    const blockCode = isCns ? 'cns' : 'cvs';
+    const syllabusTitle = isCns
+      ? 'Central Nervous System Curriculum Core Syllabus'
+      : 'Cardiovascular Curriculum Core Syllabus';
+    const subjectsAllowed = isCns
+      ? "'anatomy' | 'physiology' | 'histology' | 'pathology-micro' | 'pharmacology'"
+      : "'anatomy' | 'physiology' | 'pharmacology' | 'microbiology'";
+
+    const cnsChapterGuidance = isCns
+      ? `
+8. CURRICULUM GROUNDING (CNS - BLOCK 207):
+   - Neuroanatomy Chapters:
+     * "cns-ana-white-matter-internal-capsule" (Cerebral White Matter, Projection Fibers & Internal Capsule Limbs/Stroke)
+     * "cns-ana-cerebral-cortex-vascular" (Cerebral Hemispheres, Cortical Areas & Circle of Willis)
+     * "cns-ana-cerebellum-basal-ganglia" (Cerebellum, Basal Ganglia & Diencephalon)
+     * "cns-ana-brainstem-cranial-nerves" (Brainstem Levels & Cranial Nerve Nuclei)
+     * "cns-ana-spinal-cord-tracts" (Spinal Cord Structure & Ascending/Descending Tracts)
+     * "cns-ana-embryology-meninges-csf" (Neural Tube, Meninges & CSF Dynamics - ONLY for neurulation defects, meningeal folds, hydrocephalus)
+   - Assign the exact chapterId above that matches the question's anatomical scope. NEVER default Internal Capsule questions to Neural Tube!`
+      : '';
+
+    return `You are an elite ${specialty}.
 Your mission is to parse unformatted raw medical questions, clinical lecture notes, or rough drafts into strictly formatted, board-standard Single-Best-Answer (SBA) MCQs.
 
 CRITICAL CLINICAL & PEDAGOGICAL REQUIREMENTS:
@@ -51,7 +80,7 @@ CRITICAL CLINICAL & PEDAGOGICAL REQUIREMENTS:
 6. METADATA:
    - difficulty: 1 (fundamental), 2 (standard board level), or 3 (complex multisystem).
    - cognitiveLevel: ${isVignetteMode ? "'application'" : "'recall' | 'understanding' | 'application'"}.
-   - subjectId: ${request.targetSubjectId ? `'${request.targetSubjectId}'` : "'anatomy' | 'physiology' | 'pharmacology' | 'microbiology'"}
+   - subjectId: ${request.targetSubjectId ? `'${request.targetSubjectId}'` : subjectsAllowed}
    - highYield: true.
 7. STEM INTEGRITY & FORMATTING (CURRENT MODE: ${isVignetteMode ? 'USMLE VIGNETTE ENRICHMENT' : 'VERBATIM / STRICT AUTHOR FIDELITY'}):
 ${
@@ -66,7 +95,7 @@ ${
    - Set "stem" to this verbatim stem.
    - Set "originalRawStem" to this verbatim stem.
    - You may ALSO provide an optional USMLE clinical vignette version in "enrichedVignetteStem" for the administrator to review.`
-}
+}${cnsChapterGuidance}
 
 RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no backticks, no conversational text):
 {
@@ -83,7 +112,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
       "warnings": ["<any notices>"],
       "question": {
         "id": "q-parsed-<timestamp>-1",
-        "blockId": "cvs",
+        "blockId": "${blockCode}",
         "subjectId": "<subject>",
         "chapterId": "<chapter-id>",
         "topicId": "<topic-id>",
@@ -106,7 +135,7 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
         "evidence": [
           {
             "chunkId": "chunk-evidence-1",
-            "sourceName": "Cardiovascular Curriculum Core Syllabus",
+            "sourceName": "${syllabusTitle}",
             "location": "Clinical Reference Guidelines",
             "quote": "Key pathophysiological principles grounding this clinical item.",
             "kind": "text"
@@ -309,12 +338,24 @@ RETURN STRICTLY A JSON OBJECT matching this format (no markdown code blocks, no 
         const selectedCorrectChoiceId = (correctChoice?.id as ChoiceId) || 'a';
 
         const choicesStr = (finalQuestion.choices || []).map((c) => c.text).join(' ');
+        const isCns =
+          (request.targetBlockId || '').toLowerCase() === 'cns' ||
+          finalQuestion.blockId === 'cns' ||
+          /cns|neuro|brain|supratentorial|capsule|cortex/i.test(finalQuestion.stem);
+
+        if (isCns) {
+          finalQuestion.blockId = 'cns';
+        }
+
         const classification =
           item.taxonomyClassification ||
           curriculumClassificationAgent.classify(
             finalQuestion.stem,
             choicesStr,
-            finalQuestion.explanation
+            finalQuestion.explanation,
+            isCns
+              ? { id: 'cns', name: 'Central Nervous System', code: 'Block 207', shortName: 'CNS' }
+              : undefined
           );
 
         if (
