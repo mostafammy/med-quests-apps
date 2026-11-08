@@ -308,7 +308,7 @@ describe('CrossModelVerificationPromptBuilder (External LLM Cross-Examination)',
       modelId: 'gemini-2.5-pro',
       async *streamTurn() {
         yield {
-          type: 'text',
+          type: 'text' as const,
           delta: JSON.stringify({
             items: [
               {
