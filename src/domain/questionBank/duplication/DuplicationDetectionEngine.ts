@@ -96,7 +96,7 @@ export class DuplicationDetectionEngine implements IDuplicationDetectionEngine {
       context.stagesExecuted.push(stage.id);
       try {
         await stage.execute(context);
-      } catch (stageErr: any) {
+      } catch {
         context.degradedReasons.push('STAGE_TIMEOUT');
       }
     }
@@ -162,9 +162,9 @@ export class DuplicationDetectionEngine implements IDuplicationDetectionEngine {
         const qB = questions[j];
 
         let relation: DuplicateRelation | null = null;
-        let decidedBy: any = 'S1_EXACT';
+        let decidedBy: DuplicateCandidate['decidedBy'] = 'S1_EXACT';
         let jaccard: number | null = null;
-        let delta: readonly any[] = [];
+        let delta: DuplicateCandidate['signals']['discriminatorDelta'] = [];
 
         if (cA.itemHash === cB.itemHash) {
           relation = 'EXACT';
