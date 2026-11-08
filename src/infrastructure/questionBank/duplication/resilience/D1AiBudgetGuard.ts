@@ -19,11 +19,20 @@ const DEFAULT_CAPS: BudgetCaps = {
   llm: 150,
 };
 
+export interface D1BudgetDbLike {
+  prepare(sql: string): {
+    bind(...params: unknown[]): {
+      first<T = { units?: number }>(): Promise<T | null>;
+      run(): Promise<unknown>;
+    };
+  };
+}
+
 export class D1AiBudgetGuard implements IAiBudgetGuard {
   private readonly caps: BudgetCaps;
 
   constructor(
-    private readonly db: any,
+    private readonly db: D1BudgetDbLike | null | undefined,
     customCaps?: Partial<BudgetCaps>
   ) {
     this.caps = { ...DEFAULT_CAPS, ...customCaps };
