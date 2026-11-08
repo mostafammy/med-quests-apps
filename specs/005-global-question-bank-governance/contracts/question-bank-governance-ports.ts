@@ -12,18 +12,22 @@ import type {
   TopicId,
   QuestionId,
   Question,
+  QuestionEditableField,
   Choice,
   Evidence,
   IsoDateTime,
 } from '../../../src/domain/model/types.ts';
 
 export type {
+  UserId,
+  UserRole,
   BlockId,
   SubjectId,
   ChapterId,
   TopicId,
   QuestionId,
   Question,
+  QuestionEditableField,
   Choice,
   Evidence,
   IsoDateTime,
@@ -285,22 +289,12 @@ export interface EditorialDecisionCommand {
 
 /**
  * Typed mutation patch for editing an existing question or inline-refining a submission.
+ * Derived directly from QuestionEditableField (Single Source of Truth) so any field
+ * added to QuestionObjectSchema automatically propagates here.
  */
-export interface QuestionMutationPatch {
-  readonly subjectId?: SubjectId;
-  readonly chapterId?: ChapterId;
-  readonly topicId?: TopicId;
-  readonly concept?: string;
-  readonly stem?: string;
-  readonly choices?: Choice[];
-  readonly explanation?: string;
-  readonly examTip?: string | null;
-  readonly mnemonic?: string | null;
-  readonly difficulty?: 1 | 2 | 3;
-  readonly cognitiveLevel?: 'recall' | 'understanding' | 'application';
-  readonly highYield?: boolean;
-  readonly evidence?: Evidence[];
-}
+export type QuestionMutationPatch = {
+  readonly [K in QuestionEditableField]?: Question[K];
+};
 
 /**
  * Immutable audit record for every editorial or administrative question mutation.
