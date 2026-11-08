@@ -100,6 +100,13 @@ export interface RawQuestionParseRequest {
   readonly onTelemetryUpdate?: (telemetry: AgentExecutionTelemetry) => void;
 }
 
+export interface DraftTaxonomyScope {
+  readonly blockId?: string;
+  readonly blockName?: string;
+  readonly subjectName?: string;
+  readonly chapterName?: string;
+}
+
 export interface ParsedQuestionItem {
   readonly tempId: string;
   readonly rawInputExcerpt: string;
@@ -122,6 +129,10 @@ export interface ParsedQuestionItem {
   readonly isApproved: boolean;
   /** Dynamic AI Curriculum Taxonomy Assignment & Gap Analysis */
   readonly taxonomyClassification?: TaxonomyClassificationResult;
+  /** Author's original/draft taxonomy if detected in input (prior to AI reclassification) */
+  readonly originalDraftTaxonomy?: DraftTaxonomyScope;
+  /** Indicates whether the AI reclassified the chapter/subject away from the author's draft */
+  readonly isReclassified?: boolean;
   /** Multi-Model Cross-Examination Consensus Audit (if run) */
   readonly consensusSummary?: MultiModelConsensusSummary;
   /** Question Duplication Detection Engine Verdict & Candidates */
