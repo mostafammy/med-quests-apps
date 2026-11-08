@@ -21,6 +21,7 @@ import {
 interface FloatingBatchCommandBarProps {
   readonly totalCount: number;
   readonly selectedCount: number;
+  readonly uniqueCount?: number;
   readonly isCommitting: boolean;
   readonly isCheckingDuplication: boolean;
   readonly copiedBatchPrompt: boolean;
@@ -33,6 +34,7 @@ interface FloatingBatchCommandBarProps {
 export const FloatingBatchCommandBar: React.FC<FloatingBatchCommandBarProps> = ({
   totalCount,
   selectedCount,
+  uniqueCount,
   isCommitting,
   isCheckingDuplication,
   copiedBatchPrompt,
@@ -100,15 +102,32 @@ export const FloatingBatchCommandBar: React.FC<FloatingBatchCommandBarProps> = (
           <button
             type="button"
             onClick={onSaveAllUnique}
-            disabled={isCommitting || isCheckingDuplication || totalCount === 0}
-            title="Automatically skip all questions flagged as duplicates or conflicts and commit only unique items to the bank"
+            disabled={
+              isCommitting ||
+              isCheckingDuplication ||
+              totalCount === 0 ||
+              (uniqueCount !== undefined && uniqueCount === 0)
+            }
+            title={
+              uniqueCount === 0
+                ? 'No unique questions found in this batch (all items have collisions or duplicates)'
+                : `Automatically skip all questions flagged as duplicates or conflicts and commit ${
+                    uniqueCount !== undefined ? `${uniqueCount} ` : ''
+                  }unique item(s) to the bank`
+            }
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-blue-600/90 hover:bg-blue-500 border border-blue-400/30 text-white transition-all cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
           >
             <ShieldCheck className="w-3.5 h-3.5 text-blue-200" />
             <span className="hidden sm:inline">
-              {isCommitting ? 'Saving…' : 'Save all unique'}
+              {isCommitting
+                ? 'Saving…'
+                : uniqueCount !== undefined
+                ? `Save all unique (${uniqueCount})`
+                : 'Save all unique'}
             </span>
-            <span className="sm:hidden">Unique</span>
+            <span className="sm:hidden">
+              {uniqueCount !== undefined ? `Unique (${uniqueCount})` : 'Unique'}
+            </span>
           </button>
 
           {/* Primary Commit Button */}
