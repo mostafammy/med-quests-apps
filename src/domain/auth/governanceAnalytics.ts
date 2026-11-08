@@ -63,6 +63,8 @@ export interface SecurityAuditLogEntry {
   readonly createdAt: string;
 }
 
+export type GovernanceAuditEntry = SecurityAuditLogEntry;
+
 // ==========================================
 // 2. SPECIFICATION PATTERN: USER DIRECTORY FILTERING
 // ==========================================
@@ -208,6 +210,8 @@ export interface PlatformAnalyticsSnapshot {
   readonly coloDistribution: readonly ColoTrafficStat[];
   readonly universityCohorts: readonly UniversityCohortStat[];
 }
+
+export type PlatformAnalyticsSummary = PlatformAnalyticsSnapshot;
 
 export interface IPlatformAnalyticsAggregator {
   aggregate(users: readonly ManagedUserRecord[]): PlatformAnalyticsSnapshot;
